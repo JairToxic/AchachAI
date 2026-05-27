@@ -169,7 +169,9 @@ def generate_documentos(siniestros: pd.DataFrame) -> pd.DataFrame:
             incons = entregado and legible and (RNG.random() < p_incons)
             try:
                 fecha_oc = pd.to_datetime(sin["fecha_ocurrencia"])
-                offset = int(RNG.integers(-2, 10)) if not incons else int(RNG.integers(-30, -3))
+                # BUGFIX: rango normal SOLO posterior al evento (1 a 10 dias).
+                # Antes era (-2, 10) lo que disparaba RF-02 (factura previa) en ~20% de casos NO fraude.
+                offset = int(RNG.integers(1, 10)) if not incons else int(RNG.integers(-30, -3))
                 fecha_emision = (fecha_oc + pd.Timedelta(days=offset)).strftime("%Y-%m-%d")
             except Exception:
                 fecha_emision = None
