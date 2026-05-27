@@ -195,15 +195,21 @@ def test_signal_reporte_tardio_no_aplica_a_robo(siniestro):
     assert signal_reporte_tardio(siniestro) is None
 
 
-# ---------- Senal 13: narrativas similares ----------
-def test_signal_narrativa_alta_similitud(siniestro, ctx_vacio):
-    ctx_vacio.similitud_max_por_siniestro = {siniestro["id_siniestro"]: 0.92}
+# ---------- Senal 13: narrativas similares (top-K) ----------
+def test_signal_narrativa_en_topk(siniestro, ctx_vacio):
+    """Si esta en top-K dispara, no importa el valor absoluto de sim."""
+    ctx_vacio.ids_en_topk_similar = {siniestro["id_siniestro"]}
+    ctx_vacio.similitud_max_por_siniestro = {siniestro["id_siniestro"]: 0.95}
     result = signal_narrativas_similares(siniestro, ctx_vacio)
+    assert result is not None
     assert result["puntos"] == 8
 
 
-def test_signal_narrativa_sin_similitud(siniestro, ctx_vacio):
-    ctx_vacio.similitud_max_por_siniestro = {siniestro["id_siniestro"]: 0.10}
+def test_signal_narrativa_sin_topk_no_dispara(siniestro, ctx_vacio):
+    """Aunque la sim sea 0.99, si no esta en top-K NO dispara
+    (evita inflar la senal cuando el dominio textual es homogeneo)."""
+    ctx_vacio.ids_en_topk_similar = set()  # NO esta en top-K
+    ctx_vacio.similitud_max_por_siniestro = {siniestro["id_siniestro"]: 0.99}
     assert signal_narrativas_similares(siniestro, ctx_vacio) is None
 
 

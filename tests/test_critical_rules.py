@@ -119,13 +119,23 @@ def test_rf06_negativo_robo_rapido(siniestro):
     assert rf06_demora_robo(siniestro) is None
 
 
-# ---------- RF-07: narrativa clonada ----------
-def test_rf07_positivo(siniestro, ctx_vacio):
-    ctx_vacio.similitud_max_por_siniestro = {siniestro["id_siniestro"]: 0.95}
+# ---------- RF-07: narrativa clonada (top-K + sim>0.99) ----------
+def test_rf07_positivo_en_topk_y_alta_sim(siniestro, ctx_vacio):
+    """Necesita estar en top-K y tener sim >= 0.99."""
+    ctx_vacio.ids_en_topk_similar = {siniestro["id_siniestro"]}
+    ctx_vacio.similitud_max_por_siniestro = {siniestro["id_siniestro"]: 0.995}
     result = rf07_narrativa_clonada(siniestro, ctx_vacio)
     assert result is not None and result["codigo"] == "RF-07"
 
 
-def test_rf07_negativo(siniestro, ctx_vacio):
-    ctx_vacio.similitud_max_por_siniestro = {siniestro["id_siniestro"]: 0.10}
+def test_rf07_negativo_no_topk(siniestro, ctx_vacio):
+    """Aunque la sim sea altisima, sin estar en top-K NO dispara."""
+    ctx_vacio.similitud_max_por_siniestro = {siniestro["id_siniestro"]: 0.999}
+    assert rf07_narrativa_clonada(siniestro, ctx_vacio) is None
+
+
+def test_rf07_negativo_topk_pero_sim_baja(siniestro, ctx_vacio):
+    """Esta en top-K pero la sim no llega a 0.99 -> no dispara."""
+    ctx_vacio.ids_en_topk_similar = {siniestro["id_siniestro"]}
+    ctx_vacio.similitud_max_por_siniestro = {siniestro["id_siniestro"]: 0.96}
     assert rf07_narrativa_clonada(siniestro, ctx_vacio) is None

@@ -39,6 +39,8 @@ class Contexto:
     # Para senal 13 / RF-07: similitudes textuales precomputadas
     # {id_siniestro: similitud_maxima (0..1)}
     similitud_max_por_siniestro: dict[str, float] = field(default_factory=dict)
+    # Set de ids que estan en el top-K mas similares (clonados sospechosos reales)
+    ids_en_topk_similar: set[str] = field(default_factory=set)
 
     # Indice rapido de proveedores en lista restrictiva
     proveedores_lista_restrictiva: set[str] = field(default_factory=set)
@@ -62,6 +64,7 @@ def build_contexto(
     *,
     fecha_referencia: Optional[pd.Timestamp] = None,
     similitudes: Optional[dict[str, float]] = None,
+    similitudes_df: Optional[pd.DataFrame] = None,
 ) -> Contexto:
     """Construye el Contexto a partir de las tablas normalizadas.
 
@@ -102,8 +105,16 @@ def build_contexto(
     # Proveedores en lista restrictiva
     lista_rest = set(proveedores[proveedores["lista_restrictiva"]]["id_proveedor"].tolist())
 
-    # Similitudes
-    sims = similitudes or {sid: 0.0 for sid in s["id_siniestro"]}
+    # Similitudes (preferir similitudes_df si esta presente, mas completo)
+    if similitudes_df is not None:
+        sims = dict(zip(similitudes_df["id_siniestro"], similitudes_df["sim_topk"]))
+        ids_topk = set(similitudes_df.loc[similitudes_df["en_top_k"], "id_siniestro"])
+    elif similitudes is not None:
+        sims = similitudes
+        ids_topk = set()
+    else:
+        sims = {sid: 0.0 for sid in s["id_siniestro"]}
+        ids_topk = set()
 
     return Contexto(
         siniestros_por_asegurado_18m=sin_asegurado,
@@ -113,6 +124,7 @@ def build_contexto(
         casos_anuales_por_proveedor=casos_prov,
         umbral_recurrencia_proveedor=umbral,
         similitud_max_por_siniestro=sims,
+        ids_en_topk_similar=ids_topk,
         proveedores_lista_restrictiva=lista_rest,
         fecha_referencia=fecha_referencia.to_pydatetime(),
     )

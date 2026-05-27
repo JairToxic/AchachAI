@@ -225,16 +225,17 @@ def signal_reporte_tardio(siniestro: dict) -> dict | None:
 
 # ----------------- Senal 13: Narrativas similares -----------------
 def signal_narrativas_similares(siniestro: dict, ctx: Contexto) -> dict | None:
-    """Similitud >85% -> 8pts, 70-84% -> 4pts. Requiere embeddings precomputados."""
-    sim = ctx.similitud_max_por_siniestro.get(siniestro.get("id_siniestro"), 0.0)
-    if sim > 0.85:
-        pts = 8
-    elif sim >= 0.70:
-        pts = 4
-    else:
+    """Solo dispara si el siniestro esta en el TOP-K de pares mas similares globalmente.
+    Esto evita inflar la senal cuando TODO el dominio tiene similitud alta (texto homogeneo).
+    Si esta en top-K: 8pts. Si no (incluso con sim >0.95), no dispara.
+    """
+    sid = siniestro.get("id_siniestro")
+    if sid not in ctx.ids_en_topk_similar:
         return None
-    return {"id": 13, "nombre": "Narrativa similar a otro reclamo",
-            "puntos": pts, "evidencia": f"Similitud maxima de embeddings = {sim:.2%}"}
+    sim = ctx.similitud_max_por_siniestro.get(sid, 0.0)
+    return {"id": 13, "nombre": "Narrativa potencialmente clonada (top-K)",
+            "puntos": 8,
+            "evidencia": f"Esta entre los pares mas similares del dataset (sim={sim:.3f})"}
 
 
 # ----------------- Senal 14: Monto cercano o superior a suma asegurada -----------------

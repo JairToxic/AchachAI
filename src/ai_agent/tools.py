@@ -63,7 +63,14 @@ def top_riesgo(
     con = _con()
     proveedores = con.execute("SELECT * FROM proveedores").df()
     siniestros = con.execute("SELECT * FROM siniestros").df()
-    ctx = build_contexto(siniestros, proveedores)
+
+    # Cargar similitudes si existen (top-K)
+    sim_path = PROC / "similitudes.parquet"
+    sim_df = None
+    if sim_path.exists():
+        sim_df = pd.read_parquet(sim_path)
+
+    ctx = build_contexto(siniestros, proveedores, similitudes_df=sim_df)
 
     # Cargar todas las tablas a memoria para joins rapidos
     pol = con.execute("SELECT * FROM polizas").df().set_index("id_poliza")
@@ -141,7 +148,9 @@ def detalle_siniestro(id_siniestro: str) -> dict:
 
     all_sin = con.execute("SELECT * FROM siniestros").df()
     all_prov = con.execute("SELECT * FROM proveedores").df()
-    ctx = build_contexto(all_sin, all_prov)
+    sim_path = PROC / "similitudes.parquet"
+    sim_df = pd.read_parquet(sim_path) if sim_path.exists() else None
+    ctx = build_contexto(all_sin, all_prov, similitudes_df=sim_df)
 
     r = evaluate_siniestro(
         siniestro=sin, poliza=pol, asegurado=ase, vehiculo=veh,
