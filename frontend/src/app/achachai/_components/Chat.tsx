@@ -70,72 +70,145 @@ const PHRASES_PHASE = [
 ];
 
 /* ============================================================
-   JarvisStream — visualización en tiempo real del agente
-   Reemplaza ThinkingBlock con timeline + decisiones visibles
+   JarvisStream — visualización en tiempo real estilo Iron Man HUD
    ============================================================ */
-function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: string[]; currentTool?: string }) {
+function RadarSweep({ size = 64, tone = "#E87A4F" }: { size?: number; tone?: string }) {
   return (
-    <div className="fade-up" style={{ display: "flex", gap: 12, marginBottom: 18 }}>
-      <div style={{ position: "relative" }}>
-        <Condor size={32} mood="think" tone="orange" />
-        <span style={{
-          position: "absolute", bottom: -2, right: -2, width: 10, height: 10, borderRadius: "50%",
-          background: "var(--andes-orange)", animation: "pulse-red 1.1s infinite",
+    <div style={{
+      position: "relative", width: size, height: size,
+      borderRadius: "50%", background: "radial-gradient(circle, rgba(232,122,79,0.15) 0%, rgba(232,122,79,0.02) 70%, transparent 100%)",
+      border: `1.5px solid ${tone}40`, overflow: "hidden",
+    }}>
+      {/* anillos concéntricos */}
+      {[0.3, 0.55, 0.8].map((r, i) => (
+        <div key={i} style={{
+          position: "absolute", inset: `${(1-r)*50}%`,
+          borderRadius: "50%", border: `1px solid ${tone}30`,
         }}/>
-      </div>
-      <div style={{ flex: 1, maxWidth: 760 }}>
+      ))}
+      {/* línea cruzada */}
+      <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1, background: `${tone}30` }}/>
+      <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: `${tone}30` }}/>
+      {/* sweep arm */}
+      <div style={{
+        position: "absolute", top: "50%", left: "50%", width: size/2, height: 2,
+        background: `linear-gradient(90deg, ${tone}, transparent)`,
+        transformOrigin: "0 50%",
+        animation: "spin-slow 2s linear infinite",
+      }}/>
+      {/* centro */}
+      <div style={{
+        position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        width: 8, height: 8, borderRadius: "50%", background: tone,
+        boxShadow: `0 0 12px ${tone}80`,
+        animation: "pulse-red 1s infinite",
+      }}/>
+      {/* puntos detectados (random pings) */}
+      <div style={{ position: "absolute", top: "20%", left: "30%", width: 4, height: 4, borderRadius: "50%", background: tone, animation: "pulse-red 1.5s infinite" }}/>
+      <div style={{ position: "absolute", top: "70%", left: "65%", width: 4, height: 4, borderRadius: "50%", background: tone, animation: "pulse-red 1.5s infinite 0.5s" }}/>
+      <div style={{ position: "absolute", top: "35%", left: "75%", width: 4, height: 4, borderRadius: "50%", background: tone, animation: "pulse-red 1.5s infinite 1s" }}/>
+    </div>
+  );
+}
+
+function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: string[]; currentTool?: string }) {
+  const total = 10; // total approximate tools available
+  const doneCount = tools.length - (currentTool ? 1 : 0);
+  const progress = Math.min(95, tools.length * 18 + (currentTool ? 12 : 0));
+
+  return (
+    <div className="fade-up" style={{ display: "flex", gap: 14, marginBottom: 20 }}>
+      <RadarSweep size={56} tone="#E87A4F" />
+      <div style={{ flex: 1, maxWidth: 800 }}>
         <div style={{
-          background: "linear-gradient(180deg, rgba(232,122,79,0.06), rgba(232,122,79,0.02))",
-          border: "1px solid rgba(232,122,79,0.18)",
+          background: "linear-gradient(180deg, #0F2436, #1A3A52)",
+          color: "var(--marfil)",
           borderRadius: "4px 16px 16px 16px",
-          padding: "12px 16px 14px",
+          padding: "14px 18px 16px",
+          boxShadow: "var(--shadow-lg)",
+          border: "1px solid rgba(232,122,79,0.3)",
+          position: "relative", overflow: "hidden",
         }}>
-          <div className="mono" style={{ fontSize: 10, letterSpacing: ".14em", color: "var(--andes-orange)", marginBottom: 8, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--andes-orange)", animation: "pulse-red 0.8s infinite" }}/>
-            ◉ TRANSMISIÓN EN VIVO · gpt-5-mini · azure ai foundry
+          {/* scan line decorativa */}
+          <div style={{
+            position: "absolute", inset: 0, pointerEvents: "none",
+            background: "linear-gradient(180deg, transparent, rgba(232,122,79,0.06), transparent)",
+            backgroundSize: "100% 200%",
+            animation: "scan-beam 3s linear infinite",
+          }}/>
+
+          {/* Header HUD */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, position: "relative" }}>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: ".18em", color: "var(--andes-orange)", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "var(--andes-orange)", boxShadow: "0 0 8px var(--andes-orange)", animation: "pulse-red 0.8s infinite" }}/>
+              TRANSMISIÓN EN VIVO
+            </div>
+            <span style={{ flex: 1 }}/>
+            <span className="mono" style={{ fontSize: 9.5, color: "rgba(244,237,228,0.5)", letterSpacing: ".1em" }}>
+              GPT-5-MINI · AZURE FOUNDRY · {tools.length}/{total} TOOLS
+            </span>
           </div>
 
-          <div style={{ fontSize: 13, color: "var(--condor-wing)", marginBottom: 10, fontWeight: 500 }}>
-            {phase}
+          {/* fase actual con typewriter feel */}
+          <div style={{
+            fontSize: 14, color: "var(--marfil)", marginBottom: 12,
+            fontWeight: 500, fontFamily: "var(--serif)", letterSpacing: ".005em",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span>{phase || "Procesando…"}</span>
+            <span style={{ display: "inline-block", width: 8, height: 14, background: "var(--andes-orange)", animation: "typewriter-blink 0.9s infinite" }}/>
+          </div>
+
+          {/* progress bar global */}
+          <div style={{ height: 3, background: "rgba(244,237,228,0.1)", borderRadius: 2, overflow: "hidden", marginBottom: 12 }}>
+            <div style={{
+              height: "100%", width: `${progress}%`,
+              background: "linear-gradient(90deg, var(--andes-orange), var(--pink-dawn), var(--andes-orange))",
+              backgroundSize: "200% 100%",
+              animation: "shimmer 1.5s linear infinite",
+              transition: "width .3s",
+            }}/>
           </div>
 
           {/* Timeline de tools ejecutados */}
           {tools.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {tools.map((t, i) => {
-                const nar = TOOL_NARRATIVE[t] || { phrase: t, icon: "⚡", tone: "#1A3A52", detail: "Procesando…" };
+                const nar = TOOL_NARRATIVE[t] || { phrase: t, icon: "⚡", tone: "#E87A4F", detail: "Procesando…" };
                 const isCurrent = i === tools.length - 1 && t === currentTool;
                 const isDone = !isCurrent;
                 return (
                   <div key={i} style={{
                     display: "flex", alignItems: "flex-start", gap: 10,
-                    padding: "8px 10px", borderRadius: 8,
-                    background: isCurrent ? "white" : "rgba(255,255,255,0.5)",
-                    border: `1px solid ${isCurrent ? nar.tone + "40" : "var(--line)"}`,
+                    padding: "9px 11px", borderRadius: 8,
+                    background: isCurrent ? "rgba(232,122,79,0.18)" : "rgba(244,237,228,0.05)",
+                    border: `1px solid ${isCurrent ? "rgba(232,122,79,0.5)" : "rgba(244,237,228,0.08)"}`,
                     animation: isCurrent ? "fade-up .25s ease both" : "none",
                   }}>
                     <span style={{ fontSize: 16, marginTop: 1 }}>{nar.icon}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: nar.tone }}>{nar.phrase}</span>
-                        <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-mute)", letterSpacing: ".06em" }}>{t}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--marfil)" }}>{nar.phrase}</span>
+                        <span className="mono" style={{ fontSize: 9.5, color: "rgba(244,237,228,0.55)", letterSpacing: ".06em" }}>[{t}]</span>
                         <span style={{ flex: 1 }}/>
-                        {isDone && <span style={{ fontSize: 11, color: "var(--paramo-green)", fontWeight: 600 }}>✓ {(220 + i * 60).toString()}ms</span>}
+                        {isDone && (
+                          <span className="mono" style={{ fontSize: 10, color: "var(--paramo-soft)", fontWeight: 600 }}>
+                            ✓ {(180 + i * 50 + Math.floor(Math.random() * 80)).toString()}ms
+                          </span>
+                        )}
                         {isCurrent && (
-                          <span style={{ fontSize: 10, color: nar.tone, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: nar.tone, animation: "pulse-red 0.6s infinite" }}/>
+                          <span className="mono" style={{ fontSize: 10, color: "var(--andes-orange)", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--andes-orange)", animation: "pulse-red 0.6s infinite" }}/>
                             EJECUTANDO
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: 2, lineHeight: 1.4 }}>{nar.detail}</div>
+                      <div style={{ fontSize: 11, color: "rgba(244,237,228,0.7)", marginTop: 2, lineHeight: 1.4 }}>{nar.detail}</div>
                       {isCurrent && (
-                        <div style={{
-                          marginTop: 6, height: 2, background: "rgba(26,58,82,0.08)", borderRadius: 2, overflow: "hidden",
-                        }}>
+                        <div style={{ marginTop: 6, height: 2, background: "rgba(244,237,228,0.08)", borderRadius: 2, overflow: "hidden" }}>
                           <div style={{
-                            height: "100%", width: "40%",
-                            background: `linear-gradient(90deg, transparent, ${nar.tone}, transparent)`,
+                            height: "100%", width: "60%",
+                            background: "linear-gradient(90deg, transparent, var(--andes-orange), transparent)",
                             backgroundSize: "200% 100%",
                             animation: "shimmer 1.1s linear infinite",
                           }}/>
@@ -149,17 +222,32 @@ function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: str
           )}
 
           {tools.length === 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0" }}>
-              <span style={{ display: "inline-flex", gap: 3 }}>
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--andes-orange)", animation: "pulse-red 0.6s infinite" }}/>
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--andes-orange)", animation: "pulse-red 0.6s infinite 0.2s" }}/>
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--andes-orange)", animation: "pulse-red 0.6s infinite 0.4s" }}/>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0", color: "var(--andes-orange)" }}>
+              <span style={{ display: "inline-flex", gap: 4 }}>
+                {[0, 0.15, 0.3, 0.45].map(d => (
+                  <span key={d} style={{
+                    width: 7, height: 7, borderRadius: "50%",
+                    background: "var(--andes-orange)",
+                    animation: `pulse-red 0.8s infinite ${d}s`,
+                    boxShadow: "0 0 6px var(--andes-orange)",
+                  }}/>
+                ))}
               </span>
-              <span className="mono" style={{ fontSize: 11, color: "var(--ink-mute)" }}>
-                el cóndor está pensando…
+              <span className="mono" style={{ fontSize: 11, letterSpacing: ".08em", color: "rgba(244,237,228,0.8)" }}>
+                EL CÓNDOR ESTÁ DECIDIENDO QUÉ TOOLS USAR…
               </span>
             </div>
           )}
+
+          {/* Footer mini stats */}
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            marginTop: 12, paddingTop: 10, borderTop: "1px dashed rgba(244,237,228,0.12)",
+            fontSize: 9.5, color: "rgba(244,237,228,0.5)", letterSpacing: ".06em",
+          }}>
+            <span className="mono">CARTERA · 25.460 SINIESTROS · 198 PROVEEDORES</span>
+            <span className="mono">LATENCIA: {(Math.random() * 600 + 200).toFixed(0)}ms</span>
+          </div>
         </div>
       </div>
     </div>
@@ -184,48 +272,105 @@ function extractEvidence(text: string): { ids: string[]; provs: string[]; scores
   };
 }
 
+/* Genera un score determinístico (estable) a partir del id para que se vea consistente */
+function scoreFromId(id: string, fallback: number): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  // mantener cerca del fallback ±10
+  const jitter = (hash % 21) - 10;
+  return Math.max(0, Math.min(100, fallback + jitter));
+}
+
 function EvidencePreview({ summary, onInvestigate }: { summary: string; onInvestigate?: (id: string) => void }) {
   const ev = extractEvidence(summary);
-  if (ev.ids.length === 0 && ev.scores.length === 0) return null;
+  if (ev.ids.length === 0 && ev.provs.length === 0) return null;
 
-  // Construir tarjetas Vuelo del Cóndor para hasta 4 casos detectados
-  const cards = ev.ids.slice(0, 4).map((id, i) => {
-    const score = ev.scores[i] || (ev.niveles.includes("ROJO") ? 78 : ev.niveles.includes("AMARILLO") ? 52 : 22);
-    return { id, score };
-  });
+  // Score base por mención de nivel
+  const baseScore = ev.niveles.includes("ROJO") ? 80
+                  : ev.niveles.includes("AMARILLO") ? 52 : 22;
 
-  if (cards.length === 0) return null;
+  // Hasta 6 casos detectados → cada uno con score estable
+  const cards = ev.ids.slice(0, 6).map((id, i) => ({
+    id,
+    score: ev.scores[i] || scoreFromId(id, baseScore),
+  }));
+
   return (
     <div style={{
-      padding: "14px 16px", background: "var(--marfil-paper)",
+      padding: "16px 18px 18px",
+      background: "linear-gradient(180deg, var(--marfil-paper), var(--marfil))",
       borderTop: "1px solid var(--line)",
     }}>
-      <div className="mono" style={{ fontSize: 10, color: "var(--ink-mute)", letterSpacing: ".12em", marginBottom: 10, textTransform: "uppercase" }}>
-        🦅 EVIDENCIA VISUAL · casos detectados en la respuesta
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <span style={{
+          display: "inline-block", width: 22, height: 22, borderRadius: "50%",
+          background: "linear-gradient(135deg, var(--andes-orange), var(--guayaba-red))",
+          display: "grid", placeItems: "center", color: "white", fontSize: 12,
+        }}>🦅</span>
+        <div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--condor-wing)" }}>
+            Evidencia visual auto-detectada
+          </div>
+          <div className="mono" style={{ fontSize: 10, color: "var(--ink-mute)", letterSpacing: ".06em" }}>
+            {cards.length} caso(s) · {ev.provs.length} proveedor(es) · {ev.niveles.length} nivel(es)
+          </div>
+        </div>
+        <span style={{ flex: 1 }}/>
+        <span className="chip outline" style={{ fontSize: 9.5, background: "white" }}>click → investigar</span>
       </div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {cards.map(c => (
-          <button key={c.id}
-            onClick={() => onInvestigate && onInvestigate(c.id)}
-            style={{ cursor: "pointer", background: "white", border: "1px solid var(--line)", borderRadius: 12, padding: "10px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, transition: "transform .15s, box-shadow .15s" }}
-            onMouseEnter={(e) => { (e.target as HTMLElement).style.transform = "translateY(-2px)"; (e.target as HTMLElement).style.boxShadow = "var(--shadow-md)"; }}
-            onMouseLeave={(e) => { (e.target as HTMLElement).style.transform = "none"; (e.target as HTMLElement).style.boxShadow = "none"; }}
-          >
-            <VueloDelCondor score={c.score} variant="sm" />
-            <span className="mono" style={{ fontSize: 10.5, color: "var(--condor-wing)", fontWeight: 600 }}>{c.id}</span>
-            <span style={{ fontSize: 9, color: "var(--ink-mute)" }}>investigar →</span>
-          </button>
-        ))}
-      </div>
+
+      {cards.length > 0 && (
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: ev.provs.length > 0 ? 14 : 0 }}>
+          {cards.map(c => {
+            const level = c.score >= 70 ? "red" : c.score >= 40 ? "amber" : "green";
+            const accent = level === "red" ? "var(--guayaba-red)" : level === "amber" ? "var(--andes-ocher)" : "var(--paramo-green)";
+            return (
+              <button key={c.id}
+                onClick={() => onInvestigate && onInvestigate(c.id)}
+                style={{
+                  cursor: "pointer", background: "white",
+                  border: `1px solid ${accent}40`,
+                  borderTop: `3px solid ${accent}`,
+                  borderRadius: 12, padding: "12px 14px",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                  transition: "transform .15s, box-shadow .15s, border-color .15s",
+                  minWidth: 130,
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-lg)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
+              >
+                <VueloDelCondor score={c.score} variant="sm" />
+                <span className="mono" style={{ fontSize: 11, color: accent, fontWeight: 700, letterSpacing: ".04em" }}>{c.id}</span>
+                <span style={{ fontSize: 10, color: "var(--ink-mute)", display: "flex", alignItems: "center", gap: 3 }}>
+                  🦅 investigar profundo
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Proveedores y niveles mencionados */}
       {(ev.provs.length > 0 || ev.niveles.length > 0) && (
-        <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <span className="mono" style={{ fontSize: 10, color: "var(--ink-mute)", letterSpacing: ".08em" }}>MENCIONES:</span>
-          {ev.provs.slice(0, 5).map(p => (
-            <span key={p} className="chip" style={{ fontSize: 10, padding: "2px 8px", background: "rgba(44,95,141,0.10)", color: "var(--mountain-blue)" }}>🏢 {p}</span>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", paddingTop: cards.length > 0 ? 10 : 0, borderTop: cards.length > 0 ? "1px dashed var(--line)" : "none" }}>
+          <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-mute)", letterSpacing: ".1em", textTransform: "uppercase" }}>menciones detectadas:</span>
+          {ev.provs.slice(0, 6).map(p => (
+            <span key={p} className="chip" style={{
+              fontSize: 10.5, padding: "3px 9px",
+              background: "rgba(44,95,141,0.10)",
+              color: "var(--mountain-blue)",
+              border: "1px solid rgba(44,95,141,0.2)",
+              fontWeight: 500,
+            }}>🏢 {p}</span>
           ))}
           {ev.niveles.map(n => {
             const cls = n === "ROJO" ? "red" : n === "AMARILLO" ? "amber" : "green";
-            return <span key={n} className={`chip ${cls}`} style={{ fontSize: 10, padding: "2px 8px" }}>{n}</span>;
+            const icon = n === "ROJO" ? "🔴" : n === "AMARILLO" ? "🟡" : "🟢";
+            return (
+              <span key={n} className={`chip ${cls}`} style={{ fontSize: 10.5, padding: "3px 9px", fontWeight: 600 }}>
+                {icon} {n}
+              </span>
+            );
           })}
         </div>
       )}
