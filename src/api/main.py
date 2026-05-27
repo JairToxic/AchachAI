@@ -22,7 +22,7 @@ from typing import Any
 import duckdb
 import pandas as pd
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -42,6 +42,11 @@ from src.ai_agent.tools import (  # noqa: E402
     top_riesgo,
 )
 from src.rules import build_contexto, evaluate_siniestro  # noqa: E402
+from src.document_analysis import (  # noqa: E402
+    analyze_factura,
+    analyze_imagen_dano,
+    analyze_documento_generico,
+)
 
 PROC = ROOT / "data" / "processed"
 
@@ -186,6 +191,44 @@ def reporte_ejecutivo():
         "prioritarias para el analista."
     )
     return result
+
+
+@app.post("/analyze-document")
+async def analyze_document(
+    file: UploadFile = File(...),
+    tipo: str = Form("factura"),
+    fecha_ocurrencia: str | None = Form(None),
+    descripcion_siniestro: str | None = Form(None),
+):
+    """Analiza un documento (factura/imagen/parte) con Azure DI + GPT-4o Vision.
+
+    Body multipart:
+      - file: el archivo (.pdf, .jpg, .png)
+      - tipo: 'factura' | 'imagen_dano' | 'parte_policial' | 'denuncia' | 'documento'
+      - fecha_ocurrencia: ISO date (para validar facturas vs evento)
+      - descripcion_siniestro: relato del asegurado (para cruzar con imagen)
+
+    Devuelve DocumentAnalysisResult con score, inconsistencias y explicacion.
+    """
+    file_bytes = await file.read()
+    try:
+        if tipo == "factura":
+            result = analyze_factura(file_bytes, fecha_ocurrencia=fecha_ocurrencia)
+        elif tipo == "imagen_dano":
+            if not descripcion_siniestro:
+                raise HTTPException(400, "descripcion_siniestro requerida para imagen_dano")
+            result = analyze_imagen_dano(file_bytes, descripcion_siniestro)
+        else:
+            result = analyze_documento_generico(
+                file_bytes, tipo=tipo,
+                contexto_siniestro={"fecha_ocurrencia": fecha_ocurrencia,
+                                    "descripcion": descripcion_siniestro}
+                if fecha_ocurrencia or descripcion_siniestro else None,
+            )
+        return result.to_dict()
+    except Exception as exc:
+        log.exception("Error en /analyze-document")
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
 @app.get("/kpis")

@@ -6,6 +6,7 @@ const links = [
   { href: '/', label: 'Dashboard' },
   { href: '/casos', label: 'Bandeja' },
   { href: '/proveedores', label: 'Proveedores' },
+  { href: '/documentos', label: 'Documentos' },
   { href: '/chat', label: 'Agente IA' },
 ];
 
