@@ -47,6 +47,12 @@ outputs/
 mlruns/
 .mlflow/
 
+# --- Modelo entrenado local (regenerable) ---
+runs/
+
+# --- Claude Code local state ---
+.claude/
+
 # --- Node / frontend ---
 frontend/node_modules/
 frontend/.next/
