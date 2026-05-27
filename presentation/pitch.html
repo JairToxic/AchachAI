@@ -216,12 +216,16 @@
   <div class="slide-brand">IMPACTO DE NEGOCIO</div>
   <h2>Resultados técnicos y proyección financiera</h2>
 
-  <h3>Métricas del modelo XGBoost</h3>
+  <h3>Métricas del modelo XGBoost v4 (25K filas, 92 features, Optuna tuned)</h3>
   <div class="kpi-grid">
-    <div class="kpi green"><div class="label">AUC-ROC</div><div class="value">0.94</div></div>
-    <div class="kpi green"><div class="label">PR-AUC</div><div class="value">0.64</div></div>
-    <div class="kpi"><div class="label">F1-score</div><div class="value">0.58</div></div>
-    <div class="kpi green"><div class="label">Recall en inyectados</div><div class="value">97.5%</div></div>
+    <div class="kpi green"><div class="label">AUC-ROC</div><div class="value">0.96</div></div>
+    <div class="kpi green"><div class="label">PR-AUC</div><div class="value">0.81</div></div>
+    <div class="kpi green"><div class="label">Recall</div><div class="value">0.79</div></div>
+    <div class="kpi green"><div class="label">Recall@0.3</div><div class="value">0.88</div></div>
+    <div class="kpi green"><div class="label">F1 best</div><div class="value">0.73</div></div>
+    <div class="kpi green"><div class="label">Precision (best F1)</div><div class="value">0.81</div></div>
+    <div class="kpi green"><div class="label">Casos críticos detectados</div><div class="value">100%</div></div>
+    <div class="kpi"><div class="label">Tests pasando</div><div class="value">65/65</div></div>
   </div>
 
   <h3>Sistema híbrido (reglas + modelo + agente)</h3>
