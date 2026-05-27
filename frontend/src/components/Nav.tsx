@@ -7,6 +7,7 @@ const links = [
   { href: '/casos', label: 'Bandeja' },
   { href: '/proveedores', label: 'Proveedores' },
   { href: '/documentos', label: 'Documentos' },
+  { href: '/impacto', label: 'Impacto' },
   { href: '/chat', label: 'Agente IA' },
 ];
 
