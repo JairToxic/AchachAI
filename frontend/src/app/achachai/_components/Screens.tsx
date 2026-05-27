@@ -1,11 +1,17 @@
-/* global React, Condor, VueloDelCondor */
-const { useState: useSc, useEffect: useScE, useRef: useScR } = React;
+'use client';
+// @ts-nocheck
+import { useEffect, useRef, useState } from 'react';
+import { Condor, VueloDelCondor } from './Condor';
+
+const useSc = useState;
+const useScE = useEffect;
+const useScR = useRef;
 
 /* ============================================================
    KANBAN — Bandeja de casos (CU-03)
    ============================================================ */
 
-const KANBAN_DATA = {
+export const KANBAN_DATA = {
   rojo: [
     { id: "SIN-100029", score: 87, monto: "$8.450", ciudad: "Quito Norte", cobertura: "DM total", reglas: ["RF-01", "RF-04"], prov: "PRV-NEW0019" },
     { id: "SIN-100456", score: 82, monto: "$11.200", ciudad: "Cumbayá", cobertura: "DM parcial", reglas: ["RF-03"], prov: "PRV-NEW0019" },
@@ -25,7 +31,7 @@ const KANBAN_DATA = {
   ],
 };
 
-function KanbanScreen({ onInvestigate }) {
+export function KanbanScreen({ onInvestigate }) {
   const [liveData, setLiveData] = useSc(KANBAN_DATA);
   const [loading, setLoading] = useSc(true);
   const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
@@ -182,13 +188,13 @@ function CaseCard({ c, onInvestigate }) {
 /* ============================================================
    DOCUMENTS — CU-01 + Scanner
    ============================================================ */
-function DocumentsScreen() {
+export function DocumentsScreen() {
   const [scanning, setScanning] = useSc(false);
   const [done, setDone] = useSc(false);
   const [result, setResult] = useSc(null);
   const [error, setError] = useSc(null);
   const [fileName, setFileName] = useSc("");
-  const fileInputRef = useScR(null);
+  const fileInputRef = useScR<any>(null);
   const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
 
   function trigger() {
@@ -414,7 +420,7 @@ function ScanProgress() {
    in 5 phases. The user can replay it any time.
    ============================================================ */
 
-const TEJIDO_PROVIDERS = [
+export const TEJIDO_PROVIDERS = [
   { id: "PRV-NEW0019", x: 360, y: 220, r: 26, hot: true,  label: "Auto Servicio Andes" },
   { id: "PRV-0007",    x: 720, y: 290, r: 22, hot: true,  label: "Taller Cumbayá" },
   { id: "PRV-0042",    x: 240, y: 430, r: 20, hot: true,  label: "Clínica San Rafael" },
@@ -423,7 +429,7 @@ const TEJIDO_PROVIDERS = [
   { id: "PRV-0011",    x: 940, y: 170, r: 14, hot: false, label: "Carrocerías Norte" },
 ];
 
-const TEJIDO_INSUREDS = (() => {
+export const TEJIDO_INSUREDS = (() => {
   const arr = [];
   TEJIDO_PROVIDERS.forEach((p, pi) => {
     const count = p.hot ? 8 : 5;
@@ -443,9 +449,9 @@ const TEJIDO_INSUREDS = (() => {
 })();
 
 // path the cóndor flies along during scanning phase
-const CONDOR_FLIGHT_PATH = "M 60 80 Q 280 40 540 160 T 1020 240 Q 700 360 360 220 Q 220 380 240 430";
+export const CONDOR_FLIGHT_PATH = "M 60 80 Q 280 40 540 160 T 1020 240 Q 700 360 360 220 Q 220 380 240 430";
 
-const TEJIDO_PHASES = [
+export const TEJIDO_PHASES = [
   { id: 0, label: "Listo para investigar" },
   { id: 1, label: "Escaneando red…" },
   { id: 2, label: "Conectando hilos…" },
@@ -454,10 +460,10 @@ const TEJIDO_PHASES = [
   { id: 5, label: "Patrón detectado ✓" },
 ];
 
-function TejidoScreen() {
+export function TejidoScreen() {
   const [phase, setPhase] = useSc(0);
   const [running, setRunning] = useSc(false);
-  const timeoutsRef = useScR([]);
+  const timeoutsRef = useScR<any>([]);
 
   function clearTimers() {
     timeoutsRef.current.forEach(t => clearTimeout(t));
@@ -732,7 +738,7 @@ function TejidoCanvas({ phase }) {
 /* ============================================================
    REPORTS — CU-06
    ============================================================ */
-function ReportsScreen() {
+export function ReportsScreen() {
   return (
     <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)", padding: 32 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
@@ -843,7 +849,7 @@ function ReportsScreen() {
 /* ============================================================
    ROLES — 7 roles selector
    ============================================================ */
-const ROLES = [
+export const ROLES = [
   { id: "antifraude", name: "Analista Antifraude", icon: "🕵️", power: "Investigación profunda caso por caso", color: "var(--guayaba-red)" },
   { id: "siniestros", name: "Analista de Siniestros", icon: "📋", power: "Mi día priorizado en orden", color: "var(--andes-orange)" },
   { id: "jefatura", name: "Jefatura de Siniestros", icon: "📊", power: "Centro de operaciones", color: "var(--mountain-blue)" },
@@ -853,7 +859,7 @@ const ROLES = [
   { id: "gerencia", name: "Gerencia", icon: "💼", power: "Pulso ejecutivo cartera", color: "var(--condor-wing)" },
 ];
 
-function RolesScreen({ currentRole, onPick }) {
+export function RolesScreen({ currentRole, onPick }) {
   return (
     <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)", padding: 32 }}>
       <div style={{ textAlign: "center", marginBottom: 26 }}>
@@ -911,7 +917,7 @@ function RolesScreen({ currentRole, onPick }) {
   );
 }
 
-const ROLE_PROMPTS_PREVIEW = {
+export const ROLE_PROMPTS_PREVIEW = {
   antifraude: ["¿Qué patrones se repiten en los rojos?", "Investigar SIN-100029"],
   siniestros: ["¿Cuáles 5 casos resuelvo hoy?", "Resumime mi cola"],
   jefatura: ["¿Qué sucursal tiene más pendientes?", "Productividad de María este mes"],
@@ -921,4 +927,3 @@ const ROLE_PROMPTS_PREVIEW = {
   gerencia: ["¿Cuánto recuperamos este mes?", "Top 3 logros para el board"],
 };
 
-Object.assign(window, { KanbanScreen, DocumentsScreen, TejidoScreen, ReportsScreen, RolesScreen, ROLES });

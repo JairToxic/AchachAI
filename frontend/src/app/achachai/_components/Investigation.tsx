@@ -1,11 +1,17 @@
-/* global React, Condor, VueloDelCondor */
-const { useState: useInvState, useEffect: useInvEffect, useRef: useInvRef } = React;
+'use client';
+// @ts-nocheck
+import { useEffect, useRef, useState } from 'react';
+import { Condor, VueloDelCondor } from './Condor';
+
+const useInvState = useState;
+const useInvEffect = useEffect;
+const useInvRef = useRef;
 
 /* ============================================================
    MODO INVESTIGACIÓN PROFUNDA — the wow demo (~30s orchestration)
    ============================================================ */
 
-const BITACORA = [
+export const BITACORA = [
   { t: "00:01", icon: "🦅", text: "Recuperando datos del siniestro SIN-100029…", flag: "ok" },
   { t: "00:03", icon: "📊", text: "Calculando score con XGBoost (Azure ML endpoint v4)…", flag: "ok" },
   { t: "00:04", icon: "📋", text: "Aplicando 7 reglas críticas + 14 señales…", flag: "ok",
@@ -25,7 +31,7 @@ const BITACORA = [
   { t: "00:20", icon: "✨", text: "Sintetizando informe ejecutivo 360°…", flag: "ok" },
 ];
 
-const REPORT_SECTIONS = [6, 7, 8, 9, 10]; // step index at which each section appears
+export const REPORT_SECTIONS = [6, 7, 8, 9, 10]; // step index at which each section appears
 // We'll just unlock sections progressively as steps complete:
 // 1. Summary: step 0
 // 2. Documental evidence: step 3
@@ -34,7 +40,7 @@ const REPORT_SECTIONS = [6, 7, 8, 9, 10]; // step index at which each section ap
 // 5. Chronology: step 8
 // 6. Actions: step 9
 
-function InvestigationScreen({ caseId = "SIN-100029", onBack }) {
+export function InvestigationScreen({ caseId = "SIN-100029", onBack }) {
   const [step, setStep] = useInvState(-1);
   const [running, setRunning] = useInvState(false);
   const [committee, setCommittee] = useInvState(false);
@@ -431,4 +437,3 @@ function MiniTejido() {
   );
 }
 
-Object.assign(window, { InvestigationScreen });

@@ -1,12 +1,16 @@
-/* global React, Condor, VueloDelCondor, CondorMini */
-const { useState: useRH, useEffect: useRHE, useRef: useRHR } = React;
+'use client';
+// @ts-nocheck
+import { useEffect, useRef, useState } from 'react';
+import { Condor, VueloDelCondor, CondorMini } from './Condor';
+
+const useRH = useState;
 
 /* ============================================================
    ROLE HOMES — each role gets a distinct landing screen showing
    its superpower. Cóndor always present, but the layout differs.
    ============================================================ */
 
-function RoleHome({ role, onInvestigate, onGoChat }) {
+export function RoleHome({ role, onInvestigate, onGoChat }) {
   const map = {
     antifraude:  AntifraudeHome,
     siniestros:  SiniestrosHome,
@@ -803,4 +807,3 @@ function ThresholdSimulator() {
   );
 }
 
-Object.assign(window, { RoleHome });
