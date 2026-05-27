@@ -17,17 +17,19 @@
 | **Entrenado el** | 2026-05-26 |
 | **Autor** | Equipo AchachAI - hackIAthon 2026 |
 
-## 2. Datos de entrenamiento
+## 2. Datos de entrenamiento (extendido)
 
 | Concepto | Valor |
 |----------|-------|
 | **Origen** | Dataset sintético generado por el equipo (no PII real) |
-| **Total filas** | 15.460 siniestros (15.420 originales + 40 críticos inyectados) |
+| **Total filas** | **25.460 siniestros** (15.420 originales + 10.000 nuevos diversos + 40 críticos inyectados) |
 | **Ramo cubierto** | Vehículos (único, por scope del prototipo) |
-| **Distribución target** | 6.23% positivos (963 fraudes simulados / 14.497 no-fraudes) |
-| **Split** | 80% train (12.368) / 20% test (3.092), estratificado |
-| **Features finales** | 75 (12 numéricas + 4 ratios + 50+ one-hot + 5 booleanos + 3 agregaciones de documentos + 3 conteos de contexto) |
-| **Balanceo** | `scale_pos_weight = 15.06` (sin SMOTE) |
+| **Distribución target** | ~9.5% positivos (fraude correlacionado con patrones: lista_restrictiva, PTxRB, docs incompletos, etc.) |
+| **Proveedores** | **198** (vs 48 en v2): mayor diversidad y patrones más realistas |
+| **Templates de descripción** | **50+** diferentes (resuelve problema de embeddings homogéneos) |
+| **Split** | 80% train (20.368) / 20% test (5.092), estratificado |
+| **Features finales** | 79 |
+| **Balanceo** | `scale_pos_weight = 9.48` (auto-calculado del nuevo dataset) |
 
 ## 3. Hyperparámetros
 
@@ -43,55 +45,64 @@
 | `tree_method` | `hist` |
 | `random_state` | 42 |
 
-## 4. Métricas de evaluación (test set 3.092 filas)
+## 4. Métricas de evaluación (test set 5.092 filas)
 
 | Métrica | Valor | Objetivo del reto | ¿Cumple? |
 |---------|-------|--------------------|----------|
-| **AUC-ROC** | **0.940** | ≥ 0.85 | ✅ |
-| **PR-AUC** | **0.643** | ≥ 0.60 | ✅ |
-| **F1-score** | 0.576 | ≥ 0.50 | ✅ |
-| **Precision** | 0.582 | ≥ 0.40 | ✅ |
-| **Recall** | 0.570 | ≥ 0.70 | ⚠️ por debajo del objetivo |
-| **Prob media en casos inyectados** | 0.951 | — | ✅ excelente |
-| **% inyectados con prob ≥ 0.5** | 97.5% | — | ✅ |
+| **AUC-ROC** | **0.882** | ≥ 0.85 | ✅ |
+| **PR-AUC** | **0.554** | ≥ 0.60 | ⚠️ ligeramente debajo |
+| **F1-score** | 0.495 | ≥ 0.50 | ≈ en límite |
+| **Precision** | 0.416 | ≥ 0.40 | ✅ |
+| **Recall** | **0.609** | ≥ 0.70 | ⚠️ por debajo del objetivo |
+| **Prob media en casos inyectados** | 0.903 | — | ✅ excelente |
+| **% inyectados con prob ≥ 0.5** | 95.0% | — | ✅ |
 
 ### Matriz de confusión (test, threshold 0.5)
 
 |              | Pred. NO fraude | Pred. POSIBLE fraude |
 |--------------|-----------------|----------------------|
-| **Real NO**  | 2820 (TN)       | 79 (FP)              |
-| **Real SÍ**  | 83 (FN)         | 110 (TP)             |
+| **Real NO**  | 4191 (TN)       | 415 (FP)             |
+| **Real SÍ**  | 190 (FN)        | 296 (TP)             |
 
-- **Cobertura (Recall):** 57% — captura 110 de 193 fraudes simulados.
-- **Pureza (Precision):** 58% — de cada 100 alertas del modelo, 58 son fraudes reales.
+- **Cobertura (Recall):** 60.9% — captura 296 de 486 fraudes simulados.
+- **Pureza (Precision):** 41.6% — de cada 100 alertas del modelo, 42 son fraudes reales.
 
-> Nota: el recall del 57% (debajo del 70% objetivo) se compensa con el **motor de reglas determinísticas** (7 RF críticas + 14 señales). El sistema final combina ambos. Las reglas atrapan casos que el modelo se pierde y viceversa.
+### Evolución del modelo
 
-## 5. Features más importantes (top 15)
+| Versión | Filas | Recall | AUC-ROC | Cambio |
+|---------|-------|--------|---------|--------|
+| v1 | 15.420 | — | — | inicial |
+| v2 | 15.460 | 0.57 | 0.94 | con 40 casos inyectados |
+| **v3** | **25.460** | **0.61** | **0.88** | **+10K diversos, fraude correlacionado** |
+
+> El recall mejoró +7% al agregar más datos, aunque el AUC bajó (de 0.94 a 0.88) porque el problema es más realista con mayor diversidad de proveedores (48→198) y descripciones (1 patrón→50+ templates). El sistema final combina modelo + motor de reglas determinísticas que compensan el recall.
+
+## 5. Features más importantes (top 15) — v3
 
 | # | Feature | Importance |
 |---|---------|-----------:|
-| 1 | `cobertura_Responsabilidad Civil` | 17.46% |
-| 2 | `fault_responsable_Tercero` | 10.55% |
-| 3 | `documentos_completos` | 7.02% |
-| 4 | `n_inconsistentes` (docs) | 5.96% |
-| 5 | `categoria_SUV` | 4.48% |
-| 6 | `deducible_usd` | 3.80% |
-| 7 | `tipo_cobertura_Liability` | 2.24% |
-| 8 | `dias_desde_inicio_poliza` | 1.83% |
-| 9 | `monto_promedio_reclamado_usd` (prov) | 1.81% |
-| 10 | `marca_Hyundai` | 1.80% |
-| 11 | `marca_Nissan` | 1.80% |
-| 12 | `lista_restrictiva` | 1.43% |
-| 13 | `tipo_beneficiario_Taller` | 1.14% |
-| 14 | `dias_entre_ocurrencia_reporte` | 1.12% |
-| 15 | `monto_estimado_usd` | 1.12% |
+| 1 | `n_inconsistentes` (docs) | 10.88% |
+| 2 | `documentos_completos` | 6.75% |
+| 3 | `cobertura_Responsabilidad Civil` | 4.35% |
+| 4 | `lista_restrictiva` | **4.19%** ⬆ |
+| 5 | `fault_responsable_Tercero` | 3.24% |
+| 6 | `monto_promedio_reclamado_usd` (prov) | 2.71% |
+| 7 | `deducible_usd` | 2.41% |
+| 8 | `cobertura_Robo` | **1.96%** ⬆ |
+| 9 | `tipo_cobertura_Liability` | 1.63% |
+| 10 | `dias_desde_fin_poliza` | 1.56% |
+| 11 | `dias_entre_ocurrencia_reporte` | 1.44% |
+| 12 | `cobertura_Pérdida Total` | 1.24% |
+| 13 | `ratio_pagado_reclamado` | 1.16% |
+| 14 | `tipo_cobertura_Collision` | 1.13% |
+| 15 | `n_no_entregados` | 1.12% |
 
-**Interpretación:** las features más predictivas alinean con el conocimiento de negocio:
-- Cobertura RC es la más asociada a fraude simulado en el dataset
-- Documentos inconsistentes (señal 11 del reto) aparece como top-4
-- Días desde inicio de póliza (señal 1) tiene peso
-- Proveedor en lista restrictiva (RF-03) tiene peso
+**Interpretación (v3):** el modelo aprendió correctamente los patrones que el reto identifica:
+- **`n_inconsistentes` ahora #1** (10.9%) — confirma señal 11 del reto como dominante
+- **`lista_restrictiva` saltó a #4** (4.2% vs 1.4% en v2) — el modelo ahora pondera fuerte RF-03
+- **`cobertura_Robo` apareció en top-15** — refuerza RF-01 (PTxRB)
+- Las features sospechosas de sesgo (marcas específicas) desaparecieron del top
+- `ratio_pagado_reclamado` apareció como predictivo — captura PTxRB indirectamente
 
 ## 6. Uso esperado y limitaciones
 

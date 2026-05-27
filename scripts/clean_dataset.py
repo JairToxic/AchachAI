@@ -25,7 +25,10 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW_PATH = ROOT / "data" / "raw" / "Car_Insurance_Fraud_Detection_Dataset.csv"
+# Si existe el dataset extendido (con +10K filas diversas), usarlo. Sino, el original.
+_EXTENDED = ROOT / "data" / "raw" / "Car_Insurance_Fraud_Detection_Dataset_extended.csv"
+_ORIG = ROOT / "data" / "raw" / "Car_Insurance_Fraud_Detection_Dataset.csv"
+RAW_PATH = _EXTENDED if _EXTENDED.exists() else _ORIG
 OUT_PATH = ROOT / "data" / "processed" / "siniestros_clean.csv"
 
 # Rangos realistas Ecuador para seguros vehiculares (USD)
@@ -180,8 +183,14 @@ def main() -> int:
         log(f"ERROR: no encontre el dataset en {RAW_PATH}")
         return 1
 
-    log(f"Leyendo {RAW_PATH.name} (encoding=latin-1, sep=';')...")
-    df = pd.read_csv(RAW_PATH, sep=";", encoding="latin-1", low_memory=False)
+    log(f"Leyendo {RAW_PATH.name} (sep=';')...")
+    # El dataset original esta en Latin-1, el extendido (auto-generado) en UTF-8.
+    try:
+        df = pd.read_csv(RAW_PATH, sep=";", encoding="utf-8", low_memory=False)
+        log("  encoding: UTF-8")
+    except UnicodeDecodeError:
+        df = pd.read_csv(RAW_PATH, sep=";", encoding="latin-1", low_memory=False)
+        log("  encoding: Latin-1 (fallback)")
     log(f"Cargadas {len(df):,} filas x {len(df.columns)} columnas.")
 
     df_before = df.copy()

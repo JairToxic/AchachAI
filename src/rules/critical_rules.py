@@ -138,15 +138,20 @@ def rf06_demora_robo(siniestro: dict) -> dict | None:
 
 # ----------------- RF-07: Narrativa Identica (Clonada) -----------------
 def rf07_narrativa_clonada(siniestro: dict, ctx: Contexto) -> dict | None:
-    """Similitud de embeddings > 0.90 con otra narrativa distinta."""
-    sim = ctx.similitud_max_por_siniestro.get(siniestro.get("id_siniestro"), 0.0)
-    if sim > 0.90:
-        return {
-            "codigo": "RF-07", "nombre": "Narrativa identica/clonada de otro reclamo",
-            "clasificacion": AMARILLO,
-            "evidencia": f"Similitud maxima de embeddings = {sim:.2%}",
-        }
-    return None
+    """Solo dispara si el siniestro esta en el TOP-K de pares mas similares globalmente
+    Y la sim es >0.99 (umbral muy alto sobre los top pares para evitar falsos positivos
+    cuando el dominio textual es homogeneo)."""
+    sid = siniestro.get("id_siniestro")
+    if sid not in ctx.ids_en_topk_similar:
+        return None
+    sim = ctx.similitud_max_por_siniestro.get(sid, 0.0)
+    if sim < 0.99:
+        return None
+    return {
+        "codigo": "RF-07", "nombre": "Narrativa cuasi-identica a otro reclamo (top-K, sim>0.99)",
+        "clasificacion": AMARILLO,
+        "evidencia": f"En top-K de pares mas similares (sim={sim:.4f})",
+    }
 
 
 # ----------------- Orquestador -----------------

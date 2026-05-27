@@ -86,47 +86,104 @@ def main() -> int:
     norms[norms == 0] = 1
     embeddings = embeddings / norms
 
-    # Similitudes: para cada siniestro, encontrar la MAXIMA sim con OTRO siniestro
-    # Usamos chunks para no comer toda la RAM (15K x 15K matriz = 1.7GB en float32)
-    log("Calculando similitudes coseno (chunked)...")
+    # Guardar embeddings + ids para evitar recomputar en futuras iteraciones
+    EMB_PATH = PROC / "embeddings_descripciones.npz"
+    np.savez_compressed(EMB_PATH, embeddings=embeddings,
+                        ids=s["id_siniestro"].values)
+    log(f"  matriz de embeddings guardada en {EMB_PATH.name} ({EMB_PATH.stat().st_size/1024/1024:.1f} MB)")
+
+    # Estrategia TOP-K: encontrar los PARES mas similares globalmente.
+    # Como todos los textos del dominio se parecen entre si (~0.97 medio),
+    # un umbral absoluto no sirve. Usamos top 100 pares para marcar como sospechosos
+    # de "narrativa clonada" - los outliers reales.
+    log("Calculando similitudes coseno (chunked) y guardando top-K...")
+    chunk = 500
+    top_k = 100  # los 100 pares mas similares en TODO el dataset
+    # Heap de los top K pares (sim, i, j)
+    import heapq
+    heap = []  # min-heap, mantenemos solo los top K mas grandes
+
+    # Tambien guardamos max_sim por siniestro (para diagnostico)
     max_sims = np.zeros(len(s), dtype=np.float32)
     match_ids = np.empty(len(s), dtype=object)
-    chunk = 500
+
     for i in range(0, len(s), chunk):
-        # Sim de [i:i+chunk] contra TODO
         block = embeddings[i:i+chunk]
         sim = block @ embeddings.T  # (chunk, N)
-        # Excluir self-match: poner -inf en diagonal
+        # Excluir self-match
         for k in range(len(block)):
             sim[k, i + k] = -1.0
-        # Max por fila
+            # Excluir tambien la mitad inferior para no contar (i,j) y (j,i)
+            sim[k, :i+k+1] = -1.0  # solo j > i
+
+        # Max por fila (para diagnostico)
         max_idx = sim.argmax(axis=1)
         max_val = sim[np.arange(len(block)), max_idx]
         max_sims[i:i+chunk] = max_val
         match_ids[i:i+chunk] = s["id_siniestro"].iloc[max_idx].values
 
-    df_out = pd.DataFrame({
+        # Top-K global: para cada par valido, pushear al heap
+        rows, cols = np.unravel_index(
+            np.argpartition(sim.flatten(), -top_k)[-top_k:],
+            sim.shape,
+        )
+        for r, c in zip(rows, cols):
+            val = float(sim[r, c])
+            if val < 0:
+                continue
+            entry = (val, i + r, int(c))
+            if len(heap) < top_k:
+                heapq.heappush(heap, entry)
+            elif val > heap[0][0]:
+                heapq.heapreplace(heap, entry)
+
+    # Salida 1: max_sim por siniestro (diagnostico)
+    df_max = pd.DataFrame({
         "id_siniestro": s["id_siniestro"].values,
         "max_sim": max_sims,
         "id_match": match_ids,
     })
 
+    # Salida 2: top-K pares globales (lo que de verdad usa el motor de reglas)
+    top_pairs = sorted(heap, key=lambda x: -x[0])
+    df_pairs = pd.DataFrame([
+        {
+            "sim": v,
+            "id_siniestro_a": s["id_siniestro"].iloc[a],
+            "id_siniestro_b": s["id_siniestro"].iloc[b],
+            "rank": rank + 1,
+        }
+        for rank, (v, a, b) in enumerate(top_pairs)
+    ])
+
+    # Calcular el set de ids EN top-K para marcado rapido
+    ids_en_topk = set(df_pairs["id_siniestro_a"]) | set(df_pairs["id_siniestro_b"])
+    df_max["en_top_k"] = df_max["id_siniestro"].isin(ids_en_topk)
+    # Y rank si esta
+    sim_by_id = {}
+    for _, row in df_pairs.iterrows():
+        for _id in (row["id_siniestro_a"], row["id_siniestro_b"]):
+            if _id not in sim_by_id or sim_by_id[_id] < row["sim"]:
+                sim_by_id[_id] = row["sim"]
+    df_max["sim_topk"] = df_max["id_siniestro"].map(sim_by_id).fillna(0.0)
+
     PROC.mkdir(parents=True, exist_ok=True)
-    df_out.to_parquet(OUT, index=False)
+    df_max.to_parquet(OUT, index=False)
+    df_pairs.to_parquet(PROC / "similitudes_top_pares.parquet", index=False)
 
     # Stats
     print("\n" + "=" * 60)
-    print("ESTADISTICAS DE SIMILITUD")
+    print("ESTADISTICAS DE SIMILITUD (top-K)")
     print("=" * 60)
-    print(f"  N siniestros: {len(df_out):,}")
-    print(f"  Sim > 0.95 (RF-07 fuerte): {(df_out['max_sim'] > 0.95).sum()}")
-    print(f"  Sim > 0.90 (RF-07 trigger): {(df_out['max_sim'] > 0.90).sum()}")
-    print(f"  Sim > 0.85 (Senal 13 alta): {(df_out['max_sim'] > 0.85).sum()}")
-    print(f"  Sim 0.70-0.85 (Senal 13 media): {((df_out['max_sim'] >= 0.70) & (df_out['max_sim'] <= 0.85)).sum()}")
-    print(f"  max similitud encontrada: {df_out['max_sim'].max():.3f}")
-    print(f"  median: {df_out['max_sim'].median():.3f}")
+    print(f"  N siniestros: {len(df_max):,}")
+    print(f"  Top {top_k} pares mas similares calculados")
+    print(f"  Siniestros en top-K (marcados como sospechosos): {df_max['en_top_k'].sum()}")
+    print(f"  Sim minima en top-K: {df_pairs['sim'].min():.4f}")
+    print(f"  Sim maxima en top-K: {df_pairs['sim'].max():.4f}")
+    print(f"  Sim mediana global (referencia): {df_max['max_sim'].median():.4f}")
     print("=" * 60)
     log(f"Guardado en {OUT}")
+    log(f"Top pares: {PROC / 'similitudes_top_pares.parquet'}")
     return 0
 
 
