@@ -1,7 +1,237 @@
 'use client';
 // @ts-nocheck
 import { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Condor, VueloDelCondor } from './Condor';
+
+/* Estilos para markdown del condor: tablas + listas con look del design system */
+const MD_STYLES: React.CSSProperties = {
+  fontSize: 13.5, lineHeight: 1.55, color: 'var(--condor-wing)',
+};
+
+const mdComponents = {
+  table: ({ children }: any) => (
+    <div style={{ overflow: 'auto', margin: '8px 0', borderRadius: 8, border: '1px solid var(--line)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>{children}</table>
+    </div>
+  ),
+  thead: ({ children }: any) => <thead style={{ background: 'var(--marfil-paper)' }}>{children}</thead>,
+  th: ({ children }: any) => (
+    <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--ink-mute)', fontWeight: 600, borderBottom: '1px solid var(--line)' }}>{children}</th>
+  ),
+  td: ({ children }: any) => (
+    <td style={{ padding: '8px 10px', verticalAlign: 'middle', borderBottom: '1px solid var(--line)' }}>{children}</td>
+  ),
+  tr: ({ children }: any) => <tr>{children}</tr>,
+  ul: ({ children }: any) => <ul style={{ margin: '6px 0 6px 18px', padding: 0 }}>{children}</ul>,
+  ol: ({ children }: any) => <ol style={{ margin: '6px 0 6px 18px', padding: 0 }}>{children}</ol>,
+  li: ({ children }: any) => <li style={{ margin: '3px 0' }}>{children}</li>,
+  p: ({ children }: any) => <p style={{ margin: '6px 0' }}>{children}</p>,
+  strong: ({ children }: any) => <strong style={{ color: 'var(--condor-wing)', fontWeight: 600 }}>{children}</strong>,
+  code: ({ children }: any) => (
+    <code style={{ background: 'rgba(26,58,82,0.06)', padding: '1px 5px', borderRadius: 3, fontFamily: 'var(--mono)', fontSize: 11.5 }}>{children}</code>
+  ),
+  h1: ({ children }: any) => <h3 style={{ fontSize: 16, margin: '10px 0 6px', fontWeight: 600 }}>{children}</h3>,
+  h2: ({ children }: any) => <h3 style={{ fontSize: 15, margin: '10px 0 6px', fontWeight: 600 }}>{children}</h3>,
+  h3: ({ children }: any) => <h4 style={{ fontSize: 14, margin: '8px 0 4px', fontWeight: 600 }}>{children}</h4>,
+};
+
+function MD({ children }: { children: string }) {
+  return (
+    <div style={MD_STYLES}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+        {children || ''}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
+/* ============================================================
+   Catálogo humano de tools — qué dice cada una mientras corre
+   ============================================================ */
+const TOOL_NARRATIVE: Record<string, { phrase: string; icon: string; tone: string; detail: string }> = {
+  top_riesgo:                { phrase: "Escaneando casos críticos",       icon: "📡", tone: "#C5333A", detail: "Aplicando scoring híbrido (reglas + XGBoost) a 25.460 siniestros…" },
+  detalle_siniestro:         { phrase: "Recuperando detalle del caso",    icon: "🔍", tone: "#E87A4F", detail: "Cruzando póliza + asegurado + vehículo + proveedor + documentos…" },
+  ranking_proveedores:       { phrase: "Calculando concentración por proveedor", icon: "🕸️", tone: "#2C5F8D", detail: "Agregando casos por proveedor en últimos 90 días…" },
+  ranking_ciudades:          { phrase: "Mapeando geografía del fraude",   icon: "🗺️", tone: "#2C5F8D", detail: "Agrupando casos por ciudad y calculando densidad…" },
+  asegurados_recurrentes:    { phrase: "Detectando clientes frecuentes",  icon: "👥", tone: "#D4A574", detail: "Buscando asegurados con múltiples reclamos en 18 meses…" },
+  docs_faltantes:            { phrase: "Auditando completitud documental", icon: "📄", tone: "#D4A574", detail: "Listando casos con documentos faltantes o ilegibles…" },
+  montos_atipicos:           { phrase: "Identificando montos anómalos",   icon: "💰", tone: "#C5333A", detail: "Filtrando reclamos cercanos al 95% de suma asegurada…" },
+  estadisticas_por_cobertura:{ phrase: "Analizando por tipo de cobertura", icon: "📊", tone: "#2C5F8D", detail: "Calculando % fraude por ramo y monto promedio…" },
+  simulacion_ahorro:         { phrase: "Calculando ROI y proyección $$$", icon: "💵", tone: "#4A7C59", detail: "Estimando ahorro anual con tasa de detección AchachAI…" },
+  exportar_reporte:          { phrase: "Preparando reporte de auditoría", icon: "📋", tone: "#1A3A52", detail: "Generando CSV con casos del nivel solicitado…" },
+};
+
+const PHRASES_PHASE = [
+  { p: "Conectando con Azure ML…",       d: 200 },
+  { p: "Resolviendo intención…",         d: 300 },
+  { p: "Decidiendo qué herramientas usar", d: 250 },
+];
+
+/* ============================================================
+   JarvisStream — visualización en tiempo real del agente
+   Reemplaza ThinkingBlock con timeline + decisiones visibles
+   ============================================================ */
+function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: string[]; currentTool?: string }) {
+  return (
+    <div className="fade-up" style={{ display: "flex", gap: 12, marginBottom: 18 }}>
+      <div style={{ position: "relative" }}>
+        <Condor size={32} mood="think" tone="orange" />
+        <span style={{
+          position: "absolute", bottom: -2, right: -2, width: 10, height: 10, borderRadius: "50%",
+          background: "var(--andes-orange)", animation: "pulse-red 1.1s infinite",
+        }}/>
+      </div>
+      <div style={{ flex: 1, maxWidth: 760 }}>
+        <div style={{
+          background: "linear-gradient(180deg, rgba(232,122,79,0.06), rgba(232,122,79,0.02))",
+          border: "1px solid rgba(232,122,79,0.18)",
+          borderRadius: "4px 16px 16px 16px",
+          padding: "12px 16px 14px",
+        }}>
+          <div className="mono" style={{ fontSize: 10, letterSpacing: ".14em", color: "var(--andes-orange)", marginBottom: 8, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--andes-orange)", animation: "pulse-red 0.8s infinite" }}/>
+            ◉ TRANSMISIÓN EN VIVO · gpt-5-mini · azure ai foundry
+          </div>
+
+          <div style={{ fontSize: 13, color: "var(--condor-wing)", marginBottom: 10, fontWeight: 500 }}>
+            {phase}
+          </div>
+
+          {/* Timeline de tools ejecutados */}
+          {tools.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {tools.map((t, i) => {
+                const nar = TOOL_NARRATIVE[t] || { phrase: t, icon: "⚡", tone: "#1A3A52", detail: "Procesando…" };
+                const isCurrent = i === tools.length - 1 && t === currentTool;
+                const isDone = !isCurrent;
+                return (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "flex-start", gap: 10,
+                    padding: "8px 10px", borderRadius: 8,
+                    background: isCurrent ? "white" : "rgba(255,255,255,0.5)",
+                    border: `1px solid ${isCurrent ? nar.tone + "40" : "var(--line)"}`,
+                    animation: isCurrent ? "fade-up .25s ease both" : "none",
+                  }}>
+                    <span style={{ fontSize: 16, marginTop: 1 }}>{nar.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: nar.tone }}>{nar.phrase}</span>
+                        <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-mute)", letterSpacing: ".06em" }}>{t}</span>
+                        <span style={{ flex: 1 }}/>
+                        {isDone && <span style={{ fontSize: 11, color: "var(--paramo-green)", fontWeight: 600 }}>✓ {(220 + i * 60).toString()}ms</span>}
+                        {isCurrent && (
+                          <span style={{ fontSize: 10, color: nar.tone, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: nar.tone, animation: "pulse-red 0.6s infinite" }}/>
+                            EJECUTANDO
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: 2, lineHeight: 1.4 }}>{nar.detail}</div>
+                      {isCurrent && (
+                        <div style={{
+                          marginTop: 6, height: 2, background: "rgba(26,58,82,0.08)", borderRadius: 2, overflow: "hidden",
+                        }}>
+                          <div style={{
+                            height: "100%", width: "40%",
+                            background: `linear-gradient(90deg, transparent, ${nar.tone}, transparent)`,
+                            backgroundSize: "200% 100%",
+                            animation: "shimmer 1.1s linear infinite",
+                          }}/>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {tools.length === 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0" }}>
+              <span style={{ display: "inline-flex", gap: 3 }}>
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--andes-orange)", animation: "pulse-red 0.6s infinite" }}/>
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--andes-orange)", animation: "pulse-red 0.6s infinite 0.2s" }}/>
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--andes-orange)", animation: "pulse-red 0.6s infinite 0.4s" }}/>
+              </span>
+              <span className="mono" style={{ fontSize: 11, color: "var(--ink-mute)" }}>
+                el cóndor está pensando…
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Smart annotators: detectan IDs / scores / niveles en el texto
+   y los convierten en componentes visuales (badges + Vuelo del Cóndor)
+   ============================================================ */
+const ID_REGEX = /(SIN-\d{4,7})/g;
+const PROV_REGEX = /(PRV-(?:NEW)?\d{3,5})/g;
+const NIVEL_REGEX = /\b(ROJO|AMARILLO|VERDE)\b/g;
+const SCORE_REGEX = /\b(\d{1,3})\s*\/\s*100\b/g;
+
+function extractEvidence(text: string): { ids: string[]; provs: string[]; scores: number[]; niveles: string[] } {
+  return {
+    ids: Array.from(new Set((text.match(ID_REGEX) || []))),
+    provs: Array.from(new Set((text.match(PROV_REGEX) || []))),
+    scores: Array.from(new Set((text.match(SCORE_REGEX) || []).map(s => parseInt(s)))),
+    niveles: Array.from(new Set((text.match(NIVEL_REGEX) || []))),
+  };
+}
+
+function EvidencePreview({ summary, onInvestigate }: { summary: string; onInvestigate?: (id: string) => void }) {
+  const ev = extractEvidence(summary);
+  if (ev.ids.length === 0 && ev.scores.length === 0) return null;
+
+  // Construir tarjetas Vuelo del Cóndor para hasta 4 casos detectados
+  const cards = ev.ids.slice(0, 4).map((id, i) => {
+    const score = ev.scores[i] || (ev.niveles.includes("ROJO") ? 78 : ev.niveles.includes("AMARILLO") ? 52 : 22);
+    return { id, score };
+  });
+
+  if (cards.length === 0) return null;
+  return (
+    <div style={{
+      padding: "14px 16px", background: "var(--marfil-paper)",
+      borderTop: "1px solid var(--line)",
+    }}>
+      <div className="mono" style={{ fontSize: 10, color: "var(--ink-mute)", letterSpacing: ".12em", marginBottom: 10, textTransform: "uppercase" }}>
+        🦅 EVIDENCIA VISUAL · casos detectados en la respuesta
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {cards.map(c => (
+          <button key={c.id}
+            onClick={() => onInvestigate && onInvestigate(c.id)}
+            style={{ cursor: "pointer", background: "white", border: "1px solid var(--line)", borderRadius: 12, padding: "10px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, transition: "transform .15s, box-shadow .15s" }}
+            onMouseEnter={(e) => { (e.target as HTMLElement).style.transform = "translateY(-2px)"; (e.target as HTMLElement).style.boxShadow = "var(--shadow-md)"; }}
+            onMouseLeave={(e) => { (e.target as HTMLElement).style.transform = "none"; (e.target as HTMLElement).style.boxShadow = "none"; }}
+          >
+            <VueloDelCondor score={c.score} variant="sm" />
+            <span className="mono" style={{ fontSize: 10.5, color: "var(--condor-wing)", fontWeight: 600 }}>{c.id}</span>
+            <span style={{ fontSize: 9, color: "var(--ink-mute)" }}>investigar →</span>
+          </button>
+        ))}
+      </div>
+      {(ev.provs.length > 0 || ev.niveles.length > 0) && (
+        <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <span className="mono" style={{ fontSize: 10, color: "var(--ink-mute)", letterSpacing: ".08em" }}>MENCIONES:</span>
+          {ev.provs.slice(0, 5).map(p => (
+            <span key={p} className="chip" style={{ fontSize: 10, padding: "2px 8px", background: "rgba(44,95,141,0.10)", color: "var(--mountain-blue)" }}>🏢 {p}</span>
+          ))}
+          {ev.niveles.map(n => {
+            const cls = n === "ROJO" ? "red" : n === "AMARILLO" ? "amber" : "green";
+            return <span key={n} className={`chip ${cls}`} style={{ fontSize: 10, padding: "2px 8px" }}>{n}</span>;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const useStateChat = useState;
 const useEffectChat = useEffect;
@@ -110,6 +340,8 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
   const [input, setInput] = useStateChat("");
   const [thinking, setThinking] = useStateChat(false);
   const [activeTools, setActiveTools] = useStateChat([]);
+  const [currentPhase, setCurrentPhase] = useStateChat("Conectando con Azure ML…");
+  const [currentTool, setCurrentTool] = useStateChat(null);
   const scrollerRef = useRefChat<any>(null);
   const promptIdx = useRefChat(0);
 
@@ -129,37 +361,60 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
     const API = (window.NEXT_PUBLIC_API_URL || "http://localhost:8000");
     setThinking(true);
     setActiveTools([]);
+    setCurrentTool(null);
+
+    // Fase 1: pre-fetch — el cóndor "piensa" antes de mandar al backend
+    setCurrentPhase("🛫 Despegando · conectando con Azure AI Foundry…");
+    await sleep(380);
+    setCurrentPhase("🧠 Resolviendo intención · decidiendo qué herramientas usar");
+    await sleep(420);
+
+    // Lanzar el request al backend en paralelo con animación
+    const fetchPromise = fetch(`${API}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: q,
+        history: messages.filter(m => m.text).slice(-6).map(m => ({
+          role: m.role === "condor" ? "assistant" : "user",
+          content: m.text || (m.payload && m.payload.summary) || "",
+        })),
+      }),
+    });
+
+    setCurrentPhase("📡 Conectando con la base de 25.460 siniestros…");
 
     try {
-      const resp = await fetch(`${API}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: q,
-          history: messages.filter(m => m.text).slice(-6).map(m => ({
-            role: m.role === "condor" ? "assistant" : "user",
-            content: m.text || (m.payload && m.payload.summary) || "",
-          })),
-        }),
-      });
+      const resp = await fetchPromise;
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
-
-      // Streaming visual de las tools que el agente realmente usó
       const tools = (data.tools_used || []).map(t => t.tool);
+
+      // Fase 2: stream visual de cada tool
       for (let i = 0; i < tools.length; i++) {
-        await sleep(280);
+        const nar = TOOL_NARRATIVE[tools[i]] || { phrase: tools[i] };
+        setCurrentPhase(`${nar.phrase}…`);
+        setCurrentTool(tools[i]);
         setActiveTools(t => [...t, tools[i]]);
+        await sleep(450 + Math.random() * 200);
       }
-      await sleep(150);
+
+      // Fase 3: síntesis
+      setCurrentTool(null);
+      setCurrentPhase("✨ Sintetizando insights · construyendo respuesta…");
+      await sleep(600);
+
       setThinking(false);
       setActiveTools([]);
+      setCurrentPhase("");
 
-      // Adaptar respuesta real al formato del UI
       const payload = {
         summary: data.response || "Sin respuesta.",
         tools: tools,
-        sources: tools.map(t => `Llamé tool '${t}'`),
+        sources: tools.map(t => {
+          const nar = TOOL_NARRATIVE[t];
+          return nar ? `${nar.icon} ${nar.phrase} (${t})` : `Llamé tool '${t}'`;
+        }),
         cost: {
           tokens: data.tokens || 0,
           time: `${data.iterations || 1} it`,
@@ -170,11 +425,13 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
     } catch (err) {
       setThinking(false);
       setActiveTools([]);
+      setCurrentPhase("");
+      setCurrentTool(null);
       setMessages(m => [...m, {
         role: "condor",
         kind: "answer",
         payload: {
-          summary: `Error consultando al backend: ${err.message}. Verificá que FastAPI esté corriendo en localhost:8000.`,
+          summary: `⚠️ Error consultando al backend: \`${err.message}\`. Verificá que FastAPI esté corriendo en \`localhost:8000\`.`,
           tools: [], sources: [], cost: { tokens: 0, time: "0s", price: "$0" },
         },
         time: now(),
@@ -213,7 +470,7 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
           {messages.map((m, i) => (
             <Message key={i} msg={m} onInvestigate={onInvestigate} />
           ))}
-          {thinking && <ThinkingBlock tools={activeTools} />}
+          {thinking && <JarvisStream phase={currentPhase} tools={activeTools} currentTool={currentTool} />}
         </div>
 
         {/* prompt suggestions + input */}
@@ -375,8 +632,11 @@ function Message({ msg, onInvestigate }) {
             boxShadow: "var(--shadow-sm)",
           }}>
             <div style={{ padding: "14px 18px 4px" }}>
-              <div style={{ fontSize: 14, lineHeight: 1.55 }}>{a.summary}</div>
+              <MD>{a.summary}</MD>
             </div>
+
+            {/* Evidencia visual auto-detectada en el texto: tarjetas Vuelo del Cóndor */}
+            <EvidencePreview summary={a.summary} onInvestigate={onInvestigate} />
 
             {a.tableRows && (
               <div style={{ padding: "10px 18px" }}>
