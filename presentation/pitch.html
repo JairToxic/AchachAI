@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>AchachAI · hackIAthon 2026 · Pitch</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; background: #f0f0f0; color: #1f2937; }
+  .slide {
+    width: 297mm; height: 210mm; padding: 28mm 26mm;
+    background: #fff; margin: 12mm auto;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.12); position: relative; page-break-after: always;
+    display: flex; flex-direction: column;
+  }
+  .slide-num { position: absolute; bottom: 14mm; right: 26mm; font-size: 10pt; color: #9ca3af; }
+  .slide-brand { position: absolute; top: 14mm; right: 26mm; font-size: 9pt; color: #2563eb; font-weight: 600; letter-spacing: 1px; }
+  h1 { font-size: 32pt; margin-bottom: 6mm; color: #111827; letter-spacing: -0.5px; }
+  h2 { font-size: 22pt; margin-bottom: 4mm; color: #2563eb; font-weight: 700; }
+  h3 { font-size: 16pt; margin: 4mm 0 2mm; color: #1f2937; font-weight: 600; }
+  p { font-size: 11.5pt; line-height: 1.55; margin-bottom: 3mm; }
+  ul, ol { margin-left: 6mm; margin-bottom: 3mm; }
+  li { font-size: 11.5pt; line-height: 1.6; margin-bottom: 1.5mm; }
+  strong { color: #111827; font-weight: 700; }
+  code, pre { font-family: "Consolas", "Monaco", monospace; background: #f3f4f6; padding: 1mm 2mm; border-radius: 2mm; font-size: 10pt; color: #db2777; }
+  pre { padding: 4mm; line-height: 1.45; overflow-x: auto; color: #1f2937; white-space: pre; }
+  table { width: 100%; border-collapse: collapse; font-size: 10.5pt; margin: 3mm 0; }
+  th { background: #2563eb; color: white; padding: 2mm 3mm; text-align: left; font-weight: 600; }
+  td { padding: 2mm 3mm; border-bottom: 1px solid #e5e7eb; }
+  tr:nth-child(even) td { background: #f9fafb; }
+  .hero { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; text-align: center; }
+  .hero h1 { font-size: 56pt; background: linear-gradient(135deg, #2563eb, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 4mm; }
+  .hero .sub { font-size: 18pt; color: #6b7280; margin-bottom: 8mm; }
+  .hero .meta { font-size: 12pt; color: #9ca3af; }
+  .quote { background: #fef3c7; padding: 5mm; border-left: 4mm solid #f59e0b; margin: 4mm 0; font-style: italic; font-size: 12pt; color: #78350f; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4mm; margin: 4mm 0; }
+  .kpi { background: linear-gradient(135deg, #eff6ff, #dbeafe); padding: 4mm; border-radius: 3mm; border-left: 3mm solid #2563eb; }
+  .kpi .label { font-size: 9pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi .value { font-size: 22pt; font-weight: 700; color: #1e40af; }
+  .kpi.red { background: linear-gradient(135deg, #fef2f2, #fee2e2); border-left-color: #dc2626; }
+  .kpi.red .value { color: #991b1b; }
+  .kpi.green { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-left-color: #16a34a; }
+  .kpi.green .value { color: #14532d; }
+  .layers { display: flex; flex-direction: column; gap: 3mm; margin: 4mm 0; }
+  .layer { padding: 4mm 5mm; border-radius: 3mm; border-left: 4mm solid; }
+  .layer.l1 { background: #f3e8ff; border-color: #9333ea; }
+  .layer.l2 { background: #dbeafe; border-color: #2563eb; }
+  .layer.l3 { background: #d1fae5; border-color: #059669; }
+  .layer .title { font-weight: 700; font-size: 12pt; }
+  .layer .desc { font-size: 10.5pt; color: #4b5563; margin-top: 1mm; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .arch { font-family: "Consolas", monospace; font-size: 9pt; background: #1f2937; color: #d1fae5; padding: 5mm; border-radius: 3mm; line-height: 1.35; white-space: pre; }
+  .badge { display: inline-block; padding: 1mm 3mm; border-radius: 2mm; font-size: 9pt; font-weight: 600; }
+  .badge.ok { background: #d1fae5; color: #065f46; }
+  .badge.warn { background: #fef3c7; color: #92400e; }
+  .badge.fail { background: #fee2e2; color: #991b1b; }
+  .small { font-size: 10pt; color: #6b7280; }
+  .footer-tags { font-size: 10pt; color: #6b7280; }
+  .footer-tags strong { color: #2563eb; }
+
+  @media print {
+    body { background: white; }
+    .slide { margin: 0; box-shadow: none; page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: Portada -->
+<section class="slide">
+  <div class="slide-brand">HACKIATHON 2026 · ASEGURADORA DEL SUR</div>
+  <div class="hero">
+    <h1>AchachAI</h1>
+    <div class="sub">Detector de Posibles Fraudes en Siniestros Vehiculares</div>
+    <div class="meta">
+      Stack: <strong>Azure ML</strong> · <strong>Azure AI Foundry (gpt-5-mini)</strong> · FastAPI · Next.js<br>
+      Repo: <code>github.com/JairToxic/AchachAI</code>
+    </div>
+    <div class="quote" style="margin-top: 8mm; text-align: left;">
+      La solución genera <strong>alertas de revisión</strong> para apoyar al analista humano,
+      <strong>no acusaciones automáticas</strong> de fraude.
+    </div>
+  </div>
+  <div class="slide-num">AchachAI · hackIAthon 2026</div>
+</section>
+
+<!-- SLIDE 2: Problema -->
+<section class="slide">
+  <div class="slide-brand">PROBLEMA & OPORTUNIDAD</div>
+  <h2>El analista antifraude pierde tiempo en lo obvio</h2>
+
+  <ul>
+    <li><strong>15.000+ siniestros mensuales</strong> en una aseguradora típica de Ecuador.</li>
+    <li>Solo <strong>6–8%</strong> son posibles fraudes, pero hay que revisarlos todos.</li>
+    <li>Detección manual = experiencia del analista + cruce mental de variables + reglas en Excel.</li>
+  </ul>
+
+  <h3>Consecuencias</h3>
+  <table>
+    <tr><th>Pérdida directa</th><th>Costo indirecto</th></tr>
+    <tr><td>Pagos a fraudes que pasan filtro</td><td>Tiempo del analista en casos verdes</td></tr>
+    <tr><td>Reservas sobreestimadas</td><td>Atraso en pagos legítimos</td></tr>
+    <tr><td>Riesgo regulatorio SBS</td><td>Frustración del cliente honesto</td></tr>
+  </table>
+
+  <div class="quote" style="margin-top: 6mm;">
+    "Si un analista revisa 100 casos al día y el 92% son verdes, está perdiendo 7 horas
+    diarias en casos que un sistema podría descartar en 1 segundo."
+  </div>
+
+  <div class="slide-num">2 · Problema y oportunidad</div>
+</section>
+
+<!-- SLIDE 3: Solución -->
+<section class="slide">
+  <div class="slide-brand">SOLUCIÓN PROPUESTA</div>
+  <h2>Un sistema HÍBRIDO de 3 capas</h2>
+
+  <div class="layers">
+    <div class="layer l1">
+      <div class="title">1 · Reglas determinísticas — 7 críticas (RF-01..07) + 14 señales puntuadas</div>
+      <div class="desc">Trazable y auditable. Cada caso ROJO/AMARILLO se justifica con regla + evidencia.</div>
+    </div>
+    <div class="layer l2">
+      <div class="title">2 · Modelo XGBoost en Azure ML — registrado como <code>achachai-fraude-xgb v2</code></div>
+      <div class="desc">Captura patrones implícitos. AUC-ROC 0.94. Top features alinean con las señales del reto.</div>
+    </div>
+    <div class="layer l3">
+      <div class="title">3 · Agente conversacional GPT-5-mini en Azure AI Foundry — 8 tools con DuckDB</div>
+      <div class="desc">El analista pregunta en lenguaje natural. Responde con tabla + evidencia + acción sugerida.</div>
+    </div>
+  </div>
+
+  <h3>Cada caso recibe</h3>
+  <ul>
+    <li>Score <strong>0–100</strong> + semáforo <span style="color:#16a34a">VERDE</span> / <span style="color:#d97706">AMARILLO</span> / <span style="color:#dc2626">ROJO</span></li>
+    <li><strong>Reglas activadas</strong> con citas concretas (id, fechas, montos, proveedor)</li>
+    <li><strong>Explicación natural</strong> generada por GPT-5-mini, lenguaje no-acusatorio</li>
+    <li><strong>Top 5 features SHAP</strong> del modelo para interpretabilidad</li>
+  </ul>
+
+  <div class="slide-num">3 · Solución</div>
+</section>
+
+<!-- SLIDE 4: Demo -->
+<section class="slide">
+  <div class="slide-brand">DEMO EN VIVO (4 MIN)</div>
+  <h2>Guión cronometrado de la demo</h2>
+
+  <table>
+    <tr><th style="width:18mm">Tiempo</th><th style="width:45mm">Pantalla</th><th>Acción</th></tr>
+    <tr><td>0:00–0:30</td><td>Dashboard <code>/</code></td><td>15.460 casos · $102M reclamado · $9.8M en riesgo · 4 proveedores en lista restrictiva</td></tr>
+    <tr><td>0:30–1:10</td><td>Tabla top riesgo</td><td>Top 8 casos calculados en vivo combinando reglas + XGBoost</td></tr>
+    <tr><td>1:10–1:50</td><td>Click en <code>SIN-0900000</code></td><td>Caso PTxRB inyectado · semáforo ROJO · RF-01 activa · evidencia: pagado=98% suma</td></tr>
+    <tr><td>1:50–2:20</td><td>Detalle señales</td><td>14 señales puntuadas, cada una con su evidencia textual</td></tr>
+    <tr><td>2:20–2:50</td><td>Bandeja <code>/casos</code></td><td>Filtro ciudad="Loja" + cobertura="Robo" → 12 casos sospechosos</td></tr>
+    <tr><td>2:50–3:30</td><td>Chat <code>/chat</code></td><td>"¿Qué proveedores concentran más alertas?" → agente llama tool, devuelve tabla con PRV-0044 LISTA RESTRICTIVA + acción sugerida</td></tr>
+    <tr><td>3:30–4:00</td><td>Portal Azure ML</td><td>Mostrar workspace <code>mlw-achachai</code> con modelo registrado + endpoint provisionado</td></tr>
+  </table>
+
+  <div class="quote" style="margin-top: 6mm;">
+    Probaremos con casos de la cartera real del jurado si están autorizados. Sin eso,
+    usamos los 40 casos críticos inyectados que cubren las reglas RF-01..05 al 97.5%.
+  </div>
+
+  <div class="slide-num">4 · Demo funcional</div>
+</section>
+
+<!-- SLIDE 5: Arquitectura -->
+<section class="slide">
+  <div class="slide-brand">ARQUITECTURA & USO DE IA</div>
+  <h2>Stack técnico end-to-end</h2>
+
+  <div class="arch">┌──────────────────────────────────────────────┐
+│  ANALISTA → Browser (localhost:3000)         │
+└────────────────┬─────────────────────────────┘
+                 │ HTTPS / JSON
+┌────────────────▼─────────────────────────────┐
+│  Frontend Next.js 14 (App Router + Tailwind) │
+│  Dashboard · Bandeja · Detalle · Chat · Prov.│
+└────────────────┬─────────────────────────────┘
+                 │
+┌────────────────▼─────────────────────────────┐
+│  FastAPI Backend (10 endpoints)              │
+│  /casos /chat /top-riesgo /kpis /reportes... │
+└──┬──────────┬──────────────┬─────────────────┘
+   │          │              │
+   ▼          ▼              ▼
+┌────────┐ ┌──────────┐ ┌────────────────────────┐
+│Reglas  │ │ Azure ML │ │ Azure AI Foundry       │
+│Python  │ │ Endpoint │ │ gpt-5-mini             │
+│7 RF +  │ │ XGBoost  │ │ + text-embedding-3     │
+│14 señ. │ │ AUC 0.94 │ │ + 8 tools (DuckDB)     │
+└────────┘ └──────────┘ └────────────────────────┘
+            │
+            ▼
+    Modelo `achachai-fraude-xgb v2`
+    Workspace `mlw-achachai` (eastus2)
+    Compute cluster `cpu-cluster` (0–2 nodes)</div>
+
+  <h3>Decisiones técnicas clave</h3>
+  <table>
+    <tr><th>Decisión</th><th>Por qué</th></tr>
+    <tr><td>Modelo registrado en Azure ML</td><td>Versionado, auditable, accesible vía REST</td></tr>
+    <tr><td>Compute min=0 nodes + idle 600s</td><td>$0 de costo cuando no entrena</td></tr>
+    <tr><td>DuckDB sobre parquet</td><td>Queries sub-segundo sin DB server</td></tr>
+    <tr><td>Function calling con 8 tools</td><td>Agente determinístico, evita alucinación</td></tr>
+    <tr><td>Embeddings text-3-large</td><td>Detección narrativas clonadas (RF-07)</td></tr>
+  </table>
+
+  <div class="slide-num">5 · Arquitectura</div>
+</section>
+
+<!-- SLIDE 6: Impacto -->
+<section class="slide">
+  <div class="slide-brand">IMPACTO DE NEGOCIO</div>
+  <h2>Resultados técnicos y proyección financiera</h2>
+
+  <h3>Métricas del modelo XGBoost</h3>
+  <div class="kpi-grid">
+    <div class="kpi green"><div class="label">AUC-ROC</div><div class="value">0.94</div></div>
+    <div class="kpi green"><div class="label">PR-AUC</div><div class="value">0.64</div></div>
+    <div class="kpi"><div class="label">F1-score</div><div class="value">0.58</div></div>
+    <div class="kpi green"><div class="label">Recall en inyectados</div><div class="value">97.5%</div></div>
+  </div>
+
+  <h3>Sistema híbrido (reglas + modelo + agente)</h3>
+  <ul>
+    <li><strong>39/40 casos críticos inyectados</strong> detectados como ROJO o AMARILLO</li>
+    <li><strong>~10% falsos positivos</strong> en no-fraudes (mayoría por RF-03 que es comportamiento correcto)</li>
+    <li>Latencia evaluación: <strong>&lt;100ms</strong> local · <strong>&lt;500ms</strong> endpoint Azure</li>
+    <li>Costo agente: <strong>~$0.014 USD</strong> por consulta (gpt-5-mini)</li>
+  </ul>
+
+  <h3>Proyección anual (30.000 siniestros/año · $8.000 promedio fraude)</h3>
+  <table>
+    <tr><th>Escenario</th><th>Detección</th><th>Recuperación anual</th></tr>
+    <tr><td>Hoy (manual)</td><td>30%</td><td>$432.000</td></tr>
+    <tr><td><strong>AchachAI (recall 70% combinado)</strong></td><td><strong>70%</strong></td><td><strong>$1.008.000</strong></td></tr>
+    <tr style="background:#dcfce7"><td colspan="2"><strong>Ganancia neta vs. costo Azure (~$3.600/año)</strong></td><td><strong>+$572.400</strong></td></tr>
+  </table>
+
+  <div class="quote"><strong>ROI proyectado: 160x</strong> en el primer año de operación.</div>
+
+  <div class="slide-num">6 · Impacto</div>
+</section>
+
+<!-- SLIDE 7: Limitaciones -->
+<section class="slide">
+  <div class="slide-brand">LIMITACIONES & ÉTICA</div>
+  <h2>Lo que NO hace este sistema</h2>
+
+  <div class="two-col">
+    <div>
+      <ul>
+        <li>❌ NO rechaza siniestros automáticamente</li>
+        <li>❌ NO toma decisiones de pago</li>
+        <li>❌ NO acusa a un cliente de fraude</li>
+        <li>❌ NO sustituye al analista humano</li>
+        <li>❌ NO procesa datos personales reales (dataset sintético)</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Salvaguardas implementadas</h3>
+      <ul>
+        <li>System prompt prohíbe acusar</li>
+        <li>Test automático verifica lenguaje no acusatorio</li>
+        <li>Toda alerta requiere revisión humana</li>
+        <li>Score es input al analista, NO output al cliente</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Limitaciones conocidas (documentadas en <code>docs/limitaciones.md</code>)</h3>
+  <table>
+    <tr><th>Limitación</th><th>Mitigación</th></tr>
+    <tr><td>Dataset sintético</td><td>Piloto con datos reales anonimizados antes de prod</td></tr>
+    <tr><td>Solo ramo Vehículos</td><td>Roadmap: extender a Salud, Vida, Hogar</td></tr>
+    <tr><td>Recall modelo 57%</td><td>Compensado con motor de reglas (sistema combinado &gt;85%)</td></tr>
+    <tr><td>RF-03 muy amplia (proveedor restrictivo dispara rojo)</td><td>Refinar a nivel asegurado+proveedor en prod</td></tr>
+    <tr><td>Sin análisis de imágenes</td><td>Roadmap: visión por computadora para fotos de daños</td></tr>
+  </table>
+
+  <div class="slide-num">7 · Limitaciones</div>
+</section>
+
+<!-- SLIDE 8: Cierre -->
+<section class="slide">
+  <div class="slide-brand">CIERRE & PRÓXIMOS PASOS</div>
+  <h2>Roadmap post-hackathon</h2>
+
+  <table>
+    <tr><th style="width:30mm">Sprint</th><th>Objetivo</th></tr>
+    <tr><td>2 semanas</td><td>Piloto con 1.000 siniestros reales anonimizados</td></tr>
+    <tr><td>1 mes</td><td>Calibrar pesos del semáforo con histórico real</td></tr>
+    <tr><td>2 meses</td><td>Integración API con sistema core de Aseguradora</td></tr>
+    <tr><td>3 meses</td><td>Extender a ramos Salud y Hogar</td></tr>
+    <tr><td>6 meses</td><td>Dashboard monitoreo (drift, fairness, ROI mensual)</td></tr>
+  </table>
+
+  <div class="hero" style="flex: 1; padding: 10mm 0;">
+    <h1 style="font-size: 36pt; background: linear-gradient(135deg, #2563eb, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">"AchachAI" = "rápido" en kichwa</h1>
+    <p style="font-size: 16pt; color: #4b5563; max-width: 200mm; text-align: center; margin-top: 4mm;">
+      Eso es lo que damos al analista antifraude:<br>
+      <strong style="color:#1f2937">del Excel manual al insight en 30 segundos.</strong>
+    </p>
+  </div>
+
+  <div class="footer-tags" style="text-align: center; margin-top: 6mm;">
+    <strong>#hackIAthon</strong> · #IAenEcuador · #AgenteIA · #AgenteASUR · #DesafíoTechIA · #IdeasQueImpactan<br><br>
+    Sponsors: @viamatica · @aseguradoradelsurec · @uteg_universidad · @revistaitahora · @citytech.ecuador · @notionhq
+  </div>
+
+  <div class="slide-num">8 · Gracias · Preguntas?</div>
+</section>
+
+</body>
+</html>

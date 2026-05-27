@@ -243,6 +243,48 @@ def docs_faltantes(min_score: int = 76) -> dict:
     return {"casos_con_problemas_docs": _df_to_records(df, limit=30)}
 
 
+# ===================== TOOL 7: montos_atipicos =====================
+def montos_atipicos(top_n: int = 20, ratio_min: float = 0.80) -> dict:
+    """Siniestros donde monto_reclamado / suma_asegurada >= ratio_min (default 80%)."""
+    con = _con()
+    df = con.execute(f"""
+    SELECT s.id_siniestro, s.cobertura, s.estado, s.ciudad_evento,
+           s.monto_reclamado_usd, p.suma_asegurada_usd,
+           ROUND(s.monto_reclamado_usd * 1.0 / p.suma_asegurada_usd, 3) AS ratio,
+           s.etiqueta_fraude_simulada, s.caso_inyectado
+    FROM siniestros s
+    JOIN polizas p ON s.id_poliza = p.id_poliza
+    WHERE p.suma_asegurada_usd > 0
+      AND (s.monto_reclamado_usd * 1.0 / p.suma_asegurada_usd) >= {ratio_min}
+    ORDER BY ratio DESC
+    LIMIT {top_n}
+    """).df()
+    return {
+        "umbral_aplicado": ratio_min,
+        "n_casos": len(df),
+        "casos": _df_to_records(df, limit=top_n),
+    }
+
+
+# ===================== TOOL 8: estadisticas_por_cobertura =====================
+def estadisticas_por_cobertura() -> dict:
+    """% de fraude simulado, monto promedio y N siniestros por cobertura.
+    Responde 'que ramos / coberturas tienen mayor porcentaje sospechoso'."""
+    con = _con()
+    df = con.execute("""
+    SELECT cobertura,
+           COUNT(*) AS n_siniestros,
+           SUM(etiqueta_fraude_simulada) AS n_fraudes_simulados,
+           ROUND(AVG(etiqueta_fraude_simulada) * 100, 2) AS pct_fraude,
+           ROUND(AVG(monto_reclamado_usd), 0) AS monto_promedio,
+           ROUND(SUM(monto_reclamado_usd), 0) AS monto_total
+    FROM siniestros
+    GROUP BY cobertura
+    ORDER BY pct_fraude DESC
+    """).df()
+    return {"por_cobertura": _df_to_records(df, limit=20)}
+
+
 TOOLS_REGISTRY: dict[str, Any] = {
     "top_riesgo": top_riesgo,
     "detalle_siniestro": detalle_siniestro,
@@ -250,6 +292,8 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "ranking_ciudades": ranking_ciudades,
     "asegurados_recurrentes": asegurados_recurrentes,
     "docs_faltantes": docs_faltantes,
+    "montos_atipicos": montos_atipicos,
+    "estadisticas_por_cobertura": estadisticas_por_cobertura,
 }
 
 
@@ -333,6 +377,28 @@ TOOLS_SCHEMA = [
                 "type": "object",
                 "properties": {"min_score": {"type": "integer", "default": 76}},
             },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "montos_atipicos",
+            "description": "Siniestros con monto reclamado muy proximo o superior al limite de la poliza (ratio reclamado/suma_asegurada). Usar cuando preguntan por 'montos atipicos', 'reclamos cerca del limite', 'monto excesivo'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "top_n": {"type": "integer", "default": 20},
+                    "ratio_min": {"type": "number", "description": "Umbral del ratio reclamado/suma (default 0.80 = 80%)", "default": 0.80},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "estadisticas_por_cobertura",
+            "description": "% de fraude simulado, monto promedio y N siniestros agrupados por COBERTURA. Usar cuando preguntan 'que ramos / coberturas tienen mayor porcentaje sospechoso' o 'distribucion de fraude por tipo'.",
+            "parameters": {"type": "object", "properties": {}},
         },
     },
 ]
