@@ -149,7 +149,11 @@ def detalle_siniestro(id_siniestro: str) -> dict:
     all_sin = con.execute("SELECT * FROM siniestros").df()
     all_prov = con.execute("SELECT * FROM proveedores").df()
     sim_path = PROC / "similitudes.parquet"
-    sim_df = pd.read_parquet(sim_path) if sim_path.exists() else None
+    sim_df = None
+    if sim_path.exists():
+        _tmp = pd.read_parquet(sim_path)
+        if "sim_topk" in _tmp.columns and "en_top_k" in _tmp.columns:
+            sim_df = _tmp
     ctx = build_contexto(all_sin, all_prov, similitudes_df=sim_df)
 
     r = evaluate_siniestro(

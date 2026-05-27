@@ -35,6 +35,9 @@ htmlcov/
 # (mantenemos data/raw/ y data/synthetic/ versionados para reproducibilidad)
 data/processed/*.parquet
 data/processed/*.csv
+# EXCEPCIONES: archivos chicos que dependen de embeddings caros ($0.40)
+!data/processed/similitudes.parquet
+!data/processed/similitudes_top_pares.parquet
 *.pkl
 *.joblib
 *.onnx
@@ -52,6 +55,23 @@ runs/
 
 # --- Claude Code local state ---
 .claude/
+
+# --- Cache temporal ---
+tmp/
+
+# --- Embeddings binarios (236MB, regenerable con compute_embeddings.py) ---
+data/processed/embeddings_descripciones.npz
+
+# --- Otros datos pesados regenerables (mantenemos similitudes.parquet que es chico) ---
+data/processed/features.parquet
+data/processed/siniestros_clean.csv
+data/processed/siniestros.parquet
+data/processed/polizas.parquet
+data/processed/asegurados.parquet
+data/processed/vehiculos.parquet
+data/processed/proveedores.parquet
+data/processed/conductores.parquet
+data/processed/documentos.parquet
 
 # --- Node / frontend ---
 frontend/node_modules/
