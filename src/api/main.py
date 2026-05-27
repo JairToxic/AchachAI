@@ -37,8 +37,12 @@ from src.ai_agent.tools import (  # noqa: E402
     asegurados_recurrentes,
     detalle_siniestro,
     docs_faltantes,
+    estadisticas_por_cobertura,
+    exportar_reporte,
+    montos_atipicos,
     ranking_ciudades,
     ranking_proveedores,
+    simulacion_ahorro,
     top_riesgo,
 )
 from src.rules import build_contexto, evaluate_siniestro  # noqa: E402
@@ -191,6 +195,102 @@ def reporte_ejecutivo():
         "prioritarias para el analista."
     )
     return result
+
+
+@app.get("/simulacion-ahorro")
+def get_simulacion_ahorro(
+    tasa_deteccion_actual: float = 0.30,
+    tasa_deteccion_achachai: float = 0.70,
+):
+    """Calcula ahorro potencial anual + ROI."""
+    return simulacion_ahorro(
+        tasa_deteccion_actual=tasa_deteccion_actual,
+        tasa_deteccion_achachai=tasa_deteccion_achachai,
+    )
+
+
+@app.get("/exportar-reporte")
+def get_exportar_reporte(nivel: str = "ROJO", limit: int = 50):
+    """Genera reporte de auditoria como JSON (cliente lo puede convertir a CSV)."""
+    return exportar_reporte(nivel=nivel, limit=limit)
+
+
+@app.get("/exportar-reporte.csv")
+def get_exportar_reporte_csv(nivel: str = "ROJO", limit: int = 100):
+    """Genera el reporte directamente como CSV descargable."""
+    import io, csv
+    from fastapi.responses import StreamingResponse
+    r = exportar_reporte(nivel=nivel, limit=limit)
+    out = io.StringIO()
+    if r["casos"]:
+        w = csv.DictWriter(out, fieldnames=r["casos"][0].keys())
+        w.writeheader()
+        w.writerows(r["casos"])
+    out.seek(0)
+    return StreamingResponse(
+        iter([out.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=reporte_auditoria_{nivel}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.csv"},
+    )
+
+
+@app.get("/red-relaciones")
+def get_red_relaciones(min_siniestros: int = 5):
+    """Devuelve nodos y aristas del grafo asegurado-proveedor para visualizar."""
+    import duckdb
+    con = duckdb.connect(":memory:")
+    con.execute(f"CREATE VIEW s AS SELECT * FROM '{(PROC / 'siniestros.parquet').as_posix()}'")
+    con.execute(f"CREATE VIEW p AS SELECT * FROM '{(PROC / 'proveedores.parquet').as_posix()}'")
+    con.execute(f"CREATE VIEW a AS SELECT * FROM '{(PROC / 'asegurados.parquet').as_posix()}'")
+
+    # Nodos: proveedores top y asegurados con muchos reclamos
+    prov_top = con.execute(f"""
+        SELECT p.id_proveedor, p.nombre, p.tipo, p.lista_restrictiva,
+               COUNT(s.id_siniestro) AS n_siniestros
+        FROM p
+        LEFT JOIN s ON s.id_proveedor = p.id_proveedor
+        GROUP BY ALL
+        HAVING COUNT(s.id_siniestro) >= {min_siniestros}
+        ORDER BY n_siniestros DESC LIMIT 30
+    """).df()
+
+    ase_top = con.execute(f"""
+        SELECT a.id_asegurado, a.segmento, a.ciudad,
+               COUNT(s.id_siniestro) AS n_siniestros
+        FROM a
+        JOIN s ON s.id_asegurado = a.id_asegurado
+        GROUP BY ALL
+        HAVING COUNT(s.id_siniestro) >= {min_siniestros}
+        ORDER BY n_siniestros DESC LIMIT 30
+    """).df()
+
+    # Aristas: cuantos siniestros tienen entre cada par (asegurado, proveedor)
+    if ase_top.empty or prov_top.empty:
+        pares = ase_top.iloc[0:0]
+        pares["n"] = []
+    else:
+        pares = con.execute(f"""
+            SELECT s.id_asegurado, s.id_proveedor, COUNT(*) AS n
+            FROM s
+            WHERE s.id_asegurado IN ({','.join("'" + i + "'" for i in ase_top.id_asegurado)})
+              AND s.id_proveedor IN ({','.join("'" + i + "'" for i in prov_top.id_proveedor)})
+            GROUP BY ALL
+            HAVING n >= 2
+            ORDER BY n DESC LIMIT 200
+        """).df()
+
+    nodes = []
+    for _, p in prov_top.iterrows():
+        nodes.append({"id": p["id_proveedor"], "label": p["nombre"][:25],
+                       "type": "proveedor", "n": int(p["n_siniestros"]),
+                       "restrictiva": bool(p["lista_restrictiva"])})
+    for _, ai in ase_top.iterrows():
+        nodes.append({"id": ai["id_asegurado"], "label": ai["id_asegurado"],
+                       "type": "asegurado", "n": int(ai["n_siniestros"]),
+                       "ciudad": ai["ciudad"]})
+    edges = [{"source": r["id_asegurado"], "target": r["id_proveedor"], "weight": int(r["n"])}
+             for _, r in pares.iterrows()]
+    return {"nodes": nodes, "edges": edges, "stats": {"n_nodes": len(nodes), "n_edges": len(edges)}}
 
 
 @app.post("/analyze-document")

@@ -298,6 +298,155 @@ def estadisticas_por_cobertura() -> dict:
     return {"por_cobertura": _df_to_records(df, limit=20)}
 
 
+# ===================== TOOL 9: simulacion_ahorro =====================
+def simulacion_ahorro(
+    tasa_deteccion_actual: float = 0.30,
+    tasa_deteccion_achachai: float = 0.70,
+    costo_falso_positivo_usd: float = 80,
+    costo_revision_humana_usd: float = 40,
+) -> dict:
+    """Calcula ahorro potencial anual usando AchachAI vs deteccion manual.
+
+    Asume:
+    - Tasa deteccion actual (sin AI): 30% (industria)
+    - Tasa con AchachAI: 70% (modelo + reglas)
+    - Cada caso revisado por humano: $40 (1 hora analista)
+    - Cada falso positivo: $80 (revision profunda)
+
+    Devuelve: monto recuperado, costo del sistema, ROI.
+    """
+    con = _con()
+    siniestros = con.execute("SELECT * FROM siniestros").df()
+    n_total = len(siniestros)
+    n_fraudes = int(siniestros["etiqueta_fraude_simulada"].sum())
+    monto_total_fraudes = float(
+        siniestros[siniestros["etiqueta_fraude_simulada"] == 1]["monto_reclamado_usd"].sum()
+    )
+
+    # Calculos
+    recuperacion_actual = monto_total_fraudes * tasa_deteccion_actual
+    recuperacion_achachai = monto_total_fraudes * tasa_deteccion_achachai
+    delta_recuperacion = recuperacion_achachai - recuperacion_actual
+
+    # Costo operativo (Azure ML endpoint + Foundry + Doc Intelligence)
+    costo_azure_anual = 12 * 200  # ~$200/mes en produccion
+
+    # Costos de revision: si revisamos top 30% como rojos, son n_total*0.30 casos a $40 c/u
+    casos_a_revisar = int(n_total * 0.20)  # 20% top score
+    costo_revisiones = casos_a_revisar * costo_revision_humana_usd
+    # De esos, los falsos positivos cuestan extra
+    falsos_pos = int(casos_a_revisar * 0.40)  # 40% de los flageados pueden ser FP
+    costo_fps = falsos_pos * costo_falso_positivo_usd
+
+    costo_total_achachai = costo_azure_anual + costo_revisiones + costo_fps
+    beneficio_neto = delta_recuperacion - costo_total_achachai
+    roi = (beneficio_neto / costo_total_achachai * 100) if costo_total_achachai > 0 else 0
+
+    return {
+        "supuestos": {
+            "tasa_deteccion_manual": f"{tasa_deteccion_actual*100:.0f}%",
+            "tasa_deteccion_achachai": f"{tasa_deteccion_achachai*100:.0f}%",
+            "costo_revision_caso_usd": costo_revision_humana_usd,
+            "costo_falso_positivo_usd": costo_falso_positivo_usd,
+        },
+        "cartera": {
+            "n_siniestros_anuales": n_total,
+            "n_fraudes_estimados": n_fraudes,
+            "monto_total_fraudes_usd": round(monto_total_fraudes, 0),
+        },
+        "escenario_actual": {
+            "deteccion": "30% (manual)",
+            "recuperado_anual_usd": round(recuperacion_actual, 0),
+            "perdido_usd": round(monto_total_fraudes - recuperacion_actual, 0),
+        },
+        "escenario_achachai": {
+            "deteccion": "70% (modelo + reglas + analistas)",
+            "recuperado_anual_usd": round(recuperacion_achachai, 0),
+            "perdido_usd": round(monto_total_fraudes - recuperacion_achachai, 0),
+        },
+        "ahorro": {
+            "delta_recuperacion_usd": round(delta_recuperacion, 0),
+            "costo_total_sistema_usd": round(costo_total_achachai, 0),
+            "beneficio_neto_anual_usd": round(beneficio_neto, 0),
+            "roi_pct": round(roi, 0),
+            "payback_meses": round(costo_total_achachai / max(delta_recuperacion/12, 1), 1),
+        },
+        "mensaje_ejecutivo": (
+            f"AchachAI puede recuperar {round(delta_recuperacion):,} USD adicionales/año "
+            f"vs detección manual, con un ROI de {round(roi)}% y payback de "
+            f"{round(costo_total_achachai / max(delta_recuperacion/12, 1), 1)} meses."
+        ),
+    }
+
+
+# ===================== TOOL 10: exportar_reporte =====================
+def exportar_reporte(nivel: str = "ROJO", limit: int = 50) -> dict:
+    """Genera reporte de auditoria con casos del nivel especificado.
+
+    Devuelve datos listos para exportar a CSV/PDF.
+    """
+    from src.rules import build_contexto, evaluate_siniestro
+    con = _con()
+    siniestros = con.execute("SELECT * FROM siniestros").df()
+    proveedores = con.execute("SELECT * FROM proveedores").df()
+    pol = con.execute("SELECT * FROM polizas").df().set_index("id_poliza")
+    ase = con.execute("SELECT * FROM asegurados").df().set_index("id_asegurado")
+    veh = con.execute("SELECT * FROM vehiculos").df().set_index("id_vehiculo")
+    prov_idx = proveedores.set_index("id_proveedor")
+    cond = con.execute("SELECT * FROM conductores").df().set_index("id_conductor")
+    docs = con.execute("SELECT * FROM documentos").df()
+    docs_por = docs.groupby("id_siniestro").apply(lambda d: d.to_dict("records"),
+                                                    include_groups=False).to_dict()
+
+    sim_path = PROC / "similitudes.parquet"
+    sim_df = None
+    if sim_path.exists():
+        _tmp = pd.read_parquet(sim_path)
+        if "sim_topk" in _tmp.columns:
+            sim_df = _tmp
+    ctx = build_contexto(siniestros, proveedores, similitudes_df=sim_df)
+
+    # Sample para no evaluar 25K
+    sample = siniestros.sample(min(3000, len(siniestros)), random_state=42)
+    resultados = []
+    for _, sin in sample.iterrows():
+        try:
+            r = evaluate_siniestro(
+                siniestro=sin.to_dict(),
+                poliza=pol.loc[sin["id_poliza"]].to_dict() | {"id_poliza": sin["id_poliza"]},
+                asegurado=ase.loc[sin["id_asegurado"]].to_dict() | {"id_asegurado": sin["id_asegurado"]},
+                vehiculo=veh.loc[sin["id_vehiculo"]].to_dict() | {"id_vehiculo": sin["id_vehiculo"]},
+                proveedor=prov_idx.loc[sin["id_proveedor"]].to_dict() | {"id_proveedor": sin["id_proveedor"]},
+                conductor=cond.loc[sin["id_conductor"]].to_dict() | {"id_conductor": sin["id_conductor"]},
+                documentos=docs_por.get(sin["id_siniestro"], []),
+                ctx=ctx,
+            )
+            if r["nivel"] == nivel.upper():
+                resultados.append({
+                    "id_siniestro": sin["id_siniestro"],
+                    "fecha_ocurrencia": str(sin["fecha_ocurrencia"]),
+                    "cobertura": sin["cobertura"],
+                    "monto_reclamado_usd": float(sin["monto_reclamado_usd"]),
+                    "ciudad": sin["ciudad_evento"],
+                    "score": r["score"],
+                    "nivel": r["nivel"],
+                    "reglas_disparadas": ", ".join(reg["codigo"] for reg in r["reglas_criticas"]),
+                    "n_senales": len(r["senales_activadas"]),
+                    "explicacion": r["explicacion_corta"],
+                })
+        except Exception:
+            continue
+        if len(resultados) >= limit:
+            break
+
+    return {
+        "filtro_nivel": nivel,
+        "n_casos": len(resultados),
+        "fecha_generacion": pd.Timestamp.now().isoformat(),
+        "casos": resultados,
+    }
+
+
 TOOLS_REGISTRY: dict[str, Any] = {
     "top_riesgo": top_riesgo,
     "detalle_siniestro": detalle_siniestro,
@@ -307,6 +456,8 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "docs_faltantes": docs_faltantes,
     "montos_atipicos": montos_atipicos,
     "estadisticas_por_cobertura": estadisticas_por_cobertura,
+    "simulacion_ahorro": simulacion_ahorro,
+    "exportar_reporte": exportar_reporte,
 }
 
 
@@ -412,6 +563,34 @@ TOOLS_SCHEMA = [
             "name": "estadisticas_por_cobertura",
             "description": "% de fraude simulado, monto promedio y N siniestros agrupados por COBERTURA. Usar cuando preguntan 'que ramos / coberturas tienen mayor porcentaje sospechoso' o 'distribucion de fraude por tipo'.",
             "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "simulacion_ahorro",
+            "description": "Calcula ahorro potencial anual usando AchachAI vs deteccion manual. Devuelve ROI, payback, beneficio neto. Usar cuando preguntan por 'ahorro', 'ROI', 'impacto financiero', 'cuanto ahorrariamos', 'cuanto recuperariamos'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tasa_deteccion_actual": {"type": "number", "default": 0.30},
+                    "tasa_deteccion_achachai": {"type": "number", "default": 0.70},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "exportar_reporte",
+            "description": "Genera reporte de auditoria con casos del nivel especificado (VERDE/AMARILLO/ROJO). Devuelve datos listos para CSV/PDF para presentar al comite antifraude o auditoria interna.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nivel": {"type": "string", "enum": ["VERDE", "AMARILLO", "ROJO"], "default": "ROJO"},
+                    "limit": {"type": "integer", "default": 50},
+                },
+            },
         },
     },
 ]
