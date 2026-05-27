@@ -1,11 +1,17 @@
-/* global React, Condor, VueloDelCondor */
-const { useState: useStateChat, useEffect: useEffectChat, useRef: useRefChat } = React;
+'use client';
+// @ts-nocheck
+import { useEffect, useRef, useState } from 'react';
+import { Condor, VueloDelCondor } from './Condor';
+
+const useStateChat = useState;
+const useEffectChat = useEffect;
+const useRefChat = useRef;
 
 /* ============================================================
    CÓNDOR AGÉNTICO — chat screen (CU-05 · the protagonist)
    ============================================================ */
 
-const ROLE_PROMPTS = {
+export const ROLE_PROMPTS = {
   antifraude: [
     "Mostrame los 10 casos más críticos de hoy",
     "¿Qué patrones se repiten en los rojos de esta semana?",
@@ -43,7 +49,7 @@ const ROLE_PROMPTS = {
   ],
 };
 
-const TOOLS_CATALOG = [
+export const TOOLS_CATALOG = [
   "top_riesgo", "detalle_siniestro", "ranking_proveedores",
   "ranking_ciudades", "asegurados_recurrentes", "docs_faltantes",
   "montos_atipicos", "estadisticas_por_cobertura",
@@ -51,7 +57,7 @@ const TOOLS_CATALOG = [
 ];
 
 /* canned answer for the demo */
-const CANNED_ANSWERS = {
+export const CANNED_ANSWERS = {
   proveedor: {
     summary: "Encontré 8 proveedores con concentración alta. PRV-NEW0019 destaca con $156K en reclamos del último mes.",
     tools: ["ranking_proveedores", "montos_atipicos", "estadisticas_por_cobertura"],
@@ -85,7 +91,7 @@ const CANNED_ANSWERS = {
   },
 };
 
-function ChatScreen({ role = "antifraude", onInvestigate }) {
+export function ChatScreen({ role = "antifraude", onInvestigate }) {
   const [messages, setMessages] = useStateChat([
     {
       role: "condor",
@@ -104,7 +110,7 @@ function ChatScreen({ role = "antifraude", onInvestigate }) {
   const [input, setInput] = useStateChat("");
   const [thinking, setThinking] = useStateChat(false);
   const [activeTools, setActiveTools] = useStateChat([]);
-  const scrollerRef = useRefChat(null);
+  const scrollerRef = useRefChat<any>(null);
   const promptIdx = useRefChat(0);
 
   useEffectChat(() => {
@@ -493,4 +499,3 @@ function MiniBarChart() {
   );
 }
 
-Object.assign(window, { ChatScreen });
