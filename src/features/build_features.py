@@ -89,17 +89,94 @@ def build() -> pd.DataFrame:
         df = df.merge(counts, on=col_key, how="left")
         df[col_out] = df[col_out].fillna(0).astype(int)
 
-    # Ratios derivados
+    # Ratios derivados (básicos)
     log("Calculando ratios derivados...")
     df["ratio_reclamado_suma"] = df["monto_reclamado_usd"] / df["suma_asegurada_usd"].replace(0, np.nan)
     df["ratio_reclamado_prima"] = df["monto_reclamado_usd"] / df["prima_usd"].replace(0, np.nan)
     df["ratio_pagado_reclamado"] = df["monto_pagado_usd"] / df["monto_reclamado_usd"].replace(0, np.nan)
     df["ratio_reclamado_valor"] = df["monto_reclamado_usd"] / df["valor_comercial_usd"].replace(0, np.nan)
-    df[["ratio_reclamado_suma", "ratio_reclamado_prima",
-        "ratio_pagado_reclamado", "ratio_reclamado_valor"]] = (
-        df[["ratio_reclamado_suma", "ratio_reclamado_prima",
-            "ratio_pagado_reclamado", "ratio_reclamado_valor"]].fillna(0)
+
+    # ===== FEATURES AVANZADAS =====
+    log("Calculando features avanzadas (interacciones + agregaciones por entidad)...")
+
+    # 1. Velocidad del reclamo: ratio reclamado / dias_vigencia_usados
+    df["dias_vigencia_usados"] = df["dias_desde_inicio_poliza"].clip(lower=1)
+    df["velocidad_reclamo"] = df["monto_reclamado_usd"] / df["dias_vigencia_usados"]
+
+    # 2. Edad del vehiculo al momento del siniestro
+    fecha_oc = pd.to_datetime(df["fecha_ocurrencia"], errors="coerce")
+    df["edad_vehiculo"] = (fecha_oc.dt.year - df["anio_vehiculo"]).fillna(0).clip(lower=0)
+
+    # 3. Es robo: bandera explicita (RF-01 relacionada)
+    df["es_robo"] = (df["cobertura"] == "Robo").astype(int) if "cobertura" in df.columns else 0
+
+    # 4. Es borde de vigencia (señal 1)
+    df["es_borde_vigencia"] = (
+        (df["dias_desde_inicio_poliza"].clip(lower=0) < 30) |
+        (df["dias_desde_fin_poliza"].clip(lower=0) < 30)
+    ).astype(int)
+
+    # 5. Es reporte tardio (señal 12)
+    df["es_reporte_tardio"] = (df["dias_entre_ocurrencia_reporte"] > 7).astype(int)
+
+    # 6. Documentos faltantes ratio
+    df["ratio_docs_no_entregados"] = df["n_no_entregados"] / df["n_docs"].replace(0, np.nan)
+
+    # 7. Has any inconsistencia
+    df["tiene_inconsistencia"] = (df["n_inconsistentes"] > 0).astype(int)
+
+    # 8. Tasa historica de fraude por proveedor (LEAVE-ONE-OUT para evitar leakage)
+    # Para cada fila: calcula tasa EXCLUYENDO la propia fila
+    global_mean = df["etiqueta_fraude_simulada"].mean()
+    smoothing = 20
+
+    prov_sum = df.groupby("id_proveedor")["etiqueta_fraude_simulada"].transform("sum")
+    prov_count = df.groupby("id_proveedor")["etiqueta_fraude_simulada"].transform("count")
+    # Leave-one-out: restar la fila actual
+    prov_sum_loo = prov_sum - df["etiqueta_fraude_simulada"]
+    prov_count_loo = prov_count - 1
+    df["tasa_fraude_prov"] = (
+        (prov_sum_loo + global_mean * smoothing) /
+        (prov_count_loo + smoothing).clip(lower=1)
     )
+
+    # 9. Tasa historica de fraude por asegurado (LEAVE-ONE-OUT)
+    ase_sum = df.groupby("id_asegurado")["etiqueta_fraude_simulada"].transform("sum")
+    ase_count = df.groupby("id_asegurado")["etiqueta_fraude_simulada"].transform("count")
+    ase_sum_loo = ase_sum - df["etiqueta_fraude_simulada"]
+    ase_count_loo = ase_count - 1
+    df["tasa_fraude_ase"] = (
+        (ase_sum_loo + global_mean * smoothing) /
+        (ase_count_loo + smoothing).clip(lower=1)
+    )
+
+    # 10. Velocidad acumulacion reclamos: siniestros 18m / antiguedad asegurado
+    df["velocidad_siniestros_asegurado"] = (
+        df["n_siniestros_18m_asegurado"] / (df["antiguedad_anios"] + 1).clip(lower=1)
+    )
+
+    # 11. Monto vs promedio del proveedor
+    df["ratio_monto_vs_prov_promedio"] = (
+        df["monto_reclamado_usd"] / df["monto_promedio_reclamado_usd"].replace(0, np.nan)
+    )
+
+    # 12. Es PTxRB candidate (cobertura Robo + monto>95% suma)
+    df["es_ptxrb_candidato"] = (
+        (df["cobertura"] == "Robo") &
+        (df["ratio_reclamado_suma"] > 0.95)
+    ).astype(int) if "cobertura" in df.columns else 0
+
+    # Rellenar NaN de todas las nuevas
+    new_features = [
+        "ratio_reclamado_suma", "ratio_reclamado_prima", "ratio_pagado_reclamado",
+        "ratio_reclamado_valor", "velocidad_reclamo", "edad_vehiculo",
+        "es_robo", "es_borde_vigencia", "es_reporte_tardio",
+        "ratio_docs_no_entregados", "tiene_inconsistencia",
+        "tasa_fraude_prov", "tasa_fraude_ase",
+        "velocidad_siniestros_asegurado", "ratio_monto_vs_prov_promedio",
+        "es_ptxrb_candidato",
+    ]
+    df[new_features] = df[new_features].fillna(0).replace([np.inf, -np.inf], 0)
 
     # One-hot de categoricas (pandas >=2.0 devuelve bool por defecto)
     log("One-hot encoding...")

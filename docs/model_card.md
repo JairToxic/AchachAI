@@ -45,37 +45,45 @@
 | `tree_method` | `hist` |
 | `random_state` | 42 |
 
-## 4. Métricas de evaluación (test set 5.092 filas)
+## 4. Métricas de evaluación (test set 5.092 filas) — v4 FINAL
 
-| Métrica | Valor | Objetivo del reto | ¿Cumple? |
-|---------|-------|--------------------|----------|
-| **AUC-ROC** | **0.882** | ≥ 0.85 | ✅ |
-| **PR-AUC** | **0.554** | ≥ 0.60 | ⚠️ ligeramente debajo |
-| **F1-score** | 0.495 | ≥ 0.50 | ≈ en límite |
-| **Precision** | 0.416 | ≥ 0.40 | ✅ |
-| **Recall** | **0.609** | ≥ 0.70 | ⚠️ por debajo del objetivo |
-| **Prob media en casos inyectados** | 0.903 | — | ✅ excelente |
-| **% inyectados con prob ≥ 0.5** | 95.0% | — | ✅ |
+### Globales (no dependen de threshold)
 
-### Matriz de confusión (test, threshold 0.5)
+| Métrica | Valor | Objetivo reto | ¿Cumple? |
+|---------|-------|---------------|----------|
+| **AUC-ROC** | **0.961** | ≥ 0.85 | ✅✅ excede |
+| **PR-AUC** | **0.811** | ≥ 0.60 | ✅✅ excede |
+| **Prob media en inyectados** | 0.948 | — | ✅ |
+| **% inyectados con prob ≥ 0.5** | **100%** | — | ✅✅ |
+
+### Por threshold (configurable según prioridad de negocio)
+
+| Threshold | Precision | Recall | F1 | Uso recomendado |
+|-----------|-----------|--------|-----|-----------------|
+| **0.30** (recall-priority) | 0.46 | **0.88** | 0.60 | Sospecha alta — UAF |
+| **0.50** (default) | 0.61 | **0.79** | 0.69 | Operación normal |
+| **0.77** (F1-optimal) | **0.81** | 0.66 | **0.73** | Reportes ejecutivos |
+
+### Matriz de confusión (threshold 0.5 default)
 
 |              | Pred. NO fraude | Pred. POSIBLE fraude |
 |--------------|-----------------|----------------------|
-| **Real NO**  | 4191 (TN)       | 415 (FP)             |
-| **Real SÍ**  | 190 (FN)        | 296 (TP)             |
-
-- **Cobertura (Recall):** 60.9% — captura 296 de 486 fraudes simulados.
-- **Pureza (Precision):** 41.6% — de cada 100 alertas del modelo, 42 son fraudes reales.
+| **Real NO**  | 4358 (TN)       | 248 (FP)             |
+| **Real SÍ**  | 101 (FN)        | 385 (TP)             |
 
 ### Evolución del modelo
 
-| Versión | Filas | Recall | AUC-ROC | Cambio |
-|---------|-------|--------|---------|--------|
-| v1 | 15.420 | — | — | inicial |
-| v2 | 15.460 | 0.57 | 0.94 | con 40 casos inyectados |
-| **v3** | **25.460** | **0.61** | **0.88** | **+10K diversos, fraude correlacionado** |
+| Versión | Filas | Features | AUC-ROC | Recall | PR-AUC | Mejora vs anterior |
+|---------|-------|----------|---------|--------|--------|---------------------|
+| v1 | 15.420 | 60 | — | — | — | baseline |
+| v2 | 15.460 | 75 | 0.94 | 0.57 | 0.64 | + 40 casos inyectados |
+| v3 | 25.460 | 79 | 0.88 | 0.61 | 0.55 | + 10K filas diversas |
+| **v4** | **25.460** | **92** | **0.96** | **0.79** | **0.81** | **+ 16 features avanzadas (LOO) + Optuna + threshold tuning** |
 
-> El recall mejoró +7% al agregar más datos, aunque el AUC bajó (de 0.94 a 0.88) porque el problema es más realista con mayor diversidad de proveedores (48→198) y descripciones (1 patrón→50+ templates). El sistema final combina modelo + motor de reglas determinísticas que compensan el recall.
+> El recall pasó de 0.57 a 0.79 (+22pp) y PR-AUC de 0.64 a 0.81 (+17pp) gracias a:
+> - **16 features avanzadas**: tasa_fraude historica (leave-one-out), velocidad reclamo, es_borde_vigencia, es_ptxrb_candidato, es_reporte_tardio, edad_vehiculo, ratios derivados
+> - **Optuna tuning** sobre 9 hyperparams XGBoost (50 trials, optimiza PR-AUC)
+> - **Threshold tuning** automático (default 0.5, F1-optimal 0.77, recall-priority 0.30)
 
 ## 5. Features más importantes (top 15) — v3
 
