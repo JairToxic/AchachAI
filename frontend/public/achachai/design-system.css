@@ -1,0 +1,277 @@
+/* ============================================================
+   AchachAI · Design System
+   "Cielo andino al amanecer + Telar de Otavalo"
+   ============================================================ */
+
+:root {
+  /* Cielo Andino al amanecer */
+  --pink-dawn:      #F5A39C;
+  --andes-orange:   #E87A4F;
+  --mountain-blue:  #2C5F8D;
+  --mountain-blue-deep: #1F4A73;
+
+  /* Telar Otavalo · estados */
+  --guayaba-red:    #C5333A;
+  --guayaba-soft:   #E5746B;
+  --andes-ocher:    #D4A574;
+  --paramo-green:   #4A7C59;
+  --paramo-soft:    #7BAA88;
+
+  /* Neutrals */
+  --condor-wing:    #1A3A52;   /* primary text */
+  --condor-shadow:  #0F2436;
+  --marfil:         #F4EDE4;   /* base background */
+  --marfil-deep:    #EBDFCC;
+  --marfil-paper:   #FBF6EE;
+  --ink:            #1F2937;
+  --ink-soft:       #4B5563;
+  --ink-mute:       #8E8579;
+  --line:           rgba(26, 58, 82, 0.10);
+  --line-strong:    rgba(26, 58, 82, 0.22);
+
+  /* Accents */
+  --electric-blue:  #0066FF;
+  --pure-white:     #FFFFFF;
+
+  /* Type */
+  --serif: "Fraunces", "Cormorant Garamond", Georgia, serif;
+  --sans:  "Inter", "Helvetica Neue", system-ui, sans-serif;
+  --mono:  "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+
+  /* Shape */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgba(26,58,82,0.06), 0 1px 4px rgba(26,58,82,0.04);
+  --shadow-md: 0 4px 12px rgba(26,58,82,0.08), 0 2px 6px rgba(26,58,82,0.05);
+  --shadow-lg: 0 20px 40px rgba(26,58,82,0.10), 0 8px 16px rgba(26,58,82,0.06);
+  --shadow-xl: 0 40px 80px rgba(26,58,82,0.16), 0 16px 32px rgba(26,58,82,0.10);
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  color: var(--condor-wing);
+  background: var(--marfil);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--condor-wing);
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); }
+.serif { font-family: var(--serif); }
+
+button { font-family: inherit; cursor: pointer; }
+input, textarea { font-family: inherit; color: inherit; }
+
+/* ---------- watermark pattern (andean rhombi) ---------- */
+.andes-watermark {
+  background-image:
+    linear-gradient(45deg, transparent 47%, rgba(26,58,82,0.05) 47%, rgba(26,58,82,0.05) 53%, transparent 53%),
+    linear-gradient(-45deg, transparent 47%, rgba(26,58,82,0.05) 47%, rgba(26,58,82,0.05) 53%, transparent 53%);
+  background-size: 28px 28px;
+}
+
+/* Otavalo woven texture for hero accents */
+.weave-bg {
+  background:
+    repeating-linear-gradient(90deg, rgba(232,122,79,0.08) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(0deg, rgba(44,95,141,0.06) 0 1px, transparent 1px 6px),
+    var(--marfil-paper);
+}
+
+/* ---------- scrollbar ---------- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(26,58,82,0.18); border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-radius: var(--r-md);
+  background: var(--condor-wing); color: var(--marfil);
+  border: 0; font-size: 13px; font-weight: 500;
+  transition: transform .12s ease, box-shadow .12s ease, background .15s;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn.ghost {
+  background: transparent; color: var(--condor-wing);
+  border: 1px solid var(--line-strong);
+}
+.btn.ghost:hover { background: rgba(26,58,82,0.04); }
+.btn.warm { background: var(--andes-orange); color: white; }
+.btn.danger { background: var(--guayaba-red); color: white; }
+
+/* ---------- chip ---------- */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  font-size: 11.5px; font-weight: 500;
+  background: rgba(26,58,82,0.06); color: var(--condor-wing);
+  border: 1px solid transparent;
+}
+.chip.red { background: rgba(197,51,58,0.10); color: var(--guayaba-red); border-color: rgba(197,51,58,0.18); }
+.chip.amber { background: rgba(212,165,116,0.18); color: #8B5E2B; border-color: rgba(212,165,116,0.32); }
+.chip.green { background: rgba(74,124,89,0.12); color: var(--paramo-green); border-color: rgba(74,124,89,0.22); }
+.chip.blue { background: rgba(44,95,141,0.10); color: var(--mountain-blue); border-color: rgba(44,95,141,0.18); }
+.chip.outline { background: transparent; border-color: var(--line-strong); }
+
+/* ---------- card ---------- */
+.card {
+  background: var(--pure-white);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- divider with andes diamond ---------- */
+.diamond-divider {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--ink-mute); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+}
+.diamond-divider::before, .diamond-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--line);
+}
+
+/* ---------- condor pulse ---------- */
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(197,51,58,0.45); }
+  50%      { box-shadow: 0 0 0 14px rgba(197,51,58,0); }
+}
+@keyframes pulse-amber {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,165,116,0.45); }
+  50%      { box-shadow: 0 0 0 10px rgba(212,165,116,0); }
+}
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74,124,89,0.35); }
+  50%      { box-shadow: 0 0 0 8px rgba(74,124,89,0); }
+}
+
+/* ---------- condor anatomy keyframes ---------- */
+/* full body */
+@keyframes condor-idle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25%      { transform: translateY(-2px) rotate(-1.5deg); }
+  50%      { transform: translateY(-4px) rotate(0deg); }
+  75%      { transform: translateY(-2px) rotate(1.5deg); }
+}
+@keyframes condor-soar {
+  0%   { transform: translate(0, 0) rotate(-3deg); }
+  25%  { transform: translate(2px, -3px) rotate(0deg); }
+  50%  { transform: translate(0, -5px) rotate(3deg); }
+  75%  { transform: translate(-2px, -3px) rotate(0deg); }
+  100% { transform: translate(0, 0) rotate(-3deg); }
+}
+@keyframes condor-think {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+@keyframes condor-speak {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
+}
+@keyframes condor-dive {
+  0%   { transform: translateY(0) rotate(-6deg) scale(1); }
+  35%  { transform: translateY(2px) rotate(0deg) scale(1.02); }
+  60%  { transform: translateY(6px) rotate(14deg) scale(0.96); }
+  100% { transform: translateY(0) rotate(-6deg) scale(1); }
+}
+
+/* wing flap — controlled via transform-origin at shoulder */
+@keyframes wing-flap-left {
+  0%, 100% { transform: rotate(-4deg); }
+  50%      { transform: rotate(-30deg); }
+}
+@keyframes wing-flap-right {
+  0%, 100% { transform: rotate(4deg); }
+  50%      { transform: rotate(30deg); }
+}
+@keyframes wing-soar-left {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-6deg); }
+}
+@keyframes wing-soar-right {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(6deg); }
+}
+@keyframes wing-dive-left {
+  0%, 100% { transform: rotate(-2deg) translateY(0); }
+  60%      { transform: rotate(28deg) translateY(2px); }
+}
+@keyframes wing-dive-right {
+  0%, 100% { transform: rotate(2deg) translateY(0); }
+  60%      { transform: rotate(-28deg) translateY(2px); }
+}
+
+/* head tilt (speak) */
+@keyframes head-tilt {
+  0%, 100% { transform: rotate(-3deg); }
+  50%      { transform: rotate(3deg); }
+}
+@keyframes beak-open {
+  0%, 100% { transform: scaleY(1); }
+  30%      { transform: scaleY(1.4); }
+  60%      { transform: scaleY(0.9); }
+}
+/* tail subtle sway */
+@keyframes tail-sway {
+  0%, 100% { transform: rotate(-2deg); }
+  50%      { transform: rotate(2deg); }
+}
+
+/* sonar rings for alert state */
+@keyframes sonar-out {
+  0%   { transform: scale(0.6); opacity: 0.6; }
+  80%  { opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+/* eye blink */
+@keyframes blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  94%, 98%      { transform: scaleY(0.05); }
+}
+/* feather shimmer (alert) */
+@keyframes feather-glow {
+  0%, 100% { filter: drop-shadow(0 0 0px rgba(197,51,58,0)); }
+  50%      { filter: drop-shadow(0 0 6px rgba(197,51,58,0.6)); }
+}
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+@keyframes typewriter-blink { 50% { opacity: 0; } }
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes scan-beam {
+  0%   { top: -10%; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 110%; opacity: 0; }
+}
+@keyframes draw-line {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up { animation: fade-up .4s ease both; }
+
+/* ---------- focus ring ---------- */
+:focus-visible { outline: 2px solid var(--mountain-blue); outline-offset: 2px; border-radius: 4px; }
