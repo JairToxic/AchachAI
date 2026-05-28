@@ -273,5 +273,27 @@ input, textarea { font-family: inherit; color: inherit; }
 
 .fade-up { animation: fade-up .4s ease both; }
 
+/* ---------- cóndor silueta: planeo horizontal sobre el HUD ---------- */
+@keyframes condor-glide {
+  0%   { left: -90px; transform: translateY(0) scale(.92); opacity: 0; }
+  12%  { opacity: .65; }
+  50%  { transform: translateY(-3px) scale(1); }
+  88%  { opacity: .55; }
+  100% { left: calc(100% + 30px); transform: translateY(0) scale(.88); opacity: 0; }
+}
+@keyframes condor-glide-fast {
+  0%   { left: -70px; transform: translateY(0) scale(.95); opacity: 0; }
+  15%  { opacity: .7; }
+  50%  { transform: translateY(-4px) scale(1.02); }
+  85%  { opacity: .6; }
+  100% { left: calc(100% + 20px); transform: translateY(0) scale(.9); opacity: 0; }
+}
+
+/* watermark de fondo: leve flotación */
+@keyframes condor-float {
+  0%, 100% { transform: rotate(-3deg) translateY(0); }
+  50%      { transform: rotate(-3deg) translateY(-10px); }
+}
+
 /* ---------- focus ring ---------- */
 :focus-visible { outline: 2px solid var(--mountain-blue); outline-offset: 2px; border-radius: 4px; }

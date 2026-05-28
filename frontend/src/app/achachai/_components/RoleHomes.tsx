@@ -2,8 +2,40 @@
 // @ts-nocheck
 import { useEffect, useRef, useState } from 'react';
 import { Condor, VueloDelCondor, CondorMini } from './Condor';
+import { EcuadorHeatMap } from './EcuadorHeatMap';
 
 const useRH = useState;
+const useRHE = useEffect;
+
+const API =
+  (typeof window !== 'undefined' && (window as any).NEXT_PUBLIC_API_URL) ||
+  'http://localhost:8000';
+
+function fmtUSD(n: number | null | undefined) {
+  if (n == null || isNaN(n as any)) return '—';
+  return '$' + Math.round(n as number).toLocaleString('en-US');
+}
+
+/** Envía feedback rápido al backend. Devuelve promesa pero no bloquea UI. */
+function fbQuick(id_siniestro: string, decision: string, score_modelo: number, nivel_modelo: string) {
+  fetch(`${API}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id_siniestro,
+      decision,
+      justificacion: `Decisión rápida desde Mi vista`,
+      analista_id: 'ana.yanez',
+      score_modelo,
+      nivel_modelo,
+    }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d?.ok) console.log(`✓ feedback registrado para ${id_siniestro}: ${decision} (total: ${d.total_feedbacks})`);
+    })
+    .catch(e => console.warn('feedback failed', e));
+}
 
 /* ============================================================
    ROLE HOMES — each role gets a distinct landing screen showing
@@ -71,112 +103,471 @@ function SectionTitle({ children, action }) {
 }
 
 /* ============================================================
-   1. ANTIFRAUDE — focused on a single critical case
+   1. ANTIFRAUDE — focused on a single critical case (datos reales)
    ============================================================ */
 function AntifraudeHome({ onInvestigate }) {
+  const [topCases, setTopCases] = useRH<any[]>([]);
+  const [detail, setDetail] = useRH<any>(null);
+  const [topProv, setTopProv] = useRH<any>(null);
+  const [kpis, setKpis] = useRH<any>(null);
+  const [fbStats, setFbStats] = useRH<any>(null);
+  const [anomalias, setAnomalias] = useRH<any>(null);
+  const [alertas, setAlertas] = useRH<any>(null);
+  const [loading, setLoading] = useRH(true);
+  const [err, setErr] = useRH<string | null>(null);
+
+  useRHE(() => {
+    let cancelled = false;
+    setLoading(true);
+    setErr(null);
+
+    async function load() {
+      try {
+        // Disparamos todo en paralelo (los lentos no bloquean lo visible)
+        const [trResp, pvResp, kResp, fbResp, anResp, alResp] = await Promise.all([
+          fetch(`${API}/top-riesgo?limit=10`, { cache: 'no-store' }),
+          fetch(`${API}/proveedores/ranking?top_n=1`, { cache: 'no-store' }),
+          fetch(`${API}/kpis`, { cache: 'no-store' }).catch(() => null),
+          fetch(`${API}/feedback/stats`, { cache: 'no-store' }).catch(() => null),
+          fetch(`${API}/anomalias-novedosas?limit=5`, { cache: 'no-store' }).catch(() => null),
+          fetch(`${API}/prevencion/alertas-tempranas?ventana_dias=30`, { cache: 'no-store' }).catch(() => null),
+        ]);
+        if (!trResp.ok) throw new Error(`top-riesgo HTTP ${trResp.status}`);
+        const tr = await trResp.json();
+        const top = tr.top || [];
+        if (cancelled) return;
+        setTopCases(top);
+
+        if (top.length > 0) {
+          const dResp = await fetch(`${API}/casos/${encodeURIComponent(top[0].id_siniestro)}`, { cache: 'no-store' });
+          if (dResp.ok) {
+            const d = await dResp.json();
+            if (!cancelled) setDetail(d);
+          }
+        }
+
+        if (pvResp.ok) {
+          const pv = await pvResp.json();
+          if (!cancelled) setTopProv((pv.top && pv.top[0]) || null);
+        }
+        if (kResp && kResp.ok) {
+          const k = await kResp.json();
+          if (!cancelled) setKpis(k);
+        }
+        if (fbResp && fbResp.ok) {
+          const f = await fbResp.json();
+          if (!cancelled) setFbStats(f);
+        }
+        if (anResp && anResp.ok) {
+          const an = await anResp.json();
+          if (!cancelled) setAnomalias(an);
+        }
+        if (alResp && alResp.ok) {
+          const al = await alResp.json();
+          if (!cancelled) setAlertas(al);
+        }
+      } catch (e: any) {
+        if (!cancelled) setErr(e?.message || String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const top = topCases[0];
+  const topId = top?.id_siniestro;
+  const score = top?.score ?? 0;
+  const nivel = top?.nivel || 'VERDE';
+  const veh = detail?.vehiculo
+    ? `${detail.vehiculo.marca || ''} ${detail.vehiculo.modelo || ''} ${detail.vehiculo.anio || ''}`.trim()
+    : '—';
+  const ciudad = detail?.siniestro?.ciudad_evento || top?.ciudad || '—';
+  const cob = (detail?.siniestro?.cobertura || top?.cobertura || '—').toLowerCase();
+  const reglas = (detail?.reglas_criticas || []) as any[];
+  const senales = (detail?.senales_activadas || []) as any[];
+
+  // Casos vinculados al mismo proveedor (real)
+  const provId = detail?.siniestro?.id_proveedor;
+  const vinculados = provId
+    ? topCases.filter((c: any) => c.id_proveedor === provId).slice(0, 5)
+    : topCases.slice(1, 6);
+
   return (
     <RoleFrame
       icon="🕵️"
       title="Caso del día"
       super="Investigación profunda caso por caso"
       accent="#C5333A"
-      extra={<button className="btn" onClick={() => onInvestigate("SIN-100029")}>🦅 Investigar profundo</button>}
+      extra={
+        <button
+          className="btn"
+          disabled={!topId}
+          onClick={() => topId && onInvestigate(topId)}
+        >
+          🦅 Investigar profundo
+        </button>
+      }
     >
-      {/* Critical case spotlight */}
-      <div className="card" style={{
-        padding: 22, marginBottom: 18,
-        borderTop: "3px solid var(--guayaba-red)",
-        display: "grid", gridTemplateColumns: "230px 1fr", gap: 26, alignItems: "center",
-      }}>
-        <VueloDelCondor score={87} variant="lg"/>
-        <div>
-          <div className="mono" style={{ fontSize: 11, color: "var(--mountain-blue)", fontWeight: 600 }}>SIN-100029</div>
-          <h2 style={{ fontSize: 22, marginTop: 2 }}>Auto 2019 · colisión lateral · Quito Norte</h2>
-          <p style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 8, lineHeight: 1.55 }}>
-            Patrón clásico de fraude organizado: proveedor recurrente, factura anticipada y narrativa que no
-            coincide con la foto del daño. <strong>3 evidencias documentales</strong> activas.
-          </p>
-          <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-            {["RF-01 PTxRB", "RF-04 ProvNuevo", "factura adulterada", "narrativa incongruente"].map(t =>
-              <span key={t} className="chip red" style={{ fontSize: 10.5 }}>{t}</span>
-            )}
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-            <button className="btn warm" onClick={() => onInvestigate("SIN-100029")}>Abrir investigación →</button>
-            <button className="btn ghost">Ver evidencia</button>
+      {loading && (
+        <div className="card" style={{ padding: 22, marginBottom: 18, textAlign: 'center' }}>
+          <Condor size={48} mood="think" tone="orange" />
+          <div style={{ marginTop: 10, fontSize: 13, color: 'var(--ink-mute)' }}>
+            El cóndor está sobrevolando los 15K siniestros para elegirte el caso del día…
           </div>
         </div>
-      </div>
+      )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18 }}>
-        {/* Patrón detectado */}
-        <div className="card" style={{ padding: 18 }}>
-          <SectionTitle>Patrón detectado esta semana</SectionTitle>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: "var(--marfil-paper)", borderRadius: 10, marginBottom: 8 }}>
-            <Condor size={36} tone="red" mood="alert"/>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>
-                <span className="mono">PRV-NEW0019</span> aparece en 8 casos del último mes
-              </div>
-              <div style={{ fontSize: 11.5, color: "var(--ink-mute)" }}>
-                5 asegurados distintos · $156K USD vinculados · 3 narrativas casi idénticas
-              </div>
-            </div>
-            <button className="btn ghost" style={{ fontSize: 11 }}>Ver red →</button>
+      {err && !loading && (
+        <div className="card" style={{ padding: 22, marginBottom: 18, borderLeft: '3px solid var(--guayaba-red)' }}>
+          <div style={{ fontSize: 13, color: 'var(--guayaba-red)', fontWeight: 600 }}>
+            No pude consultar al backend: {err}
           </div>
-          <SectionTitle>Casos vinculados</SectionTitle>
-          {[
-            ["SIN-100029", 87, "$8.450", "Quito N."],
-            ["SIN-100456", 82, "$11.200", "Cumbayá"],
-            ["SIN-100789", 78, "$6.900", "Guayaquil C."],
-            ["SIN-101023", 76, "$9.340", "Tumbaco"],
-          ].map(([id, score, m, c]) => (
-            <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, marginBottom: 4 }}>
-              <VueloDelCondor score={score} variant="sm"/>
-              <div style={{ flex: 1 }}>
-                <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{id}</span>
-                <span style={{ marginLeft: 8, fontSize: 11, color: "var(--ink-mute)" }}>{c}</span>
-              </div>
-              <span className="tabular mono" style={{ fontSize: 11 }}>{m}</span>
-              <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => onInvestigate(id)}>investigar →</button>
-            </div>
-          ))}
+          <div style={{ fontSize: 11, color: 'var(--ink-mute)', marginTop: 4 }}>
+            Verifica que <span className="mono">uvicorn</span> esté corriendo en {API}.
+          </div>
         </div>
+      )}
 
-        {/* Cóndor narration */}
-        <div className="card" style={{ padding: 18, background: "linear-gradient(180deg, white, var(--marfil-paper))" }}>
-          <SectionTitle>El cóndor te narra</SectionTitle>
-          <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-            <Condor size={38} tone="wing" mood="speak"/>
-            <div style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--condor-wing)" }}>
-              "Este caso me llamó la atención por <strong>3 razones</strong>:"
+      {!loading && top && (
+        <>
+          {/* Critical case spotlight — real data */}
+          <div className="card" style={{
+            padding: 22, marginBottom: 18,
+            borderTop: `3px solid ${nivel === 'ROJO' ? 'var(--guayaba-red)' : nivel === 'AMARILLO' ? 'var(--andes-orange)' : 'var(--paramo-green)'}`,
+            display: "grid", gridTemplateColumns: "230px 1fr", gap: 26, alignItems: "center",
+          }}>
+            <VueloDelCondor score={score} variant="lg"/>
+            <div>
+              <div className="mono" style={{ fontSize: 11, color: "var(--mountain-blue)", fontWeight: 600 }}>{topId}</div>
+              <h2 style={{ fontSize: 22, marginTop: 2 }}>
+                {veh !== '—' ? veh : 'Vehículo'} · {cob} · {ciudad}
+              </h2>
+              <p style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 8, lineHeight: 1.55 }}>
+                {detail?.explicacion || `Score ${score}/100 · nivel ${nivel}. Caso prioritario según el motor de reglas + modelo.`}
+              </p>
+              <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                {reglas.slice(0, 3).map((r: any) => (
+                  <span key={r.codigo} className="chip red" style={{ fontSize: 10.5 }}>{r.codigo} · {r.nombre.split(' ').slice(0,3).join(' ')}</span>
+                ))}
+                {senales.slice(0, 3).map((s: any) => (
+                  <span key={s.id} className="chip amber" style={{ fontSize: 10.5 }}>S{s.id} +{s.puntos}</span>
+                ))}
+                {reglas.length === 0 && senales.length === 0 && (
+                  <span className="chip green" style={{ fontSize: 10.5 }}>sin alertas activas</span>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                <button className="btn warm" onClick={() => onInvestigate(topId)}>Abrir investigación →</button>
+                <button className="btn ghost" onClick={() => window.open(`${API}/casos/${encodeURIComponent(topId)}`, '_blank')}>Ver JSON</button>
+              </div>
             </div>
           </div>
-          <ol style={{ margin: "0 0 0 16px", padding: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--ink-soft)" }}>
-            <li>El proveedor <span className="mono">PRV-NEW0019</span> está en observación.</li>
-            <li>La factura tiene fecha <strong>14 días antes</strong> del siniestro.</li>
-            <li>Es la <strong>4ta vez</strong> que este asegurado reclama en 6 meses.</li>
-          </ol>
-          <div style={{ marginTop: 14, padding: 12, background: "rgba(232,122,79,0.10)", borderRadius: 10, borderLeft: "3px solid var(--andes-orange)", fontSize: 12 }}>
-            <strong>Sugerencia:</strong> investigar al proveedor primero. No te digo qué hacer, pero por ahí empezaría yo.
+
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18 }}>
+            {/* Patrón detectado — real */}
+            <div className="card" style={{ padding: 18 }}>
+              <SectionTitle>Patrón detectado esta semana</SectionTitle>
+              {topProv ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: "var(--marfil-paper)", borderRadius: 10, marginBottom: 12 }}>
+                  <Condor size={36} tone="red" mood="alert"/>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                      <span className="mono">{topProv.id_proveedor}</span> · {topProv.nombre || '—'} concentra {topProv.n_siniestros} siniestros
+                    </div>
+                    <div style={{ fontSize: 11.5, color: "var(--ink-mute)" }}>
+                      {topProv.ciudad || '—'} · monto promedio {fmtUSD(topProv.monto_promedio)}
+                      {topProv.lista_restrictiva ? ' · ⚠ lista restrictiva' : ''}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--ink-mute)', marginBottom: 12 }}>
+                  Sin ranking de proveedores disponible.
+                </div>
+              )}
+
+              <SectionTitle>
+                {provId
+                  ? <>Casos del proveedor <span className="mono">{provId}</span> en el top de riesgo</>
+                  : <>Otros casos de alto riesgo</>}
+              </SectionTitle>
+              {vinculados.length === 0 && (
+                <div style={{ fontSize: 12, color: 'var(--ink-mute)' }}>
+                  No hay otros casos del mismo proveedor en el top-riesgo actual.
+                </div>
+              )}
+              {vinculados.map((c: any) => (
+                <div key={c.id_siniestro} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, marginBottom: 4 }}>
+                  <VueloDelCondor score={c.score} variant="sm"/>
+                  <div style={{ flex: 1 }}>
+                    <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{c.id_siniestro}</span>
+                    <span style={{ marginLeft: 8, fontSize: 11, color: "var(--ink-mute)" }}>{c.ciudad || '—'}</span>
+                  </div>
+                  <span className="tabular mono" style={{ fontSize: 11 }}>{fmtUSD(c.monto_reclamado_usd)}</span>
+                  <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => onInvestigate(c.id_siniestro)}>investigar →</button>
+                </div>
+              ))}
+            </div>
+
+            {/* Cóndor narration — real */}
+            <div className="card" style={{ padding: 18, background: "linear-gradient(180deg, white, var(--marfil-paper))" }}>
+              <SectionTitle>El cóndor te narra</SectionTitle>
+              <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                <Condor size={38} tone="wing" mood="speak"/>
+                <div style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--condor-wing)" }}>
+                  {reglas.length + senales.length > 0
+                    ? <>"Este caso me llamó la atención por <strong>{reglas.length + senales.length} señal(es)</strong>:"</>
+                    : <>"Es el caso más prioritario hoy según el modelo XGBoost, aunque sin reglas críticas disparadas."</>}
+                </div>
+              </div>
+              <ol style={{ margin: "0 0 0 16px", padding: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--ink-soft)" }}>
+                {reglas.slice(0, 3).map((r: any) => (
+                  <li key={r.codigo}>
+                    <strong>{r.codigo}</strong> — {r.nombre}
+                    {r.evidencia && <div style={{ fontSize: 10.5, color: 'var(--ink-mute)' }}>{r.evidencia}</div>}
+                  </li>
+                ))}
+                {senales.slice(0, Math.max(0, 3 - reglas.length)).map((s: any) => (
+                  <li key={s.id}>
+                    <strong>S{s.id}</strong> — {s.nombre} (+{s.puntos} pts)
+                    {s.evidencia && <div style={{ fontSize: 10.5, color: 'var(--ink-mute)' }}>{s.evidencia}</div>}
+                  </li>
+                ))}
+                {reglas.length === 0 && senales.length === 0 && (
+                  <li>Score {score}/100, nivel {nivel}. Sin alertas binarias, pero el modelo lo prioriza.</li>
+                )}
+              </ol>
+              <div style={{ marginTop: 14, padding: 12, background: "rgba(232,122,79,0.10)", borderRadius: 10, borderLeft: "3px solid var(--andes-orange)", fontSize: 12 }}>
+                <strong>Sugerencia:</strong>{' '}
+                {nivel === 'ROJO'
+                  ? 'bloquear pago pendiente y abrir investigación al proveedor.'
+                  : nivel === 'AMARILLO'
+                  ? 'retener el pago y solicitar documentación complementaria antes de aprobar.'
+                  : 'continuar el flujo normal, pero mantener este caso bajo monitoreo.'}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+
+          {/* ================================================================
+              FILA NUEVA: KPIs personales + aprendizaje + alertas + anomalías
+              ================================================================ */}
+
+          {/* KPIs de cartera reales */}
+          {kpis && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 20 }}>
+              <KpiCard
+                label="Cartera total"
+                value={(kpis.totales?.siniestros || 0).toLocaleString('en-US')}
+                sub="siniestros vigilados 24/7"
+                tone="wing"
+              />
+              <KpiCard
+                label="Alertas históricas"
+                value={(kpis.totales?.fraudes_simulados || 0).toLocaleString('en-US')}
+                sub={`${((kpis.totales?.tasa_fraude_simulada || 0) * 100).toFixed(1)}% de la cartera`}
+                tone="red"
+              />
+              <KpiCard
+                label="Documentos inconsistentes"
+                value={(kpis.totales?.documentos_inconsistentes || 0).toLocaleString('en-US')}
+                sub={`de ${(kpis.totales?.documentos_totales || 0).toLocaleString('en-US')} analizados`}
+                tone="orange"
+              />
+              <KpiCard
+                label="Proveedores en lista restrictiva"
+                value={kpis.totales?.proveedores_lista_restrictiva || 0}
+                sub="bloqueados preventivamente"
+                tone="orange"
+              />
+            </div>
+          )}
+
+          {/* === Segunda fila: 3 cards (aprendizaje + alertas tempranas + anomalías) === */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 16 }}>
+            {/* CARD 1: Lo que el cóndor aprendió de MI */}
+            <div className="card" style={{
+              padding: 18,
+              background: "linear-gradient(180deg, white, rgba(232,122,79,0.05))",
+              borderTop: "3px solid var(--andes-orange)",
+            }}>
+              <SectionTitle>🦅 Mi aprendizaje del cóndor</SectionTitle>
+              {!fbStats || fbStats.total === 0 ? (
+                <div style={{ fontSize: 12, color: "var(--ink-mute)", lineHeight: 1.5 }}>
+                  Todavía no registraste decisiones. Investigá un caso y al final
+                  presioná <strong>Aprobar / Retener / Bloquear / Escalar</strong> para empezar
+                  a entrenar al cóndor con tu criterio.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <Stat label="Decisiones acumuladas" value={fbStats.total} />
+                    <Stat label="Esta semana" value={fbStats.ultimas_7d} tone={fbStats.ultimas_7d > 0 ? "orange" : "wing"} />
+                  </div>
+                  {fbStats.alineacion_con_modelo_pct != null && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontSize: 10.5, color: "var(--ink-mute)", marginBottom: 4 }}>
+                        Alineación con el nivel sugerido del modelo
+                      </div>
+                      <div style={{ height: 6, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{
+                          width: `${fbStats.alineacion_con_modelo_pct}%`,
+                          height: "100%",
+                          background: fbStats.alineacion_con_modelo_pct >= 80 ? "var(--paramo-green)"
+                                   : fbStats.alineacion_con_modelo_pct >= 60 ? "var(--andes-orange)"
+                                   : "var(--guayaba-red)",
+                        }} />
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--condor-wing)", marginTop: 4, fontWeight: 600 }}>
+                        {fbStats.alineacion_con_modelo_pct}%
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ marginTop: 12, fontSize: 10.5, color: "var(--ink-mute)", lineHeight: 1.5 }}>
+                    Tus decisiones se persisten en parquet y alimentan el próximo reentreno mensual del XGBoost.
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* CARD 2: Alertas tempranas */}
+            <div className="card" style={{
+              padding: 18,
+              background: "linear-gradient(180deg, white, rgba(74,124,89,0.04))",
+              borderTop: "3px solid var(--paramo-green)",
+            }}>
+              <SectionTitle action={
+                alertas?.n_alertas > 0 && (
+                  <span className="chip red mono" style={{ fontSize: 9 }}>{alertas.n_alertas} activas</span>
+                )
+              }>
+                🛡️ Prevención · clusters formándose
+              </SectionTitle>
+              {!alertas || alertas.n_alertas === 0 ? (
+                <div style={{ fontSize: 12, color: "var(--ink-mute)", lineHeight: 1.5 }}>
+                  ✓ La cartera luce estable en la última ventana de {alertas?.ventana_efectiva_dias || 30}d.
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: "var(--condor-wing)", lineHeight: 1.5, marginBottom: 10 }}>
+                    Detecté <strong>{alertas.n_alertas} patrones</strong> formándose · USD <strong>{Math.round((alertas.monto_total_en_riesgo_usd||0)/1000)}K</strong> prevenibles si actuás ahora.
+                  </div>
+                  <div style={{ display: "grid", gap: 4 }}>
+                    {alertas.alertas?.slice(0, 3).map((a: any, i: number) => (
+                      <div key={i} style={{
+                        padding: "6px 10px", background: "var(--marfil-paper)", borderRadius: 6,
+                        fontSize: 11, borderLeft: `3px solid ${a.severidad === 'alta' ? 'var(--guayaba-red)' : 'var(--andes-orange)'}`,
+                      }}>
+                        <span className="mono" style={{ fontWeight: 600, color: "var(--mountain-blue)" }}>{a.entidad}</span>
+                        <span style={{ marginLeft: 6, color: "var(--ink-mute)" }}>· {a.n_casos_recientes} casos · ${(a.monto_en_riesgo_usd/1000).toFixed(0)}K</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* CARD 3: Patrones nuevos (anomalías) */}
+            <div className="card" style={{
+              padding: 18,
+              background: "linear-gradient(180deg, white, rgba(44,95,141,0.05))",
+              borderTop: "3px solid var(--mountain-blue)",
+            }}>
+              <SectionTitle action={
+                anomalias?.novedosos > 0 && (
+                  <span className="chip blue mono" style={{ fontSize: 9 }}>{anomalias.novedosos} nuevos</span>
+                )
+              }>
+                ✨ Patrones inusuales hoy
+              </SectionTitle>
+              {!anomalias || !anomalias.items?.length ? (
+                <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>
+                  IsolationForest todavía no produjo resultados. Probá la pantalla <span className="mono">✨ Patrones inusuales</span>.
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: "var(--condor-wing)", lineHeight: 1.5, marginBottom: 10 }}>
+                    Detecté <strong>{anomalias.total}</strong> casos estadísticamente raros, <strong>{anomalias.novedosos}</strong> sin alerta histórica previa.
+                  </div>
+                  <div style={{ display: "grid", gap: 4 }}>
+                    {anomalias.items.slice(0, 3).map((it: any) => (
+                      <div
+                        key={it.id_siniestro}
+                        onClick={() => onInvestigate && onInvestigate(it.id_siniestro)}
+                        style={{
+                          padding: "6px 10px", background: "var(--marfil-paper)", borderRadius: 6,
+                          fontSize: 11, cursor: "pointer",
+                          borderLeft: `3px solid ${it.novedoso ? 'var(--guayaba-red)' : 'var(--paramo-green)'}`,
+                          display: "flex", alignItems: "center", gap: 6,
+                        }}
+                      >
+                        <span className="mono" style={{ fontWeight: 600, color: "var(--mountain-blue)" }}>{it.id_siniestro}</span>
+                        <span style={{ color: "var(--ink-mute)" }}>· score {it.anomaly_score}</span>
+                        {it.novedoso && <span className="chip red" style={{ fontSize: 8, marginLeft: "auto" }}>✨ nuevo</span>}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </RoleFrame>
   );
 }
 
 /* ============================================================
-   2. SINIESTROS — my day, queue priority
+   2. SINIESTROS — my day, queue priority (datos reales)
    ============================================================ */
+
+/* Hash determinista identico al backend (_analista_para_siniestro) para
+   filtrar el top-riesgo por analista actual sin nuevo endpoint. */
+function analistaParaId(id: string, n: number): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = ((h * 31) + id.charCodeAt(i)) >>> 0;
+  return h % n;
+}
+
+const ANALISTAS_FRONT = [
+  { id: 'ana.yanez',      nombre: 'María Yánez' },
+  { id: 'diego.cevallos', nombre: 'Diego Cevallos' },
+  { id: 'ana.toral',      nombre: 'Ana Toral' },
+  { id: 'luis.velez',     nombre: 'Luis Vélez' },
+  { id: 'sofia.borja',    nombre: 'Sofía Borja' },
+];
+const ANALISTA_ACTUAL_IDX = 0; // María Yánez = índice 0
+
 function SiniestrosHome({ onInvestigate }) {
-  const today = [
-    { id: "SIN-100029", score: 87, due: "10:30", monto: "$8.450", state: "pendiente" },
-    { id: "SIN-100456", score: 82, due: "11:15", monto: "$11.200", state: "pendiente" },
-    { id: "SIN-101205", score: 58, due: "12:00", monto: "$3.100", state: "en revisión" },
-    { id: "SIN-101620", score: 22, due: "14:00", monto: "$1.240", state: "pendiente" },
-    { id: "SIN-101725", score: 18, due: "15:30", monto: "$890",  state: "pendiente" },
-  ];
+  const [topMine, setTopMine] = useRH<any[]>([]);
+  const [carga, setCarga] = useRH<any>(null);
+  const [fb, setFb] = useRH<any>(null);
+  const [loading, setLoading] = useRH(true);
+
+  useRHE(() => {
+    Promise.all([
+      fetch(`${API}/top-riesgo?limit=30`).then(r => r.json()).catch(() => ({ top: [] })),
+      fetch(`${API}/analistas/carga`).then(r => r.json()).catch(() => null),
+      fetch(`${API}/feedback/stats`).then(r => r.json()).catch(() => null),
+    ]).then(([tr, c, f]) => {
+      const mine = (tr.top || []).filter((cs: any) =>
+        analistaParaId(cs.id_siniestro, ANALISTAS_FRONT.length) === ANALISTA_ACTUAL_IDX
+      );
+      setTopMine(mine);
+      setCarga(c);
+      setFb(f);
+      setLoading(false);
+    });
+  }, []);
+
+  const today = topMine.slice(0, 5);
+  const miCargaObj = carga?.analistas?.[ANALISTA_ACTUAL_IDX];
+  const miCarga = miCargaObj?.n_casos || 0;
+  const miPend = miCargaObj?.n_pendientes_estim || 0;
+  const totalFb = fb?.total || 0;
+  const align = fb?.alineacion_con_modelo_pct;
+
   return (
     <RoleFrame
       icon="📋"
@@ -185,33 +576,35 @@ function SiniestrosHome({ onInvestigate }) {
       accent="#E87A4F"
     >
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Mi cola" value="23" sub="5 prioritarios hoy" tone="wing"/>
-        <KpiCard label="Resueltos esta semana" value="34" sub="↑ 12% vs semana pasada" tone="green"/>
-        <KpiCard label="Tiempo medio" value="18m" sub="objetivo: 20m" tone="wing"/>
-        <KpiCard label="Aprobación con cóndor" value="92%" sub="aceptás sus sugerencias" tone="orange"/>
+        <KpiCard label="Mi cola" value={miCarga ? miCarga.toLocaleString('en-US') : '…'} sub={`${miPend} estimados pendientes`} tone="wing"/>
+        <KpiCard label="Feedback semana" value={fb?.ultimas_7d ?? '…'} sub={`${totalFb} decisiones acumuladas`} tone="green"/>
+        <KpiCard label="Mi top 5 hoy" value={String(today.length)} sub="filtrado por hash de id_siniestro" tone="wing"/>
+        <KpiCard label="Alineación con cóndor" value={align != null ? `${align}%` : '—'} sub={align != null ? 'tus decisiones vs nivel sugerido' : 'sin feedback aún'} tone="orange"/>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18 }}>
         <div className="card" style={{ padding: 18 }}>
-          <SectionTitle action={<span className="chip blue">5 sugeridos por orden óptimo</span>}>
+          <SectionTitle action={<span className="chip blue">{today.length} casos asignados a María Yánez</span>}>
             Hoy te recomiendo resolver en este orden
           </SectionTitle>
+          {loading && <div style={{ fontSize: 12, color: 'var(--ink-mute)' }}>Sobrevolando el dataset…</div>}
+          {!loading && today.length === 0 && <div style={{ fontSize: 12, color: 'var(--ink-mute)' }}>No te tocó ningún caso del top de riesgo hoy. Toca al cóndor agéntico si querés ver toda la cartera.</div>}
           <div style={{ display: "grid", gap: 6 }}>
-            {today.map((c, i) => (
-              <div key={c.id} style={{
+            {today.map((c: any, i: number) => (
+              <div key={c.id_siniestro} style={{
                 display: "grid", gridTemplateColumns: "32px 1fr auto auto auto auto",
                 gap: 10, alignItems: "center", padding: "10px 12px",
                 background: "var(--marfil-paper)", borderRadius: 10, border: "1px solid var(--line)",
               }}>
                 <div className="serif" style={{ fontSize: 22, color: "var(--andes-orange)", fontWeight: 600 }}>{i+1}</div>
                 <div style={{ minWidth: 0 }}>
-                  <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: "var(--mountain-blue)" }}>{c.id}</div>
-                  <div style={{ fontSize: 10.5, color: "var(--ink-mute)" }}>vencimiento {c.due} · {c.state}</div>
+                  <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: "var(--mountain-blue)" }}>{c.id_siniestro}</div>
+                  <div style={{ fontSize: 10.5, color: "var(--ink-mute)" }}>{c.ciudad || '—'} · {c.cobertura} · nivel {c.nivel}</div>
                 </div>
                 <VueloDelCondor score={c.score} variant="sm"/>
-                <span className="tabular mono" style={{ fontSize: 12 }}>{c.monto}</span>
-                <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }}>✓ resolver</button>
-                <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => onInvestigate(c.id)}>investigar</button>
+                <span className="tabular mono" style={{ fontSize: 12 }}>${(c.monto_reclamado_usd||0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => fbQuick(c.id_siniestro, 'aprobar', c.score, c.nivel)}>✓ resolver</button>
+                <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => onInvestigate(c.id_siniestro)}>investigar</button>
               </div>
             ))}
           </div>
@@ -261,9 +654,32 @@ function ProgressRing({ value, label, sub }) {
 }
 
 /* ============================================================
-   3. JEFATURA — Map of Ecuador with hot cities + team KPIs
+   3. JEFATURA — Map of Ecuador con hot cities + team KPIs (datos reales)
    ============================================================ */
 function JefaturaHome() {
+  const [sucursales, setSucursales] = useRH<any[]>([]);
+  const [analistas, setAnalistas] = useRH<any[]>([]);
+  const [kpis, setKpis] = useRH<any>(null);
+  const [loading, setLoading] = useRH(true);
+
+  useRHE(() => {
+    Promise.all([
+      fetch(`${API}/sucursales/ranking?top_n=20`).then(r => r.json()).catch(() => ({ top: [] })),
+      fetch(`${API}/analistas/carga`).then(r => r.json()).catch(() => ({ analistas: [] })),
+      fetch(`${API}/kpis`).then(r => r.json()).catch(() => null),
+    ]).then(([s, a, k]) => {
+      setSucursales(s?.top || []);
+      setAnalistas(a?.analistas || []);
+      setKpis(k);
+      setLoading(false);
+    });
+  }, []);
+
+  const totalSin = kpis?.totales?.siniestros || 0;
+  const totalSuc = sucursales.length;
+  const peorSucursal = [...sucursales].sort((a, b) => (b.tasa_fraude_sim || 0) - (a.tasa_fraude_sim || 0))[0];
+  const masCargada = [...analistas].sort((a, b) => b.n_casos - a.n_casos)[0];
+
   return (
     <RoleFrame
       icon="📊"
@@ -272,58 +688,94 @@ function JefaturaHome() {
       accent="#2C5F8D"
     >
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Casos abiertos" value="412" sub="↑ 18 desde ayer" tone="wing"/>
-        <KpiCard label="Sucursales activas" value="7" sub="Quito · GYE · CUE · MAN · LOJ · AMB · ESM" tone="wing"/>
-        <KpiCard label="Productividad equipo" value="94%" sub="vs objetivo 90%" tone="green"/>
-        <KpiCard label="SLA cumplido" value="87%" sub="caída en Guayaquil" tone="orange"/>
+        <KpiCard label="Casos en cartera" value={totalSin ? totalSin.toLocaleString('en-US') : '…'} sub={loading ? 'cargando…' : 'evaluados por el modelo'} tone="wing"/>
+        <KpiCard label="Sucursales activas" value={totalSuc ? String(totalSuc) : '…'} sub={sucursales.slice(0, 4).map((s: any) => s.sucursal).join(' · ') || '—'} tone="wing"/>
+        <KpiCard label="Sucursal con mayor tasa de alertas" value={peorSucursal?.sucursal || '—'} sub={peorSucursal ? `${(peorSucursal.tasa_fraude_sim*100).toFixed(1)}% marcadas históricamente · ${peorSucursal.n_siniestros} casos` : '—'} tone="red"/>
+        <KpiCard label="Analista más cargado" value={masCargada?.nombre || '—'} sub={masCargada ? `${masCargada.n_casos.toLocaleString('en-US')} casos` : '—'} tone="orange"/>
       </div>
 
+      {/* Mapa de calor de Ecuador real */}
+      {sucursales.length > 0 && (
+        <div className="card" style={{ padding: 14, marginBottom: 18 }}>
+          <EcuadorHeatMap
+            data={sucursales.map((s: any) => ({
+              ciudad: s.sucursal,
+              n_siniestros: s.n_siniestros,
+              tasa_fraude: s.tasa_fraude_sim,
+              monto_promedio: s.monto_promedio,
+            }))}
+            metric="tasa"
+            title="Mapa de calor por sucursal · tasa de alertas históricas"
+            height={420}
+          />
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 18 }}>
-        <div className="card" style={{ padding: 0, overflow: "hidden", minHeight: 460 }}>
-          <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--line)" }}>
-            <SectionTitle action={<span className="chip blue">🦅 cóndores volando sobre 7 ciudades</span>}>
-              Mapa de calor · Ecuador
-            </SectionTitle>
+        <div className="card" style={{ padding: 18, minHeight: 460 }}>
+          <SectionTitle action={<span className="chip blue">{sucursales.length} sucursales en cartera</span>}>
+            Sucursales · ranking por # siniestros (real)
+          </SectionTitle>
+          {loading && <div style={{ fontSize: 12, color: 'var(--ink-mute)' }}>Sobrevolando dataset…</div>}
+          <div style={{ display: 'grid', gap: 4, maxHeight: 410, overflow: 'auto' }}>
+            {sucursales.map((s: any) => {
+              const tasa = s.tasa_fraude_sim || 0;
+              const tone = tasa > 0.08 ? 'red' : tasa > 0.04 ? 'amber' : 'green';
+              const tc = tone === 'red' ? 'var(--guayaba-red)' : tone === 'amber' ? 'var(--andes-ocher)' : 'var(--paramo-green)';
+              return (
+                <div key={s.sucursal} style={{
+                  display: 'grid', gridTemplateColumns: '130px 1fr 80px 90px 60px',
+                  gap: 10, alignItems: 'center', padding: '7px 12px',
+                  background: 'var(--marfil-paper)', borderRadius: 8, fontSize: 11.5,
+                  borderLeft: `3px solid ${tc}`,
+                }}>
+                  <span style={{ fontWeight: 600 }}>{s.sucursal}</span>
+                  <div style={{ flex: 1, height: 5, background: 'var(--line)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min(100, (s.n_siniestros / Math.max(1, sucursales[0]?.n_siniestros || 1)) * 100)}%`, height: '100%', background: tc }} />
+                  </div>
+                  <span className="tabular mono" style={{ fontSize: 11 }}>{s.n_siniestros.toLocaleString('en-US')} casos</span>
+                  <span className="tabular mono" style={{ fontSize: 11 }}>${(s.monto_promedio || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                  <span className={`chip mono ${tone}`} style={{ fontSize: 9.5, justifySelf: 'end' }}>{(tasa*100).toFixed(1)}%</span>
+                </div>
+              );
+            })}
           </div>
-          <EcuadorMap/>
         </div>
 
         <div>
           <div className="card" style={{ padding: 18, marginBottom: 14 }}>
-            <SectionTitle>Productividad analistas · esta semana</SectionTitle>
-            {[
-              { name: "María Yánez",  city: "Quito",      done: 34, target: 30 },
-              { name: "Diego Cevallos", city: "Quito",    done: 28, target: 30 },
-              { name: "Ana Toral",    city: "Cumbayá",    done: 26, target: 25 },
-              { name: "Luis Vélez",   city: "Guayaquil",  done: 18, target: 30 },
-              { name: "Sofía Borja",  city: "Cuenca",     done: 22, target: 20 },
-            ].map(a => (
-              <div key={a.name} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 4 }}>
-                  <span>{a.name} <span style={{ color: "var(--ink-mute)" }}>· {a.city}</span></span>
-                  <span className="tabular mono">{a.done}/{a.target}</span>
+            <SectionTitle>Carga del equipo (asignación por hash)</SectionTitle>
+            {analistas.map((a: any) => {
+              const peso = a.n_casos / Math.max(1, analistas[0]?.n_casos || 1);
+              const c = peso > 0.95 ? 'var(--guayaba-red)' : peso > 0.7 ? 'var(--andes-ocher)' : 'var(--paramo-green)';
+              return (
+                <div key={a.id} style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 4 }}>
+                    <span>{a.nombre} <span style={{ color: "var(--ink-mute)" }}>· {a.sucursal_base}</span></span>
+                    <span className="tabular mono">{a.n_casos.toLocaleString('en-US')} casos</span>
+                  </div>
+                  <div style={{ height: 6, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ width: `${peso * 100}%`, height: "100%", background: c }}/>
+                  </div>
+                  <div style={{ fontSize: 9.5, color: 'var(--ink-mute)', marginTop: 2 }}>
+                    {a.n_fraudes_sim} alerta(s) histórica(s) · ${(a.monto_total_usd/1000).toFixed(0)}K total
+                  </div>
                 </div>
-                <div style={{ height: 6, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
-                  <div style={{
-                    width: `${Math.min(100, (a.done/a.target)*100)}%`, height: "100%",
-                    background: a.done >= a.target ? "var(--paramo-green)" : a.done < a.target * 0.7 ? "var(--guayaba-red)" : "var(--andes-ocher)",
-                  }}/>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-          <div className="card" style={{ padding: 14, background: "rgba(232,122,79,0.08)", borderLeft: "3px solid var(--andes-orange)" }}>
-            <div style={{ display: "flex", gap: 10 }}>
-              <Condor size={24} tone="orange" mood="alert"/>
-              <div style={{ fontSize: 12 }}>
-                <strong>Luis Vélez</strong> está al 60% del objetivo en Guayaquil. ¿Reasigno 8 casos al equipo de Quito?
-                <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
-                  <button className="btn warm" style={{ fontSize: 10.5, padding: "5px 10px" }}>Sí, reasignar</button>
-                  <button className="btn ghost" style={{ fontSize: 10.5, padding: "5px 10px" }}>Más tarde</button>
+          {masCargada && peorSucursal && (
+            <div className="card" style={{ padding: 14, background: "rgba(232,122,79,0.08)", borderLeft: "3px solid var(--andes-orange)" }}>
+              <div style={{ display: "flex", gap: 10 }}>
+                <Condor size={24} tone="orange" mood="alert"/>
+                <div style={{ fontSize: 12 }}>
+                  <strong>{masCargada.nombre}</strong> tiene {masCargada.n_casos.toLocaleString('en-US')} casos en cola.
+                  La sucursal <strong>{peorSucursal.sucursal}</strong> es la de mayor tasa de alertas históricas ({(peorSucursal.tasa_fraude_sim*100).toFixed(1)}%).
+                  Considerá reasignar carga al equipo con menos casos.
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </RoleFrame>
@@ -395,25 +847,41 @@ function EcuadorMap() {
 }
 
 /* ============================================================
-   4. RIESGOS — Provider exposure heatmap
+   4. RIESGOS — Provider exposure heatmap (datos reales)
    ============================================================ */
 function RiesgosHome() {
-  const providers = [
-    { id: "PRV-NEW0019", name: "Auto Servicio Andes",  exp: 156, cases: 32, level: "red" },
-    { id: "PRV-0007",    name: "Taller Cumbayá",       exp: 132, cases: 28, level: "red" },
-    { id: "PRV-0042",    name: "Clínica San Rafael",   exp: 98,  cases: 21, level: "red" },
-    { id: "PRV-0019",    name: "Multipartes Guayas",   exp: 76,  cases: 18, level: "amber" },
-    { id: "PRV-0103",    name: "Repuestos del Valle",  exp: 54,  cases: 14, level: "amber" },
-    { id: "PRV-0088",    name: "Auto Quito",           exp: 42,  cases: 12, level: "amber" },
-    { id: "PRV-0044",    name: "Manta Motors",         exp: 31,  cases: 9,  level: "green" },
-    { id: "PRV-0011",    name: "Carrocerías Norte",    exp: 24,  cases: 7,  level: "green" },
-    { id: "PRV-0033",    name: "Loja Auto",            exp: 18,  cases: 5,  level: "green" },
-    { id: "PRV-0061",    name: "Servitec Cuenca",      exp: 14,  cases: 4,  level: "green" },
-    { id: "PRV-0029",    name: "Ambato Express",       exp: 11,  cases: 3,  level: "green" },
-    { id: "PRV-0077",    name: "Esmeraldas Repair",    exp: 9,   cases: 3,  level: "green" },
-  ];
-  const max = 160;
-  const cMap = { red: "#C5333A", amber: "#D4A574", green: "#4A7C59" };
+  const [providers, setProviders] = useRH<any[]>([]);
+  const [kpis, setKpis] = useRH<any>(null);
+  const [loading, setLoading] = useRH(true);
+
+  useRHE(() => {
+    Promise.all([
+      fetch(`${API}/proveedores/ranking?top_n=12`).then(r => r.json()).catch(() => ({ top: [] })),
+      fetch(`${API}/kpis`).then(r => r.json()).catch(() => null),
+    ]).then(([pv, kp]) => {
+      const items = (pv?.top || []).map((p: any) => {
+        const exp = Math.round((p.monto_promedio || 0) * (p.n_siniestros || 0) / 1000); // miles USD
+        return {
+          id: p.id_proveedor,
+          name: p.nombre || p.id_proveedor,
+          exp,
+          cases: p.n_siniestros || 0,
+          level: p.lista_restrictiva ? 'red' : (p.n_fraudes_simulados || 0) > 5 ? 'red' : (p.n_siniestros || 0) > 20 ? 'amber' : 'green',
+          restrictiva: !!p.lista_restrictiva,
+        };
+      });
+      setProviders(items);
+      setKpis(kp);
+      setLoading(false);
+    });
+  }, []);
+
+  const max = Math.max(160, ...providers.map(p => p.exp));
+  const cMap: Record<string, string> = { red: "#C5333A", amber: "#D4A574", green: "#4A7C59" };
+  const totalExp = providers.reduce((a, p) => a + p.exp, 0);
+  const top5 = providers.slice(0, 5).reduce((a, p) => a + p.exp, 0);
+  const totalSin = kpis?.totales?.siniestros || 0;
+  const provRestr = kpis?.totales?.proveedores_lista_restrictiva || 0;
   return (
     <RoleFrame
       icon="⚠️"
@@ -422,10 +890,10 @@ function RiesgosHome() {
       accent="#D4A574"
     >
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Exposición total" value="$865K" sub="USD vinculado a sospecha" tone="red"/>
-        <KpiCard label="Proveedores activos" value="198" sub="16 en lista restrictiva" tone="wing"/>
-        <KpiCard label="Concentración top 5" value="68%" sub="del total expuesto" tone="orange"/>
-        <KpiCard label="Reducción potencial" value="-$486K" sub="si bloqueás top 5" tone="green"/>
+        <KpiCard label="Exposición top 12" value={`$${totalExp}K`} sub={loading ? 'cargando…' : 'USD vinculado a top proveedores'} tone="red"/>
+        <KpiCard label="Proveedores activos" value={kpis ? String(providers.length) : '…'} sub={`${provRestr} en lista restrictiva`} tone="wing"/>
+        <KpiCard label="Concentración top 5" value={totalExp > 0 ? `${Math.round((top5/totalExp)*100)}%` : '—'} sub="del total expuesto top 12" tone="orange"/>
+        <KpiCard label="Reducción potencial" value={`-$${top5}K`} sub="si bloqueás top 5" tone="green"/>
       </div>
 
       <div className="card" style={{ padding: 18, marginBottom: 18 }}>
@@ -698,9 +1166,27 @@ function LatencyChart() {
 }
 
 /* ============================================================
-   7. GERENCIA — Executive KPIs + what-if
+   7. GERENCIA — Executive KPIs + what-if (datos reales)
    ============================================================ */
 function GerenciaHome() {
+  const [kpis, setKpis] = useRH<any>(null);
+  const [sim, setSim] = useRH<any>(null);
+
+  useRHE(() => {
+    Promise.all([
+      fetch(`${API}/kpis`).then(r => r.json()).catch(() => null),
+      fetch(`${API}/simulacion-ahorro?tasa_deteccion_actual=0.30&tasa_deteccion_achachai=0.70`).then(r => r.json()).catch(() => null),
+    ]).then(([k, s]) => { setKpis(k); setSim(s); });
+  }, []);
+
+  const totalSin = kpis?.totales?.siniestros || 0;
+  const tasaFraude = kpis?.totales?.tasa_fraude_simulada || 0;
+  const montoTotal = kpis?.totales?.monto_reclamado_total_usd || 0;
+  const montoFraude = kpis?.totales?.monto_reclamado_fraudes_usd || 0;
+  const ahorroAnual = sim?.ahorro_anual_estimado_usd || sim?.ahorro_anual_usd || 0;
+  const ahorroMes = Math.round(ahorroAnual / 12);
+  const roi = sim?.roi_estimado_pct || sim?.roi_pct || null;
+
   return (
     <RoleFrame
       icon="💼"
@@ -710,10 +1196,30 @@ function GerenciaHome() {
       extra={<button className="btn">📤 Compartir con el board</button>}
     >
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
-        <KpiCard label="Recuperación mayo" value="$486K" sub="↑ 38% vs abril" tone="green" big/>
-        <KpiCard label="ROI proyectado" value="1.634%" sub="payback 0.7 meses" tone="green" big/>
-        <KpiCard label="Casos vigilados 24/7" value="25.460" sub="por el cóndor" tone="wing" big/>
-        <KpiCard label="Precisión (AUC)" value="0.96" sub="top 5% industria" tone="wing" big/>
+        <KpiCard
+          label="Ahorro estimado mensual"
+          value={ahorroMes ? `$${(ahorroMes/1000).toFixed(1)}K` : '…'}
+          sub={ahorroAnual ? `$${(ahorroAnual/1000).toFixed(0)}K anual proyectado` : 'calculando…'}
+          tone="green" big
+        />
+        <KpiCard
+          label="ROI proyectado"
+          value={roi ? `${Math.round(roi)}%` : '…'}
+          sub="vs proceso manual actual"
+          tone="green" big
+        />
+        <KpiCard
+          label="Casos vigilados 24/7"
+          value={totalSin ? totalSin.toLocaleString('en-US') : '…'}
+          sub="por el cóndor"
+          tone="wing" big
+        />
+        <KpiCard
+          label="Exposición con alerta histórica"
+          value={montoFraude ? `$${(montoFraude/1000).toFixed(0)}K` : '…'}
+          sub={`${(tasaFraude*100).toFixed(1)}% de la cartera marcada históricamente`}
+          tone="orange" big
+        />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 18, marginBottom: 18 }}>
@@ -799,7 +1305,7 @@ function ThresholdSimulator() {
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-        <KpiCard label="Detección" value={`${detection}%`} sub="de fraudes reales" tone="green"/>
+        <KpiCard label="Detección" value={`${detection}%`} sub="de casos sospechosos" tone="green"/>
         <KpiCard label="Falsos positivos" value={`${fp}%`} sub="casos buenos alertados" tone="orange"/>
         <KpiCard label="Recuperación est." value={`$${recovered}K`} sub="proyección mensual" tone="wing"/>
       </div>

@@ -266,25 +266,147 @@ export function CondorBubble({ onOpen, mood = 'idle' as Mood, message }: { onOpe
   );
 }
 
-export function LearningBar({ count = 47, delta = 2.3 }: { count?: number; delta?: number }) {
+/**
+ * LearningBar REAL: lee /feedback/stats del backend.
+ * Si todavia no hay feedback registrado, muestra un CTA para empezar.
+ * Si hay feedback, muestra: total esta semana + acumulado + alineacion con modelo.
+ * Refresca cada 30s para reflejar decisiones nuevas en otra pestaña.
+ */
+export function LearningBar() {
+  const API = (typeof window !== "undefined" && (window as any).NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const [stats, setStats] = useState<any>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [expandido, setExpandido] = useState(false);
+
+  function cargar() {
+    fetch(`${API}/feedback/stats`)
+      .then(r => r.json())
+      .then(setStats)
+      .catch(e => setErr(String(e?.message || e)));
+  }
+
+  useEffect(() => {
+    cargar();
+    const id = setInterval(cargar, 30000); // refresh cada 30s
+    return () => clearInterval(id);
+    // eslint-disable-next-line
+  }, []);
+
+  if (err) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", gap: 12, padding: "8px 16px",
+        background: "rgba(197,51,58,0.05)", borderBottom: "1px solid var(--line)", fontSize: 12,
+      }}>
+        <Condor size={16} tone="red" mood="alert"/>
+        <span style={{ color: "var(--guayaba-red)" }}>No se pudo cargar el aprendizaje: {err}</span>
+      </div>
+    );
+  }
+
+  const total = stats?.total ?? 0;
+  const semana = stats?.ultimas_7d ?? 0;
+  const align = stats?.alineacion_con_modelo_pct;
+  const porDecision = stats?.por_decision || {};
+
+  // Sin feedback aun → CTA
+  if (total === 0) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", gap: 12, padding: "8px 16px",
+        background: "linear-gradient(90deg, rgba(232,122,79,0.06), rgba(44,95,141,0.04))",
+        borderBottom: "1px solid var(--line)", fontSize: 12,
+      }}>
+        <div style={{ position: "relative", width: 26, height: 26, display: "grid", placeItems: "center" }}>
+          <Condor size={16} tone="orange" mood="think"/>
+        </div>
+        <div>
+          <span style={{ color: "var(--condor-wing)", fontWeight: 600 }}>El cóndor está esperando aprender de vos.</span>
+          <span style={{ color: "var(--ink-mute)", marginLeft: 6 }}>
+            Investigá un caso y registrá tu decisión (aprobar / retener / bloquear / escalar) para alimentar el modelo.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Con feedback → render real
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 12,
-      padding: "8px 16px",
+      borderBottom: "1px solid var(--line)",
       background: "linear-gradient(90deg, rgba(232,122,79,0.08), rgba(44,95,141,0.08))",
-      borderBottom: "1px solid var(--line)", fontSize: 12,
     }}>
-      <div style={{ position: "relative", width: 26, height: 26, display: "grid", placeItems: "center" }}>
-        <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1.5px solid var(--andes-orange)", borderTopColor: "transparent", animation: "spin-slow 4s linear infinite" }}/>
-        <Condor size={16} tone="orange" mood="idle"/>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 12, padding: "8px 16px", fontSize: 12,
+      }}>
+        <div style={{ position: "relative", width: 26, height: 26, display: "grid", placeItems: "center" }}>
+          <div style={{
+            position: "absolute", inset: 0, borderRadius: "50%",
+            border: "1.5px solid var(--andes-orange)", borderTopColor: "transparent",
+            animation: "spin-slow 4s linear infinite",
+          }}/>
+          <Condor size={16} tone="orange" mood="idle"/>
+        </div>
+        <div style={{ flex: 1 }}>
+          <span style={{ color: "var(--condor-wing)", fontWeight: 600 }}>
+            El cóndor aprendió de <strong style={{ color: "var(--andes-orange)" }}>{semana}</strong> decisiones tuyas en los últimos 7 días
+          </span>
+          <span style={{ color: "var(--ink-mute)", marginLeft: 6 }}>
+            ({total} acumuladas)
+          </span>
+          {align != null && (
+            <span style={{
+              color: align >= 80 ? "var(--paramo-green)" : align >= 60 ? "var(--andes-orange)" : "var(--guayaba-red)",
+              fontWeight: 600, marginLeft: 8,
+            }}>
+              · {align}% alineación con tu nivel sugerido
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setExpandido(e => !e)}
+          className="chip blue"
+          style={{ cursor: "pointer", background: "transparent", border: "1px solid var(--line-strong)" }}
+        >
+          {expandido ? "Ocultar detalle ↑" : "Ver detalle →"}
+        </button>
       </div>
-      <div>
-        <span style={{ color: "var(--condor-wing)", fontWeight: 600 }}>El cóndor aprendió de {count} decisiones tuyas esta semana.</span>
-        <span style={{ color: "var(--paramo-green)", fontWeight: 600, marginLeft: 6 }}>↑ {delta} pts de precisión</span>
-        <span style={{ color: "var(--ink-mute)", marginLeft: 6 }}>· Gracias.</span>
+
+      {expandido && (
+        <div style={{
+          padding: "10px 16px 14px",
+          background: "white",
+          borderTop: "1px solid var(--line)",
+          display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10,
+          fontSize: 11,
+        }}>
+          <MiniStat label="Total decisiones" value={total} tone="wing" />
+          <MiniStat label="Esta semana" value={semana} tone="orange" />
+          <MiniStat label="Alineación" value={align != null ? `${align}%` : "—"} tone={align >= 80 ? "green" : "orange"} />
+          <MiniStat label="Aprobar" value={porDecision.aprobar ?? 0} tone="green" />
+          <MiniStat label="Retener / Bloquear" value={(porDecision.retener ?? 0) + (porDecision.bloquear ?? 0)} tone="red" />
+          <MiniStat label="Escalar" value={porDecision.escalar ?? 0} tone="orange" />
+
+          <div style={{ gridColumn: "1 / -1", fontSize: 10.5, color: "var(--ink-mute)", marginTop: 4 }}>
+            💾 Tus decisiones se persisten en <span className="mono">data/processed/feedback_analistas.parquet</span>. El próximo reentreno del modelo XGBoost (programado mensual) incorporará todas estas etiquetas como ground truth nuevo. <strong>Cada decisión tuya hace al cóndor más preciso.</strong>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({ label, value, tone = "wing" }: { label: string; value: any; tone?: string }) {
+  const c: any = {
+    red: "var(--guayaba-red)", green: "var(--paramo-green)",
+    orange: "var(--andes-orange)", wing: "var(--condor-wing)",
+  };
+  return (
+    <div style={{ background: "var(--marfil-paper)", borderRadius: 6, padding: "6px 10px" }}>
+      <div style={{ fontSize: 9, color: "var(--ink-mute)", letterSpacing: ".06em", textTransform: "uppercase" }}>{label}</div>
+      <div className="serif tabular" style={{ fontSize: 16, fontWeight: 600, color: c[tone] || c.wing, lineHeight: 1, marginTop: 2 }}>
+        {value}
       </div>
-      <div style={{ flex: 1 }}/>
-      <button className="chip blue" style={{ cursor: "pointer", background: "transparent", border: "1px solid var(--line-strong)" }}>Ver detalle →</button>
     </div>
   );
 }

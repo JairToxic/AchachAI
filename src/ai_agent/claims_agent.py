@@ -26,9 +26,25 @@ REGLAS DURAS (no negociables):
 - Usa SIEMPRE las tools disponibles para obtener datos, no respondas de memoria.
 - Si una pregunta requiere multiples queries, encadena tools.
 
+GUIA DE MAPEO PREGUNTA -> TOOL (preguntas obligatorias del reto):
+- "top 10 siniestros con mayor riesgo" / "que casos revisar primero" -> top_riesgo(limit=10)
+- "por que este siniestro es alto riesgo" / "explicame SIN-XXXX" -> detalle_siniestro(id_siniestro)
+- "que proveedores concentran mas alertas" -> ranking_proveedores
+- "que ramos / coberturas tienen mayor % sospechoso" -> estadisticas_por_cobertura
+  (nota: el dataset es mono-ramo "Vehiculos", agrupamos por COBERTURA: Choque, Robo, RC, etc.)
+- "que ciudades tienen mayor concentracion de alertas" -> ranking_ciudades
+- "que asegurados tienen mayor frecuencia de reclamos" -> asegurados_recurrentes
+- "que documentos faltan en casos criticos" -> docs_faltantes(min_score=1)
+- "casos con montos atipicos / cerca del limite de poliza" -> montos_atipicos
+- "siniestros cerca del inicio (o fin) de la poliza" -> siniestros_borde_vigencia(modo='inicio')
+- "que patrones se repiten en reclamos sospechosos" -> ENCADENAR: ranking_proveedores + ranking_ciudades + asegurados_recurrentes + anomalias_novedosas, luego sintetizar 3-5 patrones comunes con citas.
+- "resumen ejecutivo / reporte para directorio / PDF" -> generar_reporte_pdf(tipo='ejecutivo' o 'directorio' o 'antifraude' o 'auditoria')
+- "evalua este caso hipotetico" / "que pasa si tengo un robo de N usd con M dias..." -> evaluar_caso_hipotetico(...)
+- "ahorro / ROI / impacto financiero" -> simulacion_ahorro
+
 Formato de respuesta:
 - Conciso, en espanol latinoamericano (no formal de Espana).
-- Si listas casos, usa tabla markdown.
+- Si listas casos, usa tabla markdown con id_siniestro, score/nivel y una razon corta.
 - Si das numeros, redondea a 0 decimales para USD.
 - Termina con UNA accion sugerida (1-2 lineas) para el analista.
 """
@@ -95,8 +111,13 @@ class ClaimsAgent:
                     except Exception as exc:
                         tool_result = {"error": f"{type(exc).__name__}: {exc}"}
 
-                tools_used.append({"tool": tool_name, "args": args,
-                                   "result_summary": str(tool_result)[:200]})
+                # Para tools que el frontend necesita renderizar (botones, links),
+                # incluimos el result completo. Para el resto, solo summary truncado.
+                tool_meta = {"tool": tool_name, "args": args,
+                             "result_summary": str(tool_result)[:200]}
+                if tool_name in ("generar_reporte_pdf", "evaluar_caso_hipotetico"):
+                    tool_meta["result_full"] = tool_result
+                tools_used.append(tool_meta)
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
