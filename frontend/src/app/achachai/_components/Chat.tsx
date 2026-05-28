@@ -39,7 +39,7 @@ const mdComponents = {
   h3: ({ children }: any) => <h4 style={{ fontSize: 14, margin: '8px 0 4px', fontWeight: 600 }}>{children}</h4>,
 };
 
-function MD({ children }: { children: string }) {
+export function MD({ children }: { children: string }) {
   return (
     <div style={MD_STYLES}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -52,7 +52,7 @@ function MD({ children }: { children: string }) {
 /* ============================================================
    Catálogo humano de tools — qué dice cada una mientras corre
    ============================================================ */
-const TOOL_NARRATIVE: Record<string, { phrase: string; icon: string; tone: string; detail: string }> = {
+export const TOOL_NARRATIVE: Record<string, { phrase: string; icon: string; tone: string; detail: string }> = {
   top_riesgo:                { phrase: "Escaneando casos críticos",       icon: "📡", tone: "#C5333A", detail: "Aplicando scoring híbrido (reglas + XGBoost) a 25.460 siniestros…" },
   detalle_siniestro:         { phrase: "Recuperando detalle del caso",    icon: "🔍", tone: "#E87A4F", detail: "Cruzando póliza + asegurado + vehículo + proveedor + documentos…" },
   ranking_proveedores:       { phrase: "Calculando concentración por proveedor", icon: "🕸️", tone: "#2C5F8D", detail: "Agregando casos por proveedor en últimos 90 días…" },
@@ -113,7 +113,7 @@ function RadarSweep({ size = 64, tone = "#E87A4F" }: { size?: number; tone?: str
   );
 }
 
-function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: string[]; currentTool?: string }) {
+export function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: string[]; currentTool?: string }) {
   const total = 10; // total approximate tools available
   const doneCount = tools.length - (currentTool ? 1 : 0);
   const progress = Math.min(95, tools.length * 18 + (currentTool ? 12 : 0));
@@ -362,7 +362,7 @@ function scoreVisualPorNivel(nivel: string | null): number {
  * Cuando el agente llama ranking_ciudades, fetchea el ranking y muestra
  * el mapa de calor de Ecuador con tooltips y leyenda.
  */
-function CityHeatmapAuto() {
+export function CityHeatmapAuto() {
   const API = (typeof window !== "undefined" && (window as any).NEXT_PUBLIC_API_URL) || "http://localhost:8000";
   const [data, setData] = useState<any[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -400,7 +400,7 @@ function CityHeatmapAuto() {
 /**
  * Card flotante con botón de descarga cuando el agente generó un reporte PDF.
  */
-function ReportePdfCard({ r }: { r: any }) {
+export function ReportePdfCard({ r }: { r: any }) {
   const API = (typeof window !== "undefined" && (window as any).NEXT_PUBLIC_API_URL) || "http://localhost:8000";
   const fullUrl = r.url_descarga?.startsWith("http") ? r.url_descarga : `${API}${r.url_descarga}`;
   const toneByTipo: Record<string, string> = {
@@ -467,7 +467,7 @@ function ReportePdfCard({ r }: { r: any }) {
 /**
  * Card visual con resultado de evaluar_caso_hipotetico desde el chat.
  */
-function EvaluacionCard({ e, onInvestigate }: { e: any; onInvestigate?: (id: string) => void }) {
+export function EvaluacionCard({ e, onInvestigate }: { e: any; onInvestigate?: (id: string) => void }) {
   const nivel = e.nivel || "VERDE";
   const tone = nivel === "ROJO" ? "var(--guayaba-red)"
             : nivel === "AMARILLO" ? "var(--andes-orange)"
@@ -543,7 +543,7 @@ function EvaluacionCard({ e, onInvestigate }: { e: any; onInvestigate?: (id: str
   );
 }
 
-function EvidencePreview({ summary, onInvestigate }: { summary: string; onInvestigate?: (id: string) => void }) {
+export function EvidencePreview({ summary, onInvestigate }: { summary: string; onInvestigate?: (id: string) => void }) {
   const ev = extractEvidence(summary);
   if (ev.cases.length === 0 && ev.provs.length === 0) return null;
 
