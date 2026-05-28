@@ -135,7 +135,7 @@ function KanbanColumn({ title, subtitle, tone, items, onInvestigate }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
       <div style={{
-        padding: "10px 14px", background: "white", borderRadius: "12px 12px 0 0",
+        padding: "10px 14px", background: "rgba(11, 30, 51, 0.55)", borderRadius: "12px 12px 0 0",
         border: "1px solid var(--line)", borderBottom: `3px solid ${accent}`,
         display: "flex", justifyContent: "space-between", alignItems: "baseline",
       }}>
@@ -176,7 +176,7 @@ function CaseCard({ c, onInvestigate }) {
         </div>
         {c.score >= 70 && (
           <button onClick={() => onInvestigate && onInvestigate(c.id)} className="chip outline"
-            style={{ marginTop: 8, fontSize: 10, cursor: "pointer", background: "white" }}>
+            style={{ marginTop: 8, fontSize: 10, cursor: "pointer", background: "rgba(11, 30, 51, 0.55)" }}>
             🦅 Investigar profundo
           </button>
         )}
@@ -277,7 +277,7 @@ export function DocumentsScreen() {
               <>
                 <div style={{
                   position: "absolute", left: 0, right: 0, height: 30,
-                  background: "linear-gradient(180deg, transparent, rgba(232,122,79,0.55), transparent)",
+                  background: "linear-gradient(180deg, transparent, rgba(6, 182, 212, 0.55), transparent)",
                   animation: "scan-beam 2s linear infinite",
                   pointerEvents: "none",
                 }}/>
@@ -311,7 +311,7 @@ export function DocumentsScreen() {
             </div>
           )}
           {done && error && (
-            <div className="fade-up" style={{ padding: 14, background: "rgba(197,51,58,0.08)", borderRadius: 10, color: "var(--guayaba-red)", fontSize: 12 }}>
+            <div className="fade-up" style={{ padding: 14, background: "rgba(239, 68, 68, 0.10)", borderRadius: 10, color: "var(--guayaba-red)", fontSize: 12 }}>
               <strong>Error al analizar:</strong> {error}
             </div>
           )}
@@ -339,7 +339,7 @@ export function DocumentsScreen() {
                 </tbody>
               </table>
               {result.inconsistencias && result.inconsistencias.length > 0 && (
-                <div style={{ marginTop: 14, padding: 12, background: "rgba(197,51,58,0.08)", borderRadius: 10, borderLeft: "3px solid var(--guayaba-red)" }}>
+                <div style={{ marginTop: 14, padding: 12, background: "rgba(239, 68, 68, 0.10)", borderRadius: 10, borderLeft: "3px solid var(--guayaba-red)" }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: "var(--guayaba-red)", marginBottom: 6 }}>
                     ⚠️ {result.inconsistencias.length} inconsistencia(s) detectada(s)
                   </div>
@@ -351,7 +351,7 @@ export function DocumentsScreen() {
                 </div>
               )}
               <div style={{
-                marginTop: 14, padding: 12, background: "rgba(232,122,79,0.08)", borderRadius: 10,
+                marginTop: 14, padding: 12, background: "rgba(6, 182, 212, 0.10)", borderRadius: 10,
                 fontSize: 12, color: "var(--condor-wing)", borderLeft: "3px solid var(--andes-orange)",
               }}>
                 <Condor size={14} tone="orange" mood="still" /> <strong>El cóndor opina:</strong> "{result.explicacion || 'Analizado.'}"
@@ -547,8 +547,8 @@ export function TejidoScreen() {
           ].map((c, i) => (
             <div key={c.id} className="fade-up" style={{
               padding: "10px 12px", marginBottom: 8, borderRadius: 10,
-              background: phase >= 3 && c.level === "red" ? "rgba(197,51,58,0.08)" : "white",
-              border: `1px solid ${phase >= 3 && c.level === "red" ? "rgba(197,51,58,0.30)" : "var(--line)"}`,
+              background: phase >= 3 && c.level === "red" ? "rgba(239, 68, 68, 0.10)" : "white",
+              border: `1px solid ${phase >= 3 && c.level === "red" ? "rgba(239, 68, 68, 0.35)" : "var(--line)"}`,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
               opacity: phase >= 2 ? 1 : 0.35,
               transition: "all 0.4s ease",
@@ -570,7 +570,7 @@ export function TejidoScreen() {
           <div className="diamond-divider" style={{ margin: "18px 0 10px" }}>El cóndor sugiere</div>
           {phase >= 5 ? (
             <div className="fade-up" style={{
-              padding: 12, background: "rgba(197,51,58,0.10)", borderRadius: 10,
+              padding: 12, background: "rgba(239, 68, 68, 0.12)", borderRadius: 10,
               fontSize: 12, lineHeight: 1.5, borderLeft: "3px solid var(--guayaba-red)",
             }}>
               <Condor size={14} tone="red" mood="still" /> "Encontré algo. <strong>3 proveedores</strong>
@@ -580,7 +580,7 @@ export function TejidoScreen() {
             </div>
           ) : (
             <div style={{
-              padding: 12, background: "rgba(232,122,79,0.06)", borderRadius: 10,
+              padding: 12, background: "rgba(6, 182, 212, 0.08)", borderRadius: 10,
               fontSize: 12, lineHeight: 1.5, borderLeft: "3px solid var(--andes-orange)",
               color: "var(--ink-mute)",
             }}>
@@ -598,15 +598,15 @@ function TejidoCanvas({ phase }) {
     <svg viewBox="0 0 1100 600" style={{ width: "100%", height: "100%" }}>
       <defs>
         <pattern id="loom" width="22" height="22" patternUnits="userSpaceOnUse">
-          <path d="M11 0 L22 11 L11 22 L0 11 Z" fill="none" stroke="rgba(26,58,82,0.06)" />
+          <path d="M11 0 L22 11 L11 22 L0 11 Z" fill="none" stroke="rgba(148, 163, 184, 0.10)" />
         </pattern>
         <radialGradient id="hot-glow">
-          <stop offset="0%" stopColor="rgba(197,51,58,0.40)"/>
-          <stop offset="100%" stopColor="rgba(197,51,58,0)"/>
+          <stop offset="0%" stopColor="rgba(239, 68, 68, 0.45)"/>
+          <stop offset="100%" stopColor="rgba(239, 68, 68, 0)"/>
         </radialGradient>
         <radialGradient id="scan-pulse">
-          <stop offset="0%" stopColor="rgba(232,122,79,0.30)"/>
-          <stop offset="100%" stopColor="rgba(232,122,79,0)"/>
+          <stop offset="0%" stopColor="rgba(6, 182, 212, 0.40)"/>
+          <stop offset="100%" stopColor="rgba(6, 182, 212, 0)"/>
         </radialGradient>
         {/* gradient stroke for cluster-connecting curve */}
         <linearGradient id="cluster-trace" x1="0" y1="0" x2="1" y2="1">
@@ -619,7 +619,7 @@ function TejidoCanvas({ phase }) {
 
       {/* warp threads of the loom */}
       {[...Array(22)].map((_, i) => (
-        <line key={i} x1={i * 50} y1="0" x2={i * 50} y2="600" stroke="rgba(232,122,79,0.04)" />
+        <line key={i} x1={i * 50} y1="0" x2={i * 50} y2="600" stroke="rgba(6, 182, 212, 0.05)" />
       ))}
 
       {/* invisible cóndor path (for animateMotion) */}
@@ -631,7 +631,7 @@ function TejidoCanvas({ phase }) {
         const visible = phase >= 2;
         return (
           <line key={i} x1={n.x} y1={n.y} x2={p.x} y2={p.y}
-            stroke={n.hot && phase >= 3 ? "rgba(197,51,58,0.55)" : n.hot ? "rgba(197,51,58,0.30)" : "rgba(44,95,141,0.20)"}
+            stroke={n.hot && phase >= 3 ? "rgba(239, 68, 68, 0.60)" : n.hot ? "rgba(239, 68, 68, 0.35)" : "rgba(21, 101, 192, 0.30)"}
             strokeWidth={n.hot ? 0.9 : 0.6}
             style={{
               opacity: visible ? 1 : 0,
@@ -651,7 +651,7 @@ function TejidoCanvas({ phase }) {
         <g style={{ opacity: phase >= 4 ? 1 : 0 }}>
           <path
             d="M 360 220 Q 540 100 720 290 Q 480 460 240 430 Q 200 320 360 220 Z"
-            fill="rgba(197,51,58,0.08)"
+            fill="rgba(239, 68, 68, 0.10)"
             stroke="url(#cluster-trace)"
             strokeWidth="2.5"
             strokeDasharray="600"

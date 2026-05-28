@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { Condor, CondorBubble, LearningBar } from './_components/Condor';
+import { CondorBubble, LearningBar } from './_components/Condor';
+import { CondorLogo } from './_components/CondorLogo';
 import { ChatScreen } from './_components/Chat';
 import { InvestigationScreen } from './_components/Investigation';
 import {
@@ -34,38 +35,49 @@ function Sidebar({ active, onNav, role }: SidebarProps) {
   return (
     <aside
       style={{
-        width: 220,
-        background: 'var(--condor-wing)',
-        color: 'var(--marfil)',
+        width: 232,
+        background: 'linear-gradient(180deg, rgba(7, 20, 38, 0.92) 0%, rgba(3, 11, 28, 0.95) 100%)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+        color: 'var(--text-primary)',
         display: 'flex',
         flexDirection: 'column',
-        padding: '18px 14px',
+        padding: '20px 14px',
         gap: 18,
+        borderRight: '1px solid rgba(6, 182, 212, 0.18)',
+        boxShadow: '0 0 60px rgba(6, 182, 212, 0.08)',
+        position: 'relative',
+        zIndex: 5,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px' }}>
         <div
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: 11,
-            background: 'var(--marfil)',
+            width: 46,
+            height: 46,
             display: 'grid',
             placeItems: 'center',
+            filter: 'drop-shadow(0 0 12px rgba(6, 182, 212, 0.55))',
           }}
         >
-          <Condor size={30} tone="wing" mood="idle" />
+          <CondorLogo size={46} />
         </div>
         <div>
-          <div className="serif" style={{ fontSize: 19, fontWeight: 600, lineHeight: 1 }}>
-            Achach<span style={{ color: 'var(--andes-orange)' }}>AI</span>
+          <div className="display" style={{ fontSize: 19, fontWeight: 700, lineHeight: 1, color: 'var(--text-primary)' }}>
+            Achach<span style={{
+              background: 'linear-gradient(135deg, #1565C0, #06B6D4)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}>AI</span>
           </div>
           <div
             style={{
               fontSize: 9.5,
-              letterSpacing: '.14em',
-              color: 'rgba(244,237,228,0.55)',
-              marginTop: 3,
+              letterSpacing: '.18em',
+              color: 'rgba(103, 232, 249, 0.65)',
+              marginTop: 4,
+              fontWeight: 600,
             }}
           >
             OJOS DE CÓNDOR
@@ -76,19 +88,22 @@ function Sidebar({ active, onNav, role }: SidebarProps) {
       <div
         onClick={() => onNav('roles')}
         style={{
-          padding: '10px 12px',
-          borderRadius: 10,
-          background: 'rgba(244,237,228,0.06)',
+          padding: '12px 14px',
+          borderRadius: 14,
+          background: 'rgba(6, 182, 212, 0.06)',
           cursor: 'pointer',
+          border: '1px solid rgba(6, 182, 212, 0.18)',
           borderLeft: `3px solid ${r.color}`,
+          backdropFilter: 'blur(6px)',
         }}
       >
         <div
           style={{
             fontSize: 9.5,
-            color: 'rgba(244,237,228,0.55)',
-            letterSpacing: '.1em',
+            color: 'rgba(203, 213, 225, 0.55)',
+            letterSpacing: '.14em',
             textTransform: 'uppercase',
+            fontWeight: 600,
           }}
         >
           Sesión activa
@@ -96,20 +111,21 @@ function Sidebar({ active, onNav, role }: SidebarProps) {
         <div
           style={{
             fontSize: 13,
-            fontWeight: 500,
-            marginTop: 2,
+            fontWeight: 600,
+            marginTop: 3,
             display: 'flex',
             alignItems: 'center',
             gap: 6,
+            color: 'var(--text-primary)',
           }}
         >
           <span>{r.icon}</span> María Yánez
         </div>
-        <div style={{ fontSize: 10.5, color: 'rgba(244,237,228,0.6)', marginTop: 1 }}>{r.name}</div>
-        <div style={{ fontSize: 9.5, color: 'rgba(244,237,228,0.4)', marginTop: 4 }}>cambiar de rol →</div>
+        <div style={{ fontSize: 10.5, color: 'rgba(203, 213, 225, 0.75)', marginTop: 2 }}>{r.name}</div>
+        <div style={{ fontSize: 9.5, color: 'rgba(103, 232, 249, 0.7)', marginTop: 5, fontWeight: 500 }}>cambiar de rol →</div>
       </div>
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
         {NAV.map(n => {
           const isActive = active === n.id || (active === 'investigation' && n.id === 'kanban');
           return (
@@ -120,22 +136,34 @@ function Sidebar({ active, onNav, role }: SidebarProps) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,
-                padding: '9px 12px',
-                borderRadius: 8,
-                background: isActive ? 'rgba(244,237,228,0.10)' : 'transparent',
-                color: isActive ? 'var(--marfil)' : 'rgba(244,237,228,0.78)',
-                border: 0,
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: isActive
+                  ? 'linear-gradient(135deg, rgba(21, 101, 192, 0.20), rgba(6, 182, 212, 0.18))'
+                  : 'transparent',
+                color: isActive ? 'var(--text-primary)' : 'rgba(203, 213, 225, 0.78)',
+                border: isActive ? '1px solid rgba(6, 182, 212, 0.45)' : '1px solid transparent',
                 cursor: 'pointer',
                 fontSize: 13,
-                fontWeight: 500,
+                fontWeight: isActive ? 600 : 500,
                 textAlign: 'left',
                 width: '100%',
-                borderLeft: isActive ? '2px solid var(--andes-orange)' : '2px solid transparent',
+                boxShadow: isActive ? '0 0 18px rgba(6, 182, 212, 0.18), inset 0 1px 0 rgba(255,255,255,0.05)' : 'none',
+                transition: 'background .15s ease, color .15s ease, border-color .15s ease',
               }}
             >
-              <span style={{ width: 16, fontSize: 13, color: isActive ? 'var(--andes-orange)' : 'rgba(244,237,228,0.45)' }}>{n.glyph}</span>
+              <span style={{
+                width: 16,
+                fontSize: 13,
+                color: isActive ? '#22D3EE' : 'rgba(148, 163, 184, 0.6)',
+              }}>{n.glyph}</span>
               <span style={{ flex: 1 }}>{n.label}</span>
-              <span style={{ fontSize: 9, color: 'rgba(244,237,228,0.35)', letterSpacing: '.1em' }}>{n.hint}</span>
+              <span style={{
+                fontSize: 9,
+                color: isActive ? 'rgba(103, 232, 249, 0.7)' : 'rgba(148, 163, 184, 0.45)',
+                letterSpacing: '.12em',
+                fontFamily: 'var(--mono)',
+              }}>{n.hint}</span>
             </button>
           );
         })}
@@ -143,18 +171,26 @@ function Sidebar({ active, onNav, role }: SidebarProps) {
 
       <div
         style={{
-          padding: '10px 12px',
-          borderRadius: 10,
-          background: 'rgba(244,237,228,0.04)',
+          padding: '12px 14px',
+          borderRadius: 14,
+          background: 'rgba(7, 20, 38, 0.6)',
+          border: '1px solid rgba(34, 197, 94, 0.18)',
           fontSize: 10.5,
-          color: 'rgba(244,237,228,0.6)',
+          color: 'rgba(203, 213, 225, 0.75)',
+          backdropFilter: 'blur(6px)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--paramo-green)' }} />
-          Azure ML · v4.2.1 · sano
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+          <span style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            background: 'var(--paramo-green)',
+            boxShadow: '0 0 8px rgba(34, 197, 94, 0.7)',
+          }} />
+          <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Azure ML · v4.2.1 · sano</span>
         </div>
-        <div>25.460 siniestros · AUC 0.96</div>
+        <div className="mono" style={{ fontSize: 10, color: 'rgba(148, 163, 184, 0.7)' }}>25.460 siniestros · AUC 0.96</div>
       </div>
     </aside>
   );
@@ -176,7 +212,7 @@ export default function AchachaiApp() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', height: '100vh' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '232px 1fr', height: '100vh' }}>
       <Sidebar active={screen} onNav={setScreen} role={role} />
 
       <main style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>

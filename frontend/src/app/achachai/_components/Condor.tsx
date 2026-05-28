@@ -1,13 +1,15 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { TriangleAlert } from './TriangleAlert';
+import { CondorLogo } from './CondorLogo';
 
 const TONE = {
-  wing:   { body: "#1A3A52", accent: "#2C5F8D", beak: "#E87A4F", collar: "#F4EDE4", eye: "#F4EDE4" },
-  marfil: { body: "#F4EDE4", accent: "#EBDFCC", beak: "#E87A4F", collar: "#D4A574", eye: "#1A3A52" },
-  orange: { body: "#E87A4F", accent: "#C5333A", beak: "#1A3A52", collar: "#F4EDE4", eye: "#F4EDE4" },
-  red:    { body: "#C5333A", accent: "#7A1F25", beak: "#1A3A52", collar: "#F4EDE4", eye: "#F4EDE4" },
-  green:  { body: "#4A7C59", accent: "#2F5740", beak: "#E87A4F", collar: "#F4EDE4", eye: "#F4EDE4" },
-  blue:   { body: "#2C5F8D", accent: "#1F4A73", beak: "#E87A4F", collar: "#F4EDE4", eye: "#F4EDE4" },
+  wing:   { body: "#0B3A75", accent: "#1565C0", beak: "#06B6D4", collar: "#E0F2FE", eye: "#F8FAFC" },
+  marfil: { body: "#E0F2FE", accent: "#67E8F9", beak: "#06B6D4", collar: "#1565C0", eye: "#0B1E33" },
+  orange: { body: "#06B6D4", accent: "#0891B2", beak: "#0B3A75", collar: "#E0F2FE", eye: "#F8FAFC" },
+  red:    { body: "#EF4444", accent: "#B91C1C", beak: "#FCD34D", collar: "#FEE2E2", eye: "#FFF1F2" },
+  green:  { body: "#22C55E", accent: "#15803D", beak: "#06B6D4", collar: "#DCFCE7", eye: "#F8FAFC" },
+  blue:   { body: "#1565C0", accent: "#0B3A75", beak: "#06B6D4", collar: "#E0F2FE", eye: "#F8FAFC" },
 } as const;
 
 type Mood = 'idle' | 'think' | 'speak' | 'alert' | 'still';
@@ -72,9 +74,9 @@ export function Condor({ size = 32, mood = 'idle', tone = 'wing', className = ''
     >
       {showSonar && (
         <g style={{ transformOrigin: "40px 50px" }}>
-          <circle cx="40" cy="50" r="32" fill="none" stroke="#C5333A" strokeWidth="1.2"
+          <circle cx="40" cy="50" r="32" fill="none" stroke="#EF4444" strokeWidth="1.2"
                   style={{ transformOrigin: "40px 50px", animation: "sonar-out 1.6s ease-out infinite" }}/>
-          <circle cx="40" cy="50" r="32" fill="none" stroke="#C5333A" strokeWidth="1.2"
+          <circle cx="40" cy="50" r="32" fill="none" stroke="#EF4444" strokeWidth="1.2"
                   style={{ transformOrigin: "40px 50px", animation: "sonar-out 1.6s ease-out infinite 0.55s" }}/>
         </g>
       )}
@@ -137,7 +139,7 @@ export function CondorOverPeaks({ width = 120, mood = 'idle' as Mood }) {
       <defs>
         <linearGradient id="sky-dawn" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%"  stopColor="#F5A39C" stopOpacity="0.35"/>
-          <stop offset="100%" stopColor="#F4EDE4" stopOpacity="0"/>
+          <stop offset="100%" stopColor="#020617" stopOpacity="0"/>
         </linearGradient>
       </defs>
       <rect width="220" height="90" fill="url(#sky-dawn)"/>
@@ -162,9 +164,30 @@ export interface VueloDelCondorProps {
 export function VueloDelCondor({ score = 14, variant = 'md', label, sublabel, signals = [] }: VueloDelCondorProps) {
   const level = score >= 70 ? 'red' : score >= 40 ? 'amber' : 'green';
   const palette = {
-    red:   { ring: "#C5333A", soft: "rgba(197,51,58,0.16)", text: "Descenso",     desc: "Revisión inmediata", anim: "pulse-red 1s infinite",   mood: 'alert' as Mood, tone: 'red' as Tone   },
-    amber: { ring: "#D4A574", soft: "rgba(212,165,116,0.20)", text: "Observación", desc: "Requiere revisión",  anim: "pulse-amber 2s infinite", mood: 'think' as Mood, tone: 'wing' as Tone  },
-    green: { ring: "#4A7C59", soft: "rgba(74,124,89,0.16)",  text: "Vuelo alto",   desc: "Todo en calma",      anim: "pulse-green 4s infinite", mood: 'idle' as Mood,  tone: 'wing' as Tone  },
+    red: {
+      ring: "#EF4444",
+      soft: "radial-gradient(circle at 50% 50%, rgba(2, 6, 23, 0.85) 0%, rgba(7, 20, 38, 0.92) 70%)",
+      glow: "0 0 22px rgba(239, 68, 68, 0.22), inset 0 0 30px rgba(2, 6, 23, 0.6), inset 0 1px 0 rgba(255,255,255,0.04)",
+      text: "Riesgo alto", desc: "Revisión inmediata",
+      mood: 'alert' as Mood, tone: 'red' as Tone,
+      spin: 6,
+    },
+    amber: {
+      ring: "#F59E0B",
+      soft: "radial-gradient(circle at 50% 50%, rgba(2, 6, 23, 0.82) 0%, rgba(7, 20, 38, 0.92) 70%)",
+      glow: "0 0 18px rgba(245, 158, 11, 0.18), inset 0 0 26px rgba(2, 6, 23, 0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
+      text: "Observación", desc: "Requiere revisión",
+      mood: 'think' as Mood, tone: 'blue' as Tone,
+      spin: 10,
+    },
+    green: {
+      ring: "#22C55E",
+      soft: "radial-gradient(circle at 50% 50%, rgba(2, 6, 23, 0.82) 0%, rgba(7, 20, 38, 0.92) 70%)",
+      glow: "0 0 16px rgba(34, 197, 94, 0.16), inset 0 0 26px rgba(2, 6, 23, 0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
+      text: "Vuelo alto", desc: "Todo en calma",
+      mood: 'idle' as Mood, tone: 'wing' as Tone,
+      spin: 16,
+    },
   }[level];
 
   const sizeMap = {
@@ -176,41 +199,70 @@ export function VueloDelCondor({ score = 14, variant = 'md', label, sublabel, si
   const S = sizeMap[variant] || sizeMap.md;
   const C = 2 * Math.PI * (S.ring / 2 - 6);
   const dash = (score / 100) * C;
+  const gradId = `vuelo-ring-${level}-${variant}`;
 
   return (
     <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: variant === 'sm' ? 4 : 8 }}>
-      <div style={{
+      <div className={`vuelo-score vuelo-score-${level}`} style={{
         position: "relative", width: S.box, height: S.box,
         display: "grid", placeItems: "center",
-        borderRadius: "50%", background: palette.soft,
-        animation: palette.anim,
+        borderRadius: "50%",
+        background: palette.soft,
+        boxShadow: palette.glow,
       }}>
-        <svg width={S.ring} height={S.ring} style={{ position: "absolute", inset: (S.box - S.ring) / 2, transform: "rotate(-90deg)" }}>
-          <circle cx={S.ring / 2} cy={S.ring / 2} r={S.ring / 2 - 6} fill="none" stroke="rgba(26,58,82,0.08)" strokeWidth="3"/>
-          <circle cx={S.ring / 2} cy={S.ring / 2} r={S.ring / 2 - 6} fill="none" stroke={palette.ring} strokeWidth="3"
+        <svg className="vuelo-ring" width={S.ring} height={S.ring} style={{
+          position: "absolute", inset: (S.box - S.ring) / 2,
+          filter: `drop-shadow(0 0 6px ${palette.ring}66)`,
+          animation: `spin-slow ${palette.spin}s linear infinite`,
+        }}>
+          <defs>
+            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={palette.ring} stopOpacity="0.95"/>
+              <stop offset="100%" stopColor={palette.ring} stopOpacity="0.55"/>
+            </linearGradient>
+          </defs>
+          <circle cx={S.ring / 2} cy={S.ring / 2} r={S.ring / 2 - 6} fill="none" stroke="rgba(148,163,184,0.14)" strokeWidth="3"/>
+          <circle cx={S.ring / 2} cy={S.ring / 2} r={S.ring / 2 - 6} fill="none" stroke={`url(#${gradId})`} strokeWidth="3.5"
                   strokeDasharray={`${dash} ${C}`} strokeLinecap="round" style={{ transition: "stroke-dasharray .6s ease" }}/>
         </svg>
         {level === 'red' && variant !== 'sm' && (
-          <div style={{ position: "absolute", inset: -8, borderRadius: "50%", border: "2px solid rgba(197,51,58,0.30)", animation: "pulse-red 1.5s infinite" }}/>
+          <div style={{ position: "absolute", inset: -6, borderRadius: "50%", border: "1px solid rgba(239, 68, 68, 0.18)", pointerEvents: "none" }}/>
         )}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-          <Condor size={S.condor} tone={palette.tone} mood={palette.mood} sonar={level === 'red' && variant === 'cinema'}/>
+          <div style={{ display: 'inline-flex' }}>
+            <TriangleAlert size={Math.round(S.condor * 0.72)} level={level} glow={variant !== 'sm'}/>
+          </div>
           {variant !== 'sm' && (
-            <div className="tabular serif" style={{ fontSize: S.score, fontWeight: 600, lineHeight: 1, color: palette.ring, marginTop: variant === 'cinema' ? 12 : 6 }}>
-              {score}<span style={{ fontSize: S.score * 0.4, color: "var(--ink-mute)", fontWeight: 400 }}>/100</span>
+            <div className="tabular display" style={{
+              fontSize: S.score,
+              fontWeight: 700,
+              lineHeight: 1,
+              color: palette.ring,
+              marginTop: variant === 'cinema' ? 12 : 6,
+              textShadow: `0 0 14px ${palette.ring}40`,
+              letterSpacing: '-0.03em',
+            }}>
+              {score}<span style={{ fontSize: S.score * 0.4, color: "var(--text-muted)", fontWeight: 500 }}>/100</span>
             </div>
           )}
           {variant === 'sm' && (
-            <div className="tabular" style={{ fontSize: 11, fontWeight: 700, color: palette.ring, marginTop: 1 }}>{score}</div>
+            <div className="tabular display" style={{
+              fontSize: 12, fontWeight: 700, color: palette.ring, marginTop: 1, letterSpacing: '-0.02em',
+            }}>{score}</div>
           )}
         </div>
       </div>
       {variant !== 'sm' && (
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: variant === 'cinema' ? 24 : 13, fontWeight: 600, color: palette.ring, letterSpacing: ".02em" }}>
+          <div className="display" style={{
+            fontSize: variant === 'cinema' ? 22 : 13,
+            fontWeight: 600,
+            color: palette.ring,
+            letterSpacing: "-0.01em",
+          }}>
             {label || palette.text}
           </div>
-          <div style={{ fontSize: variant === 'cinema' ? 14 : 11, color: "var(--ink-mute)", marginTop: 2 }}>
+          <div style={{ fontSize: variant === 'cinema' ? 13 : 11, color: "var(--text-muted)", marginTop: 4, fontWeight: 500 }}>
             {sublabel || palette.desc}
           </div>
         </div>
@@ -239,27 +291,41 @@ export function CondorBubble({ onOpen, mood = 'idle' as Mood, message }: { onOpe
   return (
     <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 80, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
       {showMsg && message && (
-        <div className="fade-up" style={{ maxWidth: 280, background: "white", border: "1px solid var(--line)", padding: "10px 14px", borderRadius: 14, boxShadow: "var(--shadow-lg)", fontSize: 12.5, color: "var(--condor-wing)", position: "relative" }}>
-          <div style={{ fontSize: 10, color: "var(--andes-orange)", fontWeight: 600, marginBottom: 4, letterSpacing: ".08em" }}>EL CÓNDOR DICE</div>
+        <div className="fade-up" style={{
+          maxWidth: 280,
+          background: "rgba(7, 20, 38, 0.92)",
+          backdropFilter: "blur(18px)",
+          WebkitBackdropFilter: "blur(18px)",
+          border: "1px solid rgba(6, 182, 212, 0.35)",
+          padding: "12px 16px", borderRadius: 16,
+          boxShadow: "0 20px 50px rgba(2,6,23,0.55), 0 0 24px rgba(6, 182, 212, 0.18)",
+          fontSize: 12.5, color: "var(--text-primary)", position: "relative",
+        }}>
+          <div style={{ fontSize: 10, color: "#22D3EE", fontWeight: 700, marginBottom: 5, letterSpacing: ".14em" }}>EL CÓNDOR DICE</div>
           {message}
-          <div style={{ position: "absolute", bottom: -6, right: 24, width: 12, height: 12, background: "white", borderRight: "1px solid var(--line)", borderBottom: "1px solid var(--line)", transform: "rotate(45deg)" }}/>
+          <div style={{ position: "absolute", bottom: -6, right: 24, width: 12, height: 12, background: "rgba(7, 20, 38, 0.92)", borderRight: "1px solid rgba(6, 182, 212, 0.35)", borderBottom: "1px solid rgba(6, 182, 212, 0.35)", transform: "rotate(45deg)" }}/>
         </div>
       )}
       <button
         onClick={onOpen}
         style={{
           width: 64, height: 64, borderRadius: "50%",
-          background: mood === 'alert' ? "linear-gradient(135deg, #C5333A, #7A1F25)" : "linear-gradient(135deg, var(--mountain-blue), var(--condor-wing))",
-          border: "3px solid var(--marfil-paper)", boxShadow: "var(--shadow-lg)",
-          display: "grid", placeItems: "center", color: "var(--marfil)", position: "relative",
+          background: mood === 'alert'
+            ? "linear-gradient(135deg, #EF4444, #B91C1C)"
+            : "linear-gradient(135deg, #0c72e7, #a9e9f5)",
+          border: "2px solid rgba(6, 182, 212, 0.55)",
+          boxShadow: mood === 'alert'
+            ? "0 0 32px rgba(239, 68, 68, 0.55), 0 12px 30px rgba(2,6,23,0.55)"
+            : "0 0 32px rgba(6, 182, 212, 0.45), 0 12px 30px rgba(2,6,23,0.55)",
+          display: "grid", placeItems: "center", color: "#F8FAFC", position: "relative",
           animation: mood === 'alert' ? "pulse-red 1.2s infinite" : "none",
           cursor: "pointer",
         }}
         aria-label="Hablar con el cóndor"
       >
-        <Condor size={40} tone="marfil" mood={mood}/>
+        <CondorLogo size={46}/>
         {mood === 'alert' && (
-          <span style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "var(--guayaba-red)", border: "2px solid var(--marfil-paper)" }}/>
+          <span style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "#EF4444", border: "2px solid #020617", boxShadow: "0 0 10px rgba(239, 68, 68, 0.7)" }}/>
         )}
       </button>
     </div>
@@ -270,21 +336,29 @@ export function LearningBar({ count = 47, delta = 2.3 }: { count?: number; delta
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 12,
-      padding: "8px 16px",
-      background: "linear-gradient(90deg, rgba(232,122,79,0.08), rgba(44,95,141,0.08))",
-      borderBottom: "1px solid var(--line)", fontSize: 12,
+      padding: "10px 20px",
+      background: "linear-gradient(90deg, rgba(6, 182, 212, 0.08), rgba(21, 101, 192, 0.10))",
+      borderBottom: "1px solid rgba(6, 182, 212, 0.18)",
+      fontSize: 12,
+      backdropFilter: "blur(10px)",
+      WebkitBackdropFilter: "blur(10px)",
     }}>
-      <div style={{ position: "relative", width: 26, height: 26, display: "grid", placeItems: "center" }}>
-        <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1.5px solid var(--andes-orange)", borderTopColor: "transparent", animation: "spin-slow 4s linear infinite" }}/>
+      <div style={{ position: "relative", width: 28, height: 28, display: "grid", placeItems: "center" }}>
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: "50%",
+          border: "1.5px solid #06B6D4", borderTopColor: "transparent",
+          animation: "spin-slow 4s linear infinite",
+          boxShadow: "0 0 10px rgba(6, 182, 212, 0.45)",
+        }}/>
         <Condor size={16} tone="orange" mood="idle"/>
       </div>
       <div>
-        <span style={{ color: "var(--condor-wing)", fontWeight: 600 }}>El cóndor aprendió de {count} decisiones tuyas esta semana.</span>
-        <span style={{ color: "var(--paramo-green)", fontWeight: 600, marginLeft: 6 }}>↑ {delta} pts de precisión</span>
-        <span style={{ color: "var(--ink-mute)", marginLeft: 6 }}>· Gracias.</span>
+        <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>El cóndor aprendió de {count} decisiones tuyas esta semana.</span>
+        <span style={{ color: "#34D399", fontWeight: 700, marginLeft: 8, textShadow: "0 0 8px rgba(34, 197, 94, 0.40)" }}>↑ {delta} pts de precisión</span>
+        <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>· Gracias.</span>
       </div>
       <div style={{ flex: 1 }}/>
-      <button className="chip blue" style={{ cursor: "pointer", background: "transparent", border: "1px solid var(--line-strong)" }}>Ver detalle →</button>
+      <button className="chip blue" style={{ cursor: "pointer" }}>Ver detalle →</button>
     </div>
   );
 }

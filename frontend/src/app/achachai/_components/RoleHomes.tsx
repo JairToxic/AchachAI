@@ -2,6 +2,8 @@
 // @ts-nocheck
 import { useEffect, useRef, useState } from 'react';
 import { Condor, VueloDelCondor, CondorMini } from './Condor';
+import { TriangleAlert } from './TriangleAlert';
+import { CondorLogo } from './CondorLogo';
 
 const useRH = useState;
 
@@ -27,44 +29,65 @@ export function RoleHome({ role, onInvestigate, onGoChat }) {
 /* ---------- shared frame ---------- */
 function RoleFrame({ icon, title, super: superPower, accent, children, extra }) {
   return (
-    <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)" }}>
+    <div style={{ height: "100%", overflow: "auto", background: "transparent" }}>
       <div style={{
-        padding: "20px 32px 18px", borderBottom: "1px solid var(--line)",
-        background: `linear-gradient(180deg, ${accent}10, transparent)`,
-        display: "flex", alignItems: "center", gap: 14,
+        padding: "26px 36px 22px",
+        borderBottom: "1px solid rgba(148, 163, 184, 0.10)",
+        background: `linear-gradient(180deg, rgba(6, 182, 212, 0.05), transparent 80%)`,
+        display: "flex", alignItems: "center", gap: 18,
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
       }}>
         <div style={{
-          width: 44, height: 44, borderRadius: 12,
-          background: `${accent}20`, display: "grid", placeItems: "center", fontSize: 22,
+          width: 48, height: 48, borderRadius: 14,
+          background: `linear-gradient(135deg, rgba(11, 58, 117, 0.30), rgba(6, 182, 212, 0.18))`,
+          border: `1px solid rgba(6, 182, 212, 0.35)`,
+          boxShadow: `0 0 18px rgba(6, 182, 212, 0.18)`,
+          display: "grid", placeItems: "center", fontSize: 22,
         }}>{icon}</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 10.5, letterSpacing: ".18em", color: accent, fontWeight: 700, textTransform: "uppercase" }}>
+          <div style={{ fontSize: 10.5, letterSpacing: ".22em", color: "#67E8F9", fontWeight: 600, textTransform: "uppercase" }}>
             Superpoder · {superPower}
           </div>
-          <h2 style={{ fontSize: 24, marginTop: 2 }}>{title}</h2>
+          <h2 style={{ fontSize: 26, marginTop: 4, color: "var(--text-primary)", fontFamily: "var(--display)", fontWeight: 700, letterSpacing: "-0.03em" }}>{title}</h2>
         </div>
         {extra}
       </div>
-      <div style={{ padding: 24 }}>{children}</div>
+      <div style={{ padding: 32 }}>{children}</div>
     </div>
   );
 }
 
 function KpiCard({ label, value, sub, tone = "wing", big }) {
-  const c = { red: "var(--guayaba-red)", green: "var(--paramo-green)", orange: "var(--andes-orange)", blue: "var(--mountain-blue)", wing: "var(--condor-wing)" }[tone];
+  const palette = {
+    red:    { color: "#F87171", glow: "0 0 18px rgba(239,68,68,0.35)" },
+    green:  { color: "#34D399", glow: "0 0 18px rgba(34,197,94,0.30)" },
+    orange: { color: "#22D3EE", glow: "0 0 18px rgba(6,182,212,0.32)" },
+    blue:   { color: "#60A5FA", glow: "0 0 18px rgba(21,101,192,0.32)" },
+    wing:   { color: "#F8FAFC", glow: "0 0 14px rgba(148,163,184,0.18)" },
+  };
+  const p = palette[tone] || palette.wing;
   return (
     <div className="card" style={{ padding: big ? "18px 20px" : "14px 16px" }}>
-      <div style={{ fontSize: 10, color: "var(--ink-mute)", letterSpacing: ".1em", textTransform: "uppercase" }}>{label}</div>
-      <div className="serif tabular" style={{ fontSize: big ? 44 : 28, fontWeight: 500, color: c, lineHeight: 1, marginTop: 6 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: "var(--ink-mute)", marginTop: 6 }}>{sub}</div>}
+      <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: ".14em", textTransform: "uppercase", fontWeight: 600 }}>{label}</div>
+      <div className="display tabular" style={{
+        fontSize: big ? 44 : 28,
+        fontWeight: 700,
+        color: p.color,
+        lineHeight: 1,
+        marginTop: 8,
+        letterSpacing: "-0.02em",
+        textShadow: p.glow,
+      }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 7 }}>{sub}</div>}
     </div>
   );
 }
 
 function SectionTitle({ children, action }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", marginBottom: 12, marginTop: 4 }}>
-      <h3 style={{ fontSize: 16, fontWeight: 500, flex: 1 }}>{children}</h3>
+    <div style={{ display: "flex", alignItems: "baseline", marginBottom: 14, marginTop: 4 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 600, flex: 1, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>{children}</h3>
       {action}
     </div>
   );
@@ -84,41 +107,82 @@ function AntifraudeHome({ onInvestigate }) {
     >
       {/* Critical case spotlight */}
       <div className="card" style={{
-        padding: 22, marginBottom: 18,
-        borderTop: "3px solid var(--guayaba-red)",
-        display: "grid", gridTemplateColumns: "230px 1fr", gap: 26, alignItems: "center",
+        padding: 32, marginBottom: 26,
+        border: "1px solid rgba(6, 182, 212, 0.28)",
+        boxShadow: "0 24px 80px rgba(0, 0, 0, 0.40), 0 0 40px rgba(6, 182, 212, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+        background: "radial-gradient(circle at 85% 20%, rgba(6, 182, 212, 0.14), transparent 32%), linear-gradient(135deg, rgba(7, 20, 38, 0.96), rgba(2, 6, 23, 0.98))",
+        display: "grid", gridTemplateColumns: "240px 1fr", gap: 32, alignItems: "center",
       }}>
         <VueloDelCondor score={87} variant="lg"/>
         <div>
-          <div className="mono" style={{ fontSize: 11, color: "var(--mountain-blue)", fontWeight: 600 }}>SIN-100029</div>
-          <h2 style={{ fontSize: 22, marginTop: 2 }}>Auto 2019 · colisión lateral · Quito Norte</h2>
-          <p style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 8, lineHeight: 1.55 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <span className="mono" style={{ fontSize: 10.5, color: "#67E8F9", fontWeight: 600, letterSpacing: ".12em" }}>SIN-100029</span>
+            <span style={{
+              fontSize: 9.5, padding: "2px 8px", borderRadius: 999,
+              background: "rgba(239, 68, 68, 0.10)", color: "#FCA5A5",
+              border: "1px solid rgba(239, 68, 68, 0.30)",
+              fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase",
+            }}>Crítico</span>
+          </div>
+          <h2 style={{ fontSize: 26, color: "var(--text-primary)", fontFamily: "var(--display)", fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.15 }}>
+            Auto 2019 · colisión lateral · Quito Norte
+          </h2>
+          <p style={{ fontSize: 13.5, color: "var(--text-secondary)", marginTop: 12, lineHeight: 1.65, maxWidth: 620 }}>
             Patrón clásico de fraude organizado: proveedor recurrente, factura anticipada y narrativa que no
-            coincide con la foto del daño. <strong>3 evidencias documentales</strong> activas.
+            coincide con la foto del daño. <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>3 evidencias documentales</strong> activas.
           </p>
-          <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-            {["RF-01 PTxRB", "RF-04 ProvNuevo", "factura adulterada", "narrativa incongruente"].map(t =>
-              <span key={t} className="chip red" style={{ fontSize: 10.5 }}>{t}</span>
+          <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
+            {[
+              ["RF-01 PTxRB", true],
+              ["RF-04 ProvNuevo", false],
+              ["factura adulterada", false],
+              ["narrativa incongruente", false],
+            ].map(([t, critical]) =>
+              <span key={t as string} className={`chip${critical ? ' red' : ''}`} style={{ fontSize: 11 }}>{t}</span>
             )}
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
             <button className="btn warm" onClick={() => onInvestigate("SIN-100029")}>Abrir investigación →</button>
             <button className="btn ghost">Ver evidencia</button>
           </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
         {/* Patrón detectado */}
-        <div className="card" style={{ padding: 18 }}>
-          <SectionTitle>Patrón detectado esta semana</SectionTitle>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: "var(--marfil-paper)", borderRadius: 10, marginBottom: 8 }}>
-            <Condor size={36} tone="red" mood="alert"/>
+        <div className="card" style={{ padding: 28 }}>
+          <SectionTitle action={
+            <span style={{
+              fontSize: 9.5, padding: "3px 9px", borderRadius: 999,
+              background: "rgba(6, 182, 212, 0.10)", color: "#67E8F9",
+              border: "1px solid rgba(6, 182, 212, 0.28)",
+              fontWeight: 600, letterSpacing: ".10em", textTransform: "uppercase",
+            }}>Insight IA</span>
+          }>
+            Patrón detectado esta semana
+          </SectionTitle>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 16,
+            padding: "18px 20px",
+            background: "linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(34, 197, 94, 0.05))",
+            border: "1px solid rgba(6, 182, 212, 0.20)",
+            borderRadius: 16, marginBottom: 18,
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+          }}>
+            <div style={{
+              flexShrink: 0,
+              display: "grid", placeItems: "center",
+              width: 38, height: 38, borderRadius: 12,
+              background: "rgba(6, 182, 212, 0.10)",
+              border: "1px solid rgba(6, 182, 212, 0.30)",
+            }}>
+              <TriangleAlert size={20} color="#22D3EE" glow={false}/>
+            </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>
-                <span className="mono">PRV-NEW0019</span> aparece en 8 casos del último mes
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
+                <span className="mono" style={{ color: "#67E8F9", letterSpacing: ".06em" }}>PRV-NEW0019</span> aparece en 8 casos del último mes
               </div>
-              <div style={{ fontSize: 11.5, color: "var(--ink-mute)" }}>
+              <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 3 }}>
                 5 asegurados distintos · $156K USD vinculados · 3 narrativas casi idénticas
               </div>
             </div>
@@ -131,34 +195,74 @@ function AntifraudeHome({ onInvestigate }) {
             ["SIN-100789", 78, "$6.900", "Guayaquil C."],
             ["SIN-101023", 76, "$9.340", "Tumbaco"],
           ].map(([id, score, m, c]) => (
-            <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, marginBottom: 4 }}>
+            <div key={id} style={{
+              display: "flex", alignItems: "center", gap: 14,
+              padding: "12px 14px",
+              borderRadius: 12, marginBottom: 6,
+              border: "1px solid rgba(148, 163, 184, 0.10)",
+              background: "rgba(11, 30, 51, 0.35)",
+              transition: "border-color .15s ease, background .15s ease",
+            }}>
               <VueloDelCondor score={score} variant="sm"/>
               <div style={{ flex: 1 }}>
-                <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{id}</span>
-                <span style={{ marginLeft: 8, fontSize: 11, color: "var(--ink-mute)" }}>{c}</span>
+                <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", letterSpacing: ".04em" }}>{id}</span>
+                <span style={{ marginLeft: 10, fontSize: 11, color: "var(--text-muted)" }}>{c}</span>
               </div>
-              <span className="tabular mono" style={{ fontSize: 11 }}>{m}</span>
+              <span className="tabular mono" style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{m}</span>
               <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => onInvestigate(id)}>investigar →</button>
             </div>
           ))}
         </div>
 
         {/* Cóndor narration */}
-        <div className="card" style={{ padding: 18, background: "linear-gradient(180deg, white, var(--marfil-paper))" }}>
+        <div className="card" style={{
+          padding: 28,
+          background: "radial-gradient(circle at 90% 0%, rgba(6, 182, 212, 0.08), transparent 35%), linear-gradient(180deg, rgba(7, 20, 38, 0.86), rgba(2, 6, 23, 0.92))",
+          border: "1px solid rgba(6, 182, 212, 0.24)",
+          boxShadow: "0 24px 80px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+        }}>
           <SectionTitle>El cóndor te narra</SectionTitle>
-          <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-            <Condor size={38} tone="wing" mood="speak"/>
-            <div style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--condor-wing)" }}>
-              "Este caso me llamó la atención por <strong>3 razones</strong>:"
+          <div style={{ display: "flex", gap: 14, marginBottom: 16, alignItems: "center" }}>
+            <div style={{
+              filter: "drop-shadow(0 0 10px rgba(6, 182, 212, 0.40))",
+              flexShrink: 0,
+              display: "inline-flex",
+            }}>
+              <CondorLogo size={40}/>
+            </div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--text-primary)" }}>
+              "Este caso me llamó la atención por <strong style={{ color: "#22D3EE", fontWeight: 600 }}>3 razones</strong>:"
             </div>
           </div>
-          <ol style={{ margin: "0 0 0 16px", padding: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--ink-soft)" }}>
-            <li>El proveedor <span className="mono">PRV-NEW0019</span> está en observación.</li>
-            <li>La factura tiene fecha <strong>14 días antes</strong> del siniestro.</li>
-            <li>Es la <strong>4ta vez</strong> que este asegurado reclama en 6 meses.</li>
+          <ol style={{ margin: "0 0 0 18px", padding: 0, fontSize: 12.5, lineHeight: 1.8, color: "var(--text-secondary)" }}>
+            <li>El proveedor <span className="mono" style={{ color: "#67E8F9", letterSpacing: ".04em" }}>PRV-NEW0019</span> está en observación.</li>
+            <li>La factura tiene fecha <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>14 días antes</strong> del siniestro.</li>
+            <li>Es la <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>4ta vez</strong> que este asegurado reclama en 6 meses.</li>
           </ol>
-          <div style={{ marginTop: 14, padding: 12, background: "rgba(232,122,79,0.10)", borderRadius: 10, borderLeft: "3px solid var(--andes-orange)", fontSize: 12 }}>
-            <strong>Sugerencia:</strong> investigar al proveedor primero. No te digo qué hacer, pero por ahí empezaría yo.
+          <div style={{
+            marginTop: 20, padding: "16px 18px",
+            background: "rgba(2, 6, 23, 0.55)",
+            border: "1px solid rgba(34, 197, 94, 0.28)",
+            borderRadius: 14,
+            fontSize: 12.5,
+            color: "var(--text-primary)",
+            lineHeight: 1.55,
+            display: "flex", gap: 12, alignItems: "flex-start",
+          }}>
+            <span style={{
+              flexShrink: 0,
+              display: "grid", placeItems: "center",
+              width: 26, height: 26, borderRadius: 8,
+              background: "rgba(34, 197, 94, 0.12)",
+              border: "1px solid rgba(34, 197, 94, 0.35)",
+              color: "#34D399", fontSize: 14, fontWeight: 700,
+            }}>✓</span>
+            <div>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: "#34D399", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 4 }}>
+                Sugerencia
+              </div>
+              Investigar al proveedor primero. No te digo qué hacer, pero por ahí empezaría yo.
+            </div>
           </div>
         </div>
       </div>
@@ -201,12 +305,13 @@ function SiniestrosHome({ onInvestigate }) {
               <div key={c.id} style={{
                 display: "grid", gridTemplateColumns: "32px 1fr auto auto auto auto",
                 gap: 10, alignItems: "center", padding: "10px 12px",
-                background: "var(--marfil-paper)", borderRadius: 10, border: "1px solid var(--line)",
+                background: "rgba(11, 30, 51, 0.55)", borderRadius: 12,
+                border: "1px solid rgba(148, 163, 184, 0.12)",
               }}>
-                <div className="serif" style={{ fontSize: 22, color: "var(--andes-orange)", fontWeight: 600 }}>{i+1}</div>
+                <div className="display" style={{ fontSize: 22, color: "#22D3EE", fontWeight: 700, textShadow: "0 0 10px rgba(6, 182, 212, 0.45)" }}>{i+1}</div>
                 <div style={{ minWidth: 0 }}>
-                  <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: "var(--mountain-blue)" }}>{c.id}</div>
-                  <div style={{ fontSize: 10.5, color: "var(--ink-mute)" }}>vencimiento {c.due} · {c.state}</div>
+                  <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: "#67E8F9" }}>{c.id}</div>
+                  <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>vencimiento {c.due} · {c.state}</div>
                 </div>
                 <VueloDelCondor score={c.score} variant="sm"/>
                 <span className="tabular mono" style={{ fontSize: 12 }}>{c.monto}</span>
@@ -223,15 +328,15 @@ function SiniestrosHome({ onInvestigate }) {
           <div style={{ marginTop: 18 }}>
             <SectionTitle>Decisiones tomadas hoy</SectionTitle>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, textAlign: "center" }}>
-              <div style={{ padding: 10, background: "rgba(74,124,89,0.10)", borderRadius: 8 }}>
+              <div style={{ padding: 10, background: "rgba(34, 197, 94, 0.12)", borderRadius: 8 }}>
                 <div className="serif tabular" style={{ fontSize: 22, color: "var(--paramo-green)" }}>8</div>
                 <div style={{ fontSize: 10, color: "var(--ink-mute)" }}>Aprobados</div>
               </div>
-              <div style={{ padding: 10, background: "rgba(212,165,116,0.18)", borderRadius: 8 }}>
+              <div style={{ padding: 10, background: "rgba(245, 158, 11, 0.18)", borderRadius: 8 }}>
                 <div className="serif tabular" style={{ fontSize: 22, color: "#8B5E2B" }}>3</div>
                 <div style={{ fontSize: 10, color: "var(--ink-mute)" }}>En espera</div>
               </div>
-              <div style={{ padding: 10, background: "rgba(197,51,58,0.10)", borderRadius: 8 }}>
+              <div style={{ padding: 10, background: "rgba(239, 68, 68, 0.12)", borderRadius: 8 }}>
                 <div className="serif tabular" style={{ fontSize: 22, color: "var(--guayaba-red)" }}>1</div>
                 <div style={{ fontSize: 10, color: "var(--ink-mute)" }}>Escalado</div>
               </div>
@@ -247,14 +352,20 @@ function ProgressRing({ value, label, sub }) {
   const r = 50, c = 2 * Math.PI * r;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-      <svg width={120} height={120} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx="60" cy="60" r={r} fill="none" stroke="var(--line)" strokeWidth="8"/>
-        <circle cx="60" cy="60" r={r} fill="none" stroke="var(--andes-orange)" strokeWidth="8"
+      <svg width={120} height={120} style={{ transform: "rotate(-90deg)", filter: "drop-shadow(0 0 6px rgba(6, 182, 212, 0.40))" }}>
+        <defs>
+          <linearGradient id="progress-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#1565C0"/>
+            <stop offset="100%" stopColor="#06B6D4"/>
+          </linearGradient>
+        </defs>
+        <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(148, 163, 184, 0.14)" strokeWidth="8"/>
+        <circle cx="60" cy="60" r={r} fill="none" stroke="url(#progress-ring-grad)" strokeWidth="8"
           strokeDasharray={`${(value/100)*c} ${c}`} strokeLinecap="round"/>
       </svg>
       <div>
-        <div className="serif tabular" style={{ fontSize: 32, fontWeight: 500, color: "var(--andes-orange)" }}>{label}</div>
-        <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>{sub}</div>
+        <div className="display tabular" style={{ fontSize: 36, fontWeight: 700, color: "#22D3EE", letterSpacing: "-0.02em", textShadow: "0 0 18px rgba(6, 182, 212, 0.45)" }}>{label}</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{sub}</div>
       </div>
     </div>
   );
@@ -312,14 +423,19 @@ function JefaturaHome() {
               </div>
             ))}
           </div>
-          <div className="card" style={{ padding: 14, background: "rgba(232,122,79,0.08)", borderLeft: "3px solid var(--andes-orange)" }}>
-            <div style={{ display: "flex", gap: 10 }}>
+          <div className="card" style={{
+            padding: 16,
+            background: "rgba(6, 182, 212, 0.08)",
+            border: "1px solid rgba(6, 182, 212, 0.30)",
+            borderLeft: "3px solid #06B6D4",
+          }}>
+            <div style={{ display: "flex", gap: 12 }}>
               <Condor size={24} tone="orange" mood="alert"/>
-              <div style={{ fontSize: 12 }}>
-                <strong>Luis Vélez</strong> está al 60% del objetivo en Guayaquil. ¿Reasigno 8 casos al equipo de Quito?
-                <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
-                  <button className="btn warm" style={{ fontSize: 10.5, padding: "5px 10px" }}>Sí, reasignar</button>
-                  <button className="btn ghost" style={{ fontSize: 10.5, padding: "5px 10px" }}>Más tarde</button>
+              <div style={{ fontSize: 12, color: "var(--text-primary)" }}>
+                <strong style={{ color: "#22D3EE" }}>Luis Vélez</strong> está al 60% del objetivo en Guayaquil. ¿Reasigno 8 casos al equipo de Quito?
+                <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                  <button className="btn warm" style={{ fontSize: 10.5, padding: "5px 12px" }}>Sí, reasignar</button>
+                  <button className="btn ghost" style={{ fontSize: 10.5, padding: "5px 12px" }}>Más tarde</button>
                 </div>
               </div>
             </div>
@@ -347,12 +463,12 @@ function EcuadorMap() {
     <svg viewBox="0 0 280 380" style={{ width: "100%", height: "auto", display: "block" }}>
       <defs>
         <radialGradient id="city-glow-red">
-          <stop offset="0%" stopColor="rgba(197,51,58,0.4)"/>
-          <stop offset="100%" stopColor="rgba(197,51,58,0)"/>
+          <stop offset="0%" stopColor="rgba(239, 68, 68, 0.45)"/>
+          <stop offset="100%" stopColor="rgba(239, 68, 68, 0)"/>
         </radialGradient>
         <radialGradient id="city-glow-amber">
-          <stop offset="0%" stopColor="rgba(212,165,116,0.4)"/>
-          <stop offset="100%" stopColor="rgba(212,165,116,0)"/>
+          <stop offset="0%" stopColor="rgba(245, 158, 11, 0.40)"/>
+          <stop offset="100%" stopColor="rgba(245, 158, 11, 0)"/>
         </radialGradient>
       </defs>
       {/* Ecuador silhouette — simplified */}
@@ -362,13 +478,13 @@ function EcuadorMap() {
                L 175 340 L 140 365 L 110 360 L 80 340
                L 55 300 L 45 250 L 50 200 L 60 160
                L 55 120 L 50 85 Z"
-            fill="var(--marfil-paper)" stroke="var(--condor-wing)" strokeWidth="1" opacity="0.9"/>
+            fill="rgba(11, 30, 51, 0.7)" stroke="rgba(6, 182, 212, 0.45)" strokeWidth="1" opacity="0.95"/>
       {/* Equator line */}
-      <line x1="40" y1="130" x2="260" y2="130" stroke="var(--andes-orange)" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.6"/>
-      <text x="248" y="126" fontSize="8" fill="var(--andes-orange)" textAnchor="end">ecuador</text>
+      <line x1="40" y1="130" x2="260" y2="130" stroke="#06B6D4" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.7"/>
+      <text x="248" y="126" fontSize="8" fill="#22D3EE" textAnchor="end">ecuador</text>
       {/* Andes spine */}
       <path d="M 155 50 L 160 90 L 165 130 L 162 170 L 158 220 L 152 270 L 145 320"
-            fill="none" stroke="var(--condor-wing)" strokeWidth="1.5" opacity="0.25" strokeDasharray="2 4"/>
+            fill="none" stroke="rgba(148, 163, 184, 0.5)" strokeWidth="1.5" opacity="0.6" strokeDasharray="2 4"/>
 
       {cities.map(c => (
         <g key={c.name}>
@@ -413,7 +529,7 @@ function RiesgosHome() {
     { id: "PRV-0077",    name: "Esmeraldas Repair",    exp: 9,   cases: 3,  level: "green" },
   ];
   const max = 160;
-  const cMap = { red: "#C5333A", amber: "#D4A574", green: "#4A7C59" };
+  const cMap = { red: "#EF4444", amber: "#F59E0B", green: "#22C55E" };
   return (
     <RoleFrame
       icon="⚠️"
@@ -432,7 +548,7 @@ function RiesgosHome() {
         <SectionTitle action={
           <div style={{ display: "flex", gap: 8 }}>
             <button className="chip outline" style={{ fontSize: 11 }}>por proveedor</button>
-            <button className="chip" style={{ fontSize: 11, background: "var(--condor-wing)", color: "white" }}>por proveedor ✓</button>
+            <button className="chip blue" style={{ fontSize: 11, fontWeight: 600 }}>por proveedor ✓</button>
             <button className="chip outline" style={{ fontSize: 11 }}>por cobertura</button>
             <button className="chip outline" style={{ fontSize: 11 }}>por segmento</button>
           </div>
@@ -442,18 +558,20 @@ function RiesgosHome() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
           {providers.map(p => {
             const ratio = p.exp / max;
+            const alpha = Math.max(0.10, ratio * 0.35);
             return (
               <div key={p.id} style={{
-                padding: "12px 14px", borderRadius: 10,
-                background: `${cMap[p.level]}${Math.floor(ratio * 100).toString(16).padStart(2,"0")}`,
+                padding: "14px 16px", borderRadius: 14,
+                background: `linear-gradient(135deg, ${cMap[p.level]}${Math.floor(alpha * 255).toString(16).padStart(2,"0")}, rgba(7, 20, 38, 0.6))`,
                 border: `1px solid ${cMap[p.level]}55`,
-                color: ratio > 0.6 ? "white" : "var(--condor-wing)",
-                minHeight: 100,
+                boxShadow: `0 0 ${12 + ratio * 24}px ${cMap[p.level]}33`,
+                color: "var(--text-primary)",
+                minHeight: 110,
               }}>
-                <div className="mono" style={{ fontSize: 10.5, opacity: 0.85 }}>{p.id}</div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, marginTop: 2, lineHeight: 1.2 }}>{p.name}</div>
-                <div className="serif tabular" style={{ fontSize: 22, fontWeight: 600, marginTop: 8 }}>${p.exp}K</div>
-                <div style={{ fontSize: 10.5, opacity: 0.85 }}>{p.cases} casos vinculados</div>
+                <div className="mono" style={{ fontSize: 10.5, color: cMap[p.level], opacity: 0.95, fontWeight: 600 }}>{p.id}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, marginTop: 4, lineHeight: 1.3, color: "var(--text-primary)" }}>{p.name}</div>
+                <div className="display tabular" style={{ fontSize: 24, fontWeight: 700, marginTop: 10, color: cMap[p.level], letterSpacing: "-0.02em", textShadow: `0 0 12px ${cMap[p.level]}55` }}>${p.exp}K</div>
+                <div style={{ fontSize: 10.5, color: "var(--text-secondary)", marginTop: 2 }}>{p.cases} casos vinculados</div>
               </div>
             );
           })}
@@ -476,14 +594,14 @@ function WhatIfSimulator() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 24, alignItems: "center" }}>
       <div>
-        <label style={{ fontSize: 12, color: "var(--ink-mute)" }}>
-          Si bloqueamos los top <strong style={{ color: "var(--condor-wing)" }}>{n}</strong> proveedores sospechosos:
+        <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          Si bloqueamos los top <strong style={{ color: "#22D3EE", fontSize: 14 }}>{n}</strong> proveedores sospechosos:
         </label>
         <input
           type="range" min={1} max={20} value={n} onChange={e => setN(+e.target.value)}
-          style={{ width: "100%", marginTop: 10, accentColor: "var(--andes-orange)" }}
+          style={{ width: "100%", marginTop: 12, accentColor: "#06B6D4" }}
         />
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--ink-mute)", marginTop: 4 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>
           <span>1</span><span>10</span><span>20</span>
         </div>
       </div>
@@ -527,7 +645,7 @@ function AuditoriaHome() {
             { time: "10:18", what: "Aprobó pago SIN-101205", before: "pendiente", after: "aprobado · $3.100", reason: "Factura validada con proveedor" },
             { time: "11:05", what: "Marcó PRV-0042 para investigación", before: "estado normal", after: "lista de observación", reason: "5 casos concentrados último mes" },
           ].map((d, i) => (
-            <div key={i} style={{ padding: "10px 12px", marginBottom: 8, background: "var(--marfil-paper)", borderRadius: 10, borderLeft: "3px solid var(--paramo-green)" }}>
+            <div key={i} style={{ padding: "12px 14px", marginBottom: 8, background: "rgba(34, 197, 94, 0.06)", border: "1px solid rgba(34, 197, 94, 0.18)", borderRadius: 12, borderLeft: "3px solid #22C55E" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                 <span style={{ fontSize: 12, fontWeight: 500 }}>{d.what}</span>
                 <span className="mono" style={{ fontSize: 10.5, color: "var(--ink-mute)" }}>⏱ {d.time}</span>
@@ -561,7 +679,7 @@ function ForensicTimeline() {
       <div style={{ position: "absolute", left: 5, top: 4, bottom: 4, width: 2, background: "var(--paramo-green)" }}/>
       {events.map((e, i) => (
         <div key={i} style={{ position: "relative", paddingLeft: 16, paddingBottom: 12 }}>
-          <div style={{ position: "absolute", left: -2, top: 4, width: 12, height: 12, borderRadius: "50%", background: "white", border: "2px solid var(--paramo-green)" }}/>
+          <div style={{ position: "absolute", left: -2, top: 4, width: 12, height: 12, borderRadius: "50%", background: "#0B1E33", border: "2px solid #22C55E", boxShadow: "0 0 6px rgba(34, 197, 94, 0.55)" }}/>
           <div className="mono" style={{ fontSize: 10, color: "var(--ink-mute)" }}>{e.t} · {e.who}</div>
           <div style={{ fontSize: 12, marginTop: 2 }}>{e.what}</div>
           <div className="mono" style={{ fontSize: 9.5, color: "var(--paramo-green)" }}>✓ {e.hash}</div>
@@ -644,17 +762,24 @@ function TecnologiaHome() {
         </div>
         <div className="card" style={{ padding: 18 }}>
           <SectionTitle>Logs · últimas 4h</SectionTitle>
-          <div className="mono" style={{ fontSize: 10.5, lineHeight: 1.7, background: "#0F2436", color: "#cfe2f3", padding: 12, borderRadius: 8, height: 200, overflow: "auto" }}>
-            <div style={{ color: "#80c080" }}>[INFO] 09:42:18 score computed sin=100029 v=4.2.1 lat=128ms</div>
-            <div style={{ color: "#80c080" }}>[INFO] 09:42:19 agent.tool=ranking_proveedores tokens=412</div>
-            <div style={{ color: "#80c080" }}>[INFO] 09:42:21 di.invoice extracted=13 fields ok=true</div>
-            <div style={{ color: "#e8c068" }}>[WARN] 09:43:02 vision.gpt4o slow=3.2s expected=&lt;2s</div>
-            <div style={{ color: "#80c080" }}>[INFO] 09:43:14 embeddings.search hits=3 sim&gt;=0.94</div>
-            <div style={{ color: "#80c080" }}>[INFO] 09:43:30 report.signed hash=0x55ff…ab12</div>
-            <div style={{ color: "#e07070" }}>[ERROR] 09:44:08 docs.upload size&gt;25MB rejected user=luis.velez</div>
-            <div style={{ color: "#80c080" }}>[INFO] 09:44:22 agent.tool=top_riesgo tokens=287</div>
-            <div style={{ color: "#80c080" }}>[INFO] 09:44:35 cache.hit ratio=0.78 last_1h</div>
-            <div style={{ color: "#80c080" }}>[INFO] 09:45:01 model.feedback received id=fb_4421</div>
+          <div className="mono" style={{
+            fontSize: 10.5, lineHeight: 1.7,
+            background: "rgba(2, 6, 23, 0.85)",
+            color: "#CBD5E1",
+            padding: 14, borderRadius: 12, height: 200, overflow: "auto",
+            border: "1px solid rgba(6, 182, 212, 0.18)",
+            boxShadow: "inset 0 0 24px rgba(6, 182, 212, 0.06)",
+          }}>
+            <div style={{ color: "#86EFAC" }}>[INFO] 09:42:18 score computed sin=100029 v=4.2.1 lat=128ms</div>
+            <div style={{ color: "#86EFAC" }}>[INFO] 09:42:19 agent.tool=ranking_proveedores tokens=412</div>
+            <div style={{ color: "#86EFAC" }}>[INFO] 09:42:21 di.invoice extracted=13 fields ok=true</div>
+            <div style={{ color: "#FCD34D" }}>[WARN] 09:43:02 vision.gpt4o slow=3.2s expected=&lt;2s</div>
+            <div style={{ color: "#86EFAC" }}>[INFO] 09:43:14 embeddings.search hits=3 sim&gt;=0.94</div>
+            <div style={{ color: "#86EFAC" }}>[INFO] 09:43:30 report.signed hash=0x55ff…ab12</div>
+            <div style={{ color: "#FCA5A5" }}>[ERROR] 09:44:08 docs.upload size&gt;25MB rejected user=luis.velez</div>
+            <div style={{ color: "#86EFAC" }}>[INFO] 09:44:22 agent.tool=top_riesgo tokens=287</div>
+            <div style={{ color: "#86EFAC" }}>[INFO] 09:44:35 cache.hit ratio=0.78 last_1h</div>
+            <div style={{ color: "#86EFAC" }}>[INFO] 09:45:01 model.feedback received id=fb_4421</div>
           </div>
         </div>
       </div>
@@ -721,22 +846,27 @@ function GerenciaHome() {
           <SectionTitle>Recuperación mensual</SectionTitle>
           <RevenueChart/>
         </div>
-        <div className="card" style={{ padding: 18, background: "linear-gradient(180deg, white, var(--marfil-paper))" }}>
+        <div className="card" style={{
+          padding: 18,
+          background: "linear-gradient(180deg, rgba(6, 182, 212, 0.08), rgba(7, 20, 38, 0.78) 60%)",
+          border: "1px solid rgba(6, 182, 212, 0.30)",
+          boxShadow: "0 0 28px rgba(6, 182, 212, 0.10), inset 0 1px 0 rgba(255,255,255,0.04)",
+        }}>
           <SectionTitle>Top 3 logros para el board</SectionTitle>
           {[
             ["1", "$486K recuperados en mayo", "vs $352K abril (+38%)"],
             ["2", "Cluster PRV-NEW0019 desmantelado", "8 casos · $156K bloqueados"],
             ["3", "Tiempo de detección bajó a 1.4s", "antes: 18 min por caso"],
           ].map(([n, t, sub]) => (
-            <div key={n} style={{ display: "flex", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
-              <div className="serif" style={{ fontSize: 26, color: "var(--andes-orange)", fontWeight: 600, lineHeight: 1 }}>{n}</div>
+            <div key={n} style={{ display: "flex", gap: 14, padding: "12px 0", borderBottom: "1px solid rgba(148, 163, 184, 0.12)" }}>
+              <div className="display" style={{ fontSize: 28, color: "#22D3EE", fontWeight: 700, lineHeight: 1, textShadow: "0 0 12px rgba(6, 182, 212, 0.45)", letterSpacing: "-0.02em" }}>{n}</div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{t}</div>
-                <div style={{ fontSize: 11, color: "var(--ink-mute)" }}>{sub}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{t}</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{sub}</div>
               </div>
             </div>
           ))}
-          <button className="btn warm" style={{ marginTop: 14, width: "100%" }}>📄 Generar resumen ejecutivo</button>
+          <button className="btn warm" style={{ marginTop: 16, width: "100%" }}>📄 Generar resumen ejecutivo</button>
         </div>
       </div>
 
@@ -763,18 +893,23 @@ function RevenueChart() {
         {data.map(d => (
           <div key={d.m} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 4, flex: 1, width: "100%", justifyContent: "center" }}>
-              <div style={{ width: 18, height: `${(d.manual/max)*100}%`, background: "var(--line-strong)", borderRadius: "3px 3px 0 0" }}/>
-              <div style={{ width: 18, height: `${(d.real/max)*100}%`, background: "linear-gradient(180deg, var(--andes-orange), var(--guayaba-red))", borderRadius: "3px 3px 0 0", position: "relative" }}>
-                <div className="tabular mono" style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: "var(--guayaba-red)", fontWeight: 600 }}>${d.real}K</div>
+              <div style={{ width: 18, height: `${(d.manual/max)*100}%`, background: "rgba(148, 163, 184, 0.28)", borderRadius: "4px 4px 0 0" }}/>
+              <div style={{
+                width: 18, height: `${(d.real/max)*100}%`,
+                background: "linear-gradient(180deg, #06B6D4, #1565C0)",
+                borderRadius: "4px 4px 0 0", position: "relative",
+                boxShadow: "0 0 12px rgba(6, 182, 212, 0.45)",
+              }}>
+                <div className="tabular mono" style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: "#22D3EE", fontWeight: 700, textShadow: "0 0 6px rgba(6, 182, 212, 0.45)" }}>${d.real}K</div>
               </div>
             </div>
-            <div style={{ fontSize: 10.5, color: "var(--ink-mute)" }}>{d.m}</div>
+            <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{d.m}</div>
           </div>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 14, justifyContent: "center", fontSize: 11, color: "var(--ink-mute)", marginTop: 6 }}>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "var(--andes-orange)", marginRight: 4, verticalAlign: "middle" }}/> con AchachAI</span>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "var(--line-strong)", marginRight: 4, verticalAlign: "middle" }}/> detección manual</span>
+      <div style={{ display: "flex", gap: 14, justifyContent: "center", fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "linear-gradient(180deg, #06B6D4, #1565C0)", marginRight: 6, verticalAlign: "middle", borderRadius: 2 }}/> con AchachAI</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "rgba(148, 163, 184, 0.28)", marginRight: 6, verticalAlign: "middle", borderRadius: 2 }}/> detección manual</span>
       </div>
     </div>
   );
@@ -788,13 +923,13 @@ function ThresholdSimulator() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 24, alignItems: "center" }}>
       <div>
-        <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>Threshold de alerta</div>
-        <div className="serif tabular" style={{ fontSize: 48, fontWeight: 500, color: "var(--andes-orange)", lineHeight: 1, marginTop: 4 }}>{t}</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", letterSpacing: ".06em", textTransform: "uppercase", fontWeight: 600 }}>Threshold de alerta</div>
+        <div className="display tabular" style={{ fontSize: 52, fontWeight: 700, color: "#22D3EE", lineHeight: 1, marginTop: 6, textShadow: "0 0 22px rgba(6, 182, 212, 0.55)", letterSpacing: "-0.03em" }}>{t}</div>
         <input
           type="range" min={30} max={95} value={t} onChange={e => setT(+e.target.value)}
-          style={{ width: "100%", marginTop: 12, accentColor: "var(--andes-orange)" }}
+          style={{ width: "100%", marginTop: 14, accentColor: "#06B6D4" }}
         />
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--ink-mute)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)" }}>
           <span>30 (sensible)</span><span>95 (conservador)</span>
         </div>
       </div>

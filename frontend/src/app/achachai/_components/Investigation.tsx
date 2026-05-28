@@ -78,7 +78,7 @@ export function InvestigationScreen({ caseId = "SIN-100029", onBack }) {
       <div style={{
         padding: "20px 32px", borderBottom: "1px solid var(--line)",
         display: "flex", alignItems: "center", gap: 18,
-        background: "linear-gradient(180deg, rgba(197,51,58,0.06), transparent)",
+        background: "linear-gradient(180deg, rgba(239, 68, 68, 0.08), transparent)",
       }}>
         <button className="btn ghost" onClick={onBack} style={{ padding: "6px 10px", fontSize: 12 }}>← Volver</button>
         <div style={{ flex: 1 }}>
@@ -250,7 +250,7 @@ export function InvestigationScreen({ caseId = "SIN-100029", onBack }) {
                 ].map(([t, sub], i) => (
                   <label key={i} style={{
                     display: "flex", alignItems: "center", gap: 10,
-                    padding: "10px 14px", background: "white", borderRadius: 10,
+                    padding: "10px 14px", background: "rgba(11, 30, 51, 0.55)", borderRadius: 10,
                     border: "1px solid var(--line)", cursor: "pointer",
                   }}>
                     <input type="checkbox" />
@@ -284,7 +284,7 @@ export function InvestigationScreen({ caseId = "SIN-100029", onBack }) {
 
 function BitacoraStep({ b, latest }) {
   const tone = b.flag === "warn" ? "amber" : "wing";
-  const bg = b.flag === "warn" ? "rgba(212,165,116,0.08)" : "white";
+  const bg = b.flag === "warn" ? "rgba(245, 158, 11, 0.10)" : "white";
   return (
     <div className="fade-up" style={{
       borderLeft: `2px solid var(--${b.flag === "warn" ? "andes-orange" : "paramo-green"})`,
@@ -335,13 +335,13 @@ function EvidenceCard({ title, type, findings, hero }) {
   return (
     <div style={{
       border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden",
-      background: hero ? "linear-gradient(180deg, rgba(197,51,58,0.04), white)" : "white",
+      background: hero ? "linear-gradient(180deg, rgba(239, 68, 68, 0.06), white)" : "white",
     }}>
       <div style={{
         height: 80,
         background: hero
-          ? "repeating-linear-gradient(135deg, rgba(197,51,58,0.10) 0 8px, rgba(197,51,58,0.04) 8px 16px)"
-          : "repeating-linear-gradient(135deg, rgba(26,58,82,0.06) 0 8px, rgba(26,58,82,0.02) 8px 16px)",
+          ? "repeating-linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0 8px, rgba(239, 68, 68, 0.06) 8px 16px)"
+          : "repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.10) 0 8px, rgba(148, 163, 184, 0.04) 8px 16px)",
         display: "grid", placeItems: "center", position: "relative",
       }}>
         <div className="mono" style={{ fontSize: 10, color: "var(--ink-mute)", letterSpacing: ".1em" }}>
@@ -412,7 +412,7 @@ function MiniTejido() {
     <svg viewBox="0 0 240 180" style={{ width: "100%", height: 180 }}>
       <defs>
         <pattern id="andean-rhombi" width="14" height="14" patternUnits="userSpaceOnUse">
-          <path d="M7 0 L14 7 L7 14 L0 7 Z" fill="none" stroke="rgba(26,58,82,0.08)" />
+          <path d="M7 0 L14 7 L7 14 L0 7 Z" fill="none" stroke="rgba(148, 163, 184, 0.14)" />
         </pattern>
       </defs>
       <rect width="240" height="180" fill="var(--marfil-paper)" />

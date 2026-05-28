@@ -30,7 +30,7 @@ const mdComponents = {
   p: ({ children }: any) => <p style={{ margin: '6px 0' }}>{children}</p>,
   strong: ({ children }: any) => <strong style={{ color: 'var(--condor-wing)', fontWeight: 600 }}>{children}</strong>,
   code: ({ children }: any) => (
-    <code style={{ background: 'rgba(26,58,82,0.06)', padding: '1px 5px', borderRadius: 3, fontFamily: 'var(--mono)', fontSize: 11.5 }}>{children}</code>
+    <code style={{ background: 'rgba(6, 182, 212, 0.10)', padding: '1px 5px', borderRadius: 3, fontFamily: 'var(--mono)', fontSize: 11.5 }}>{children}</code>
   ),
   h1: ({ children }: any) => <h3 style={{ fontSize: 16, margin: '10px 0 6px', fontWeight: 600 }}>{children}</h3>,
   h2: ({ children }: any) => <h3 style={{ fontSize: 15, margin: '10px 0 6px', fontWeight: 600 }}>{children}</h3>,
@@ -76,7 +76,7 @@ function RadarSweep({ size = 64, tone = "#E87A4F" }: { size?: number; tone?: str
   return (
     <div style={{
       position: "relative", width: size, height: size,
-      borderRadius: "50%", background: "radial-gradient(circle, rgba(232,122,79,0.15) 0%, rgba(232,122,79,0.02) 70%, transparent 100%)",
+      borderRadius: "50%", background: "radial-gradient(circle, rgba(6, 182, 212, 0.18) 0%, rgba(6, 182, 212, 0.02) 70%, transparent 100%)",
       border: `1.5px solid ${tone}40`, overflow: "hidden",
     }}>
       {/* anillos concéntricos */}
@@ -126,13 +126,13 @@ function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: str
           borderRadius: "4px 16px 16px 16px",
           padding: "14px 18px 16px",
           boxShadow: "var(--shadow-lg)",
-          border: "1px solid rgba(232,122,79,0.3)",
+          border: "1px solid rgba(6, 182, 212, 0.40)",
           position: "relative", overflow: "hidden",
         }}>
           {/* scan line decorativa */}
           <div style={{
             position: "absolute", inset: 0, pointerEvents: "none",
-            background: "linear-gradient(180deg, transparent, rgba(232,122,79,0.06), transparent)",
+            background: "linear-gradient(180deg, transparent, rgba(6, 182, 212, 0.08), transparent)",
             backgroundSize: "100% 200%",
             animation: "scan-beam 3s linear infinite",
           }}/>
@@ -144,7 +144,7 @@ function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: str
               TRANSMISIÓN EN VIVO
             </div>
             <span style={{ flex: 1 }}/>
-            <span className="mono" style={{ fontSize: 9.5, color: "rgba(244,237,228,0.5)", letterSpacing: ".1em" }}>
+            <span className="mono" style={{ fontSize: 9.5, color: "rgba(203, 213, 225,0.5)", letterSpacing: ".1em" }}>
               GPT-5-MINI · AZURE FOUNDRY · {tools.length}/{total} TOOLS
             </span>
           </div>
@@ -160,7 +160,7 @@ function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: str
           </div>
 
           {/* progress bar global */}
-          <div style={{ height: 3, background: "rgba(244,237,228,0.1)", borderRadius: 2, overflow: "hidden", marginBottom: 12 }}>
+          <div style={{ height: 3, background: "rgba(203, 213, 225,0.1)", borderRadius: 2, overflow: "hidden", marginBottom: 12 }}>
             <div style={{
               height: "100%", width: `${progress}%`,
               background: "linear-gradient(90deg, var(--andes-orange), var(--pink-dawn), var(--andes-orange))",
@@ -181,15 +181,15 @@ function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: str
                   <div key={i} style={{
                     display: "flex", alignItems: "flex-start", gap: 10,
                     padding: "9px 11px", borderRadius: 8,
-                    background: isCurrent ? "rgba(232,122,79,0.18)" : "rgba(244,237,228,0.05)",
-                    border: `1px solid ${isCurrent ? "rgba(232,122,79,0.5)" : "rgba(244,237,228,0.08)"}`,
+                    background: isCurrent ? "rgba(6, 182, 212, 0.20)" : "rgba(203, 213, 225,0.05)",
+                    border: `1px solid ${isCurrent ? "rgba(6, 182, 212, 0.55)" : "rgba(203, 213, 225,0.08)"}`,
                     animation: isCurrent ? "fade-up .25s ease both" : "none",
                   }}>
                     <span style={{ fontSize: 16, marginTop: 1 }}>{nar.icon}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--marfil)" }}>{nar.phrase}</span>
-                        <span className="mono" style={{ fontSize: 9.5, color: "rgba(244,237,228,0.55)", letterSpacing: ".06em" }}>[{t}]</span>
+                        <span className="mono" style={{ fontSize: 9.5, color: "rgba(203, 213, 225,0.55)", letterSpacing: ".06em" }}>[{t}]</span>
                         <span style={{ flex: 1 }}/>
                         {isDone && (
                           <span className="mono" style={{ fontSize: 10, color: "var(--paramo-soft)", fontWeight: 600 }}>
@@ -203,9 +203,9 @@ function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: str
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 11, color: "rgba(244,237,228,0.7)", marginTop: 2, lineHeight: 1.4 }}>{nar.detail}</div>
+                      <div style={{ fontSize: 11, color: "rgba(203, 213, 225,0.7)", marginTop: 2, lineHeight: 1.4 }}>{nar.detail}</div>
                       {isCurrent && (
-                        <div style={{ marginTop: 6, height: 2, background: "rgba(244,237,228,0.08)", borderRadius: 2, overflow: "hidden" }}>
+                        <div style={{ marginTop: 6, height: 2, background: "rgba(203, 213, 225,0.08)", borderRadius: 2, overflow: "hidden" }}>
                           <div style={{
                             height: "100%", width: "60%",
                             background: "linear-gradient(90deg, transparent, var(--andes-orange), transparent)",
@@ -233,7 +233,7 @@ function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: str
                   }}/>
                 ))}
               </span>
-              <span className="mono" style={{ fontSize: 11, letterSpacing: ".08em", color: "rgba(244,237,228,0.8)" }}>
+              <span className="mono" style={{ fontSize: 11, letterSpacing: ".08em", color: "rgba(203, 213, 225,0.8)" }}>
                 EL CÓNDOR ESTÁ DECIDIENDO QUÉ TOOLS USAR…
               </span>
             </div>
@@ -242,8 +242,8 @@ function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: str
           {/* Footer mini stats */}
           <div style={{
             display: "flex", justifyContent: "space-between", alignItems: "center",
-            marginTop: 12, paddingTop: 10, borderTop: "1px dashed rgba(244,237,228,0.12)",
-            fontSize: 9.5, color: "rgba(244,237,228,0.5)", letterSpacing: ".06em",
+            marginTop: 12, paddingTop: 10, borderTop: "1px dashed rgba(203, 213, 225,0.12)",
+            fontSize: 9.5, color: "rgba(203, 213, 225,0.5)", letterSpacing: ".06em",
           }}>
             <span className="mono">CARTERA · 25.460 SINIESTROS · 198 PROVEEDORES</span>
             <span className="mono">LATENCIA: {(Math.random() * 600 + 200).toFixed(0)}ms</span>
@@ -316,7 +316,7 @@ function EvidencePreview({ summary, onInvestigate }: { summary: string; onInvest
           </div>
         </div>
         <span style={{ flex: 1 }}/>
-        <span className="chip outline" style={{ fontSize: 9.5, background: "white" }}>click → investigar</span>
+        <span className="chip outline" style={{ fontSize: 9.5, background: "rgba(11, 30, 51, 0.55)" }}>click → investigar</span>
       </div>
 
       {cards.length > 0 && (
@@ -328,7 +328,7 @@ function EvidencePreview({ summary, onInvestigate }: { summary: string; onInvest
               <button key={c.id}
                 onClick={() => onInvestigate && onInvestigate(c.id)}
                 style={{
-                  cursor: "pointer", background: "white",
+                  cursor: "pointer", background: "rgba(11, 30, 51, 0.55)",
                   border: `1px solid ${accent}40`,
                   borderTop: `3px solid ${accent}`,
                   borderRadius: 12, padding: "12px 14px",
@@ -625,14 +625,14 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
               <button key={i}
                 onClick={() => send(p)}
                 className="chip outline"
-                style={{ cursor: "pointer", fontSize: 11.5, padding: "6px 12px", background: "white" }}>
+                style={{ cursor: "pointer", fontSize: 11.5, padding: "6px 12px", background: "rgba(11, 30, 51, 0.55)" }}>
                 <Condor size={12} tone="wing" mood="still" /> {p}
               </button>
             ))}
           </div>
           <div style={{
             display: "flex", alignItems: "center", gap: 10,
-            background: "white", border: "1px solid var(--line-strong)",
+            background: "rgba(11, 30, 51, 0.55)", border: "1px solid var(--line-strong)",
             borderRadius: 16, padding: "8px 8px 8px 16px",
             boxShadow: "var(--shadow-sm)",
           }}>
@@ -680,7 +680,7 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
           <div className="diamond-divider" style={{ marginBottom: 10 }}>Capacidades</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {TOOLS_CATALOG.map(t => (
-              <span key={t} className="chip" style={{ fontSize: 10, padding: "3px 7px", background: "white" }}>
+              <span key={t} className="chip" style={{ fontSize: 10, padding: "3px 7px", background: "rgba(11, 30, 51, 0.55)" }}>
                 <span className="mono">{t}</span>
               </span>
             ))}
@@ -706,7 +706,7 @@ function HistoryItem({ time, title, tools, highlight, red }) {
   return (
     <div className="fade-up" style={{
       padding: "10px 12px", marginBottom: 6, borderRadius: 10,
-      background: highlight ? "rgba(232,122,79,0.10)" : red ? "rgba(197,51,58,0.08)" : "white",
+      background: highlight ? "rgba(6, 182, 212, 0.10)" : red ? "rgba(239, 68, 68, 0.08)" : "rgba(11, 30, 51, 0.55)",
       border: "1px solid var(--line)", cursor: "pointer",
       display: "flex", alignItems: "center", gap: 10,
     }}>
@@ -729,10 +729,10 @@ function ThinkingBlock({ tools }) {
           {tools.map((t, i) => (
             <span key={i} className="chip" style={{
               fontSize: 10.5, padding: "4px 10px",
-              background: "rgba(232,122,79,0.10)",
+              background: "rgba(6, 182, 212, 0.12)",
               color: "var(--andes-orange)",
               animation: i === tools.length - 1 ? "shimmer 1.2s linear infinite" : "none",
-              backgroundImage: i === tools.length - 1 ? "linear-gradient(90deg, rgba(232,122,79,0.1), rgba(232,122,79,0.3), rgba(232,122,79,0.1))" : "none",
+              backgroundImage: i === tools.length - 1 ? "linear-gradient(90deg, rgba(6, 182, 212, 0.12), rgba(6, 182, 212, 0.40), rgba(6, 182, 212, 0.12))" : "none",
               backgroundSize: "200% 100%",
             }}>
               <span className="mono">{t}</span>
@@ -772,7 +772,7 @@ function Message({ msg, onInvestigate }) {
         <Condor size={28} mood="speak" tone="wing" />
         <div style={{ flex: 1, maxWidth: 760 }}>
           <div style={{
-            background: "white", border: "1px solid var(--line)",
+            background: "rgba(11, 30, 51, 0.55)", border: "1px solid var(--line)",
             borderRadius: "4px 16px 16px 16px", overflow: "hidden",
             boxShadow: "var(--shadow-sm)",
           }}>
@@ -851,8 +851,8 @@ function Message({ msg, onInvestigate }) {
       <Condor size={28} mood={msg.kind === "proactive" ? "alert" : "idle"} tone={msg.kind === "proactive" ? "orange" : "wing"} />
       <div style={{ flex: 1, maxWidth: 560 }}>
         <div style={{
-          background: msg.kind === "proactive" ? "rgba(232,122,79,0.10)" : "white",
-          border: msg.kind === "proactive" ? "1px solid rgba(232,122,79,0.30)" : "1px solid var(--line)",
+          background: msg.kind === "proactive" ? "rgba(6, 182, 212, 0.12)" : "white",
+          border: msg.kind === "proactive" ? "1px solid rgba(6, 182, 212, 0.40)" : "1px solid var(--line)",
           padding: "12px 16px",
           borderRadius: "4px 16px 16px 16px",
           fontSize: 13.5, lineHeight: 1.55,
