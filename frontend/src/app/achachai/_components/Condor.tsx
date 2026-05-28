@@ -162,20 +162,21 @@ export interface VueloDelCondorProps {
 export function VueloDelCondor({ score = 14, variant = 'md', label, sublabel, signals = [] }: VueloDelCondorProps) {
   const level = score >= 70 ? 'red' : score >= 40 ? 'amber' : 'green';
   const palette = {
-    red:   { ring: "#C5333A", soft: "rgba(197,51,58,0.16)", text: "Descenso",     desc: "Revisión inmediata", anim: "pulse-red 1s infinite",   mood: 'alert' as Mood, tone: 'red' as Tone   },
-    amber: { ring: "#D4A574", soft: "rgba(212,165,116,0.20)", text: "Observación", desc: "Requiere revisión",  anim: "pulse-amber 2s infinite", mood: 'think' as Mood, tone: 'wing' as Tone  },
-    green: { ring: "#4A7C59", soft: "rgba(74,124,89,0.16)",  text: "Vuelo alto",   desc: "Todo en calma",      anim: "pulse-green 4s infinite", mood: 'idle' as Mood,  tone: 'wing' as Tone  },
+    red:   { ring: "var(--danger)",  soft: "var(--danger-soft)",  text: "Riesgo alto",  desc: "Revisión inmediata" },
+    amber: { ring: "var(--warning)", soft: "var(--warning-soft)", text: "Riesgo medio", desc: "Requiere revisión"  },
+    green: { ring: "var(--success)", soft: "var(--success-soft)", text: "Riesgo bajo",  desc: "Todo en calma"      },
   }[level];
 
   const sizeMap = {
-    sm:     { box: 64,  ring: 56,  score: 18, condor: 22 },
-    md:     { box: 130, ring: 112, score: 32, condor: 50 },
-    lg:     { box: 200, ring: 172, score: 52, condor: 78 },
-    cinema: { box: 340, ring: 296, score: 96, condor: 130 },
+    sm:     { box: 56,  ring: 48,  score: 16, stroke: 3, fontLabel: 10 },
+    md:     { box: 120, ring: 104, score: 30, stroke: 5, fontLabel: 12 },
+    lg:     { box: 180, ring: 160, score: 46, stroke: 6, fontLabel: 13 },
+    cinema: { box: 300, ring: 268, score: 84, stroke: 8, fontLabel: 16 },
   };
   const S = sizeMap[variant] || sizeMap.md;
-  const C = 2 * Math.PI * (S.ring / 2 - 6);
-  const dash = (score / 100) * C;
+  const radius = S.ring / 2 - S.stroke;
+  const C = 2 * Math.PI * radius;
+  const dash = (Math.min(100, Math.max(0, score)) / 100) * C;
 
   return (
     <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: variant === 'sm' ? 4 : 8 }}>
@@ -183,34 +184,31 @@ export function VueloDelCondor({ score = 14, variant = 'md', label, sublabel, si
         position: "relative", width: S.box, height: S.box,
         display: "grid", placeItems: "center",
         borderRadius: "50%", background: palette.soft,
-        animation: palette.anim,
       }}>
         <svg width={S.ring} height={S.ring} style={{ position: "absolute", inset: (S.box - S.ring) / 2, transform: "rotate(-90deg)" }}>
-          <circle cx={S.ring / 2} cy={S.ring / 2} r={S.ring / 2 - 6} fill="none" stroke="rgba(26,58,82,0.08)" strokeWidth="3"/>
-          <circle cx={S.ring / 2} cy={S.ring / 2} r={S.ring / 2 - 6} fill="none" stroke={palette.ring} strokeWidth="3"
+          <circle cx={S.ring / 2} cy={S.ring / 2} r={radius} fill="none" stroke="var(--border-color)" strokeWidth={S.stroke}/>
+          <circle cx={S.ring / 2} cy={S.ring / 2} r={radius} fill="none" stroke={palette.ring} strokeWidth={S.stroke}
                   strokeDasharray={`${dash} ${C}`} strokeLinecap="round" style={{ transition: "stroke-dasharray .6s ease" }}/>
         </svg>
-        {level === 'red' && variant !== 'sm' && (
-          <div style={{ position: "absolute", inset: -8, borderRadius: "50%", border: "2px solid rgba(197,51,58,0.30)", animation: "pulse-red 1.5s infinite" }}/>
-        )}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-          <Condor size={S.condor} tone={palette.tone} mood={palette.mood} sonar={level === 'red' && variant === 'cinema'}/>
+        <div className="display tabular" style={{
+          fontSize: S.score, fontWeight: 700, lineHeight: 1, color: palette.ring,
+        }}>
+          {score}
           {variant !== 'sm' && (
-            <div className="tabular serif" style={{ fontSize: S.score, fontWeight: 600, lineHeight: 1, color: palette.ring, marginTop: variant === 'cinema' ? 12 : 6 }}>
-              {score}<span style={{ fontSize: S.score * 0.4, color: "var(--ink-mute)", fontWeight: 400 }}>/100</span>
-            </div>
-          )}
-          {variant === 'sm' && (
-            <div className="tabular" style={{ fontSize: 11, fontWeight: 700, color: palette.ring, marginTop: 1 }}>{score}</div>
+            <span style={{ fontSize: S.score * 0.4, color: "var(--text-muted)", fontWeight: 500 }}>/100</span>
           )}
         </div>
       </div>
       {variant !== 'sm' && (
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: variant === 'cinema' ? 24 : 13, fontWeight: 600, color: palette.ring, letterSpacing: ".02em" }}>
+          <div style={{
+            display: 'inline-block',
+            fontSize: S.fontLabel, fontWeight: 600, color: palette.ring,
+            padding: '3px 10px', borderRadius: 999, background: palette.soft,
+          }}>
             {label || palette.text}
           </div>
-          <div style={{ fontSize: variant === 'cinema' ? 14 : 11, color: "var(--ink-mute)", marginTop: 2 }}>
+          <div style={{ fontSize: S.fontLabel - 1, color: "var(--text-secondary)", marginTop: 4 }}>
             {sublabel || palette.desc}
           </div>
         </div>
@@ -368,7 +366,7 @@ export function LearningBar() {
           className="chip blue"
           style={{ cursor: "pointer", background: "transparent", border: "1px solid var(--line-strong)" }}
         >
-          {expandido ? "Ocultar detalle ↑" : "Ver detalle →"}
+          {expandido ? "Ocultar detalle" : "Ver detalle"}
         </button>
       </div>
 
@@ -387,8 +385,8 @@ export function LearningBar() {
           <MiniStat label="Retener / Bloquear" value={(porDecision.retener ?? 0) + (porDecision.bloquear ?? 0)} tone="red" />
           <MiniStat label="Escalar" value={porDecision.escalar ?? 0} tone="orange" />
 
-          <div style={{ gridColumn: "1 / -1", fontSize: 10.5, color: "var(--ink-mute)", marginTop: 4 }}>
-            💾 Tus decisiones se persisten en <span className="mono">data/processed/feedback_analistas.parquet</span>. El próximo reentreno del modelo XGBoost (programado mensual) incorporará todas estas etiquetas como ground truth nuevo. <strong>Cada decisión tuya hace al cóndor más preciso.</strong>
+          <div style={{ gridColumn: "1 / -1", fontSize: 10.5, color: "var(--text-secondary)", marginTop: 4 }}>
+            Tus decisiones se persisten en <span className="mono">data/processed/feedback_analistas.parquet</span>. El próximo reentreno del modelo XGBoost (programado mensual) incorporará todas estas etiquetas como ground truth nuevo. <strong>Cada decisión tuya hace al cóndor más preciso.</strong>
           </div>
         </div>
       )}

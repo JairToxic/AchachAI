@@ -71,15 +71,20 @@ def base_vehiculo(i: int) -> dict:
 
 
 def base_asegurado(i: int) -> dict:
+    perfil = str(RNG.choice(["Bajo", "Medio", "Alto"], p=[0.3, 0.4, 0.3]))
     return {
         "id_asegurado": new_id("ASE", i),
-        "segmento": RNG.choice(SEGMENTOS),
+        "nombre": f"Asegurado Inyectado #{i:03d}",
+        "segmento": str(RNG.choice(SEGMENTOS)),
         "antiguedad_anios": int(RNG.integers(0, 15)),
-        "ciudad": RNG.choice(CIUDADES),
+        "ciudad": str(RNG.choice(CIUDADES)),
         "num_polizas": int(RNG.integers(1, 4)),
         "reclamos_ultimos_12_meses": int(RNG.integers(0, 4)),
         "mora_actual": bool(RNG.random() < 0.15),
         "score_cliente_simulado": int(RNG.integers(300, 850)),
+        "reclamos_historico_total": int(RNG.integers(0, 6)),
+        "reclamos_rc_sin_tercero": int(RNG.integers(0, 3)),
+        "perfil_riesgo": perfil,
     }
 
 
@@ -102,7 +107,7 @@ def base_poliza(i: int, id_asegurado: str, ciudad: str, fecha_inicio: str,
     return {
         "id_poliza": new_id("POL", i),
         "id_asegurado": id_asegurado,
-        "ramo": "Vehiculos",
+        "ramo": "Vehículos",
         "fecha_inicio": fecha_inicio,
         "fecha_fin": fecha_fin,
         "prima_usd": round(prima, 2),
@@ -131,7 +136,7 @@ def build_siniestro(i: int, *, cobertura: str, estado: str, descripcion: str,
         "id_vehiculo": id_vehiculo,
         "id_proveedor": id_proveedor,
         "id_conductor": id_conductor,
-        "ramo": "Vehiculos",
+        "ramo": "Vehículos",
         "cobertura": cobertura,
         "fecha_ocurrencia": fecha_ocurrencia,
         "fecha_reporte": fecha_reporte,
@@ -152,6 +157,8 @@ def build_siniestro(i: int, *, cobertura: str, estado: str, descripcion: str,
         "tuvo_testigo": bool(tuvo_testigo),
         "fault_responsable": fault,
         "etiqueta_fraude_simulada": 1,
+        "placa": f"INY-{i:04d}",
+        "similitud_narrativa_max": 0.0,
     }
 
 
@@ -172,6 +179,7 @@ def build_docs(i_base: int, id_siniestro: str, fecha_ocurrencia: str,
             "fecha_emision": fecha_fac,
             "inconsistencia_detectada": True,
             "observacion": "Factura emitida ANTES del evento",
+            "ruta_pdf": None,
         })
     else:
         docs.append({
@@ -181,6 +189,7 @@ def build_docs(i_base: int, id_siniestro: str, fecha_ocurrencia: str,
             "entregado": True, "legible": True,
             "fecha_emision": (fecha_oc + pd.Timedelta(days=int(RNG.integers(1, 7)))).strftime("%Y-%m-%d"),
             "inconsistencia_detectada": False, "observacion": None,
+            "ruta_pdf": None,
         })
     # Foto
     docs.append({
@@ -200,6 +209,7 @@ def build_docs(i_base: int, id_siniestro: str, fecha_ocurrencia: str,
         "fecha_emision": (fecha_oc + pd.Timedelta(days=2)).strftime("%Y-%m-%d") if not denuncia_falta else None,
         "inconsistencia_detectada": False,
         "observacion": "Denuncia no entregada" if denuncia_falta else None,
+        "ruta_pdf": None,
     })
     return docs
 

@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Condor, LearningBar } from './_components/Condor';
 import { CondorSilhouette } from './_components/CondorSilhouette';
 import { ChatScreen } from './_components/Chat';
 import { InvestigationScreen } from './_components/Investigation';
@@ -17,165 +16,14 @@ import {
   PrevencionScreen,
   ExplorarScreen,
   CargarCasosScreen,
-  ROLES,
 } from './_components/Screens';
 import { RoleHome } from './_components/RoleHomes';
 import { AgentProvider, AgentDrawer, AgentFAB, useAgent } from './_components/AgentDrawer';
+import { Sidebar, SIDEBAR_NAV, SIDEBAR_ROLES } from './_components/Sidebar';
+import { Topbar } from './_components/Topbar';
+import { useTheme } from './_components/ThemeToggle';
 
-const NAV = [
-  { id: 'home',      label: 'Mi vista',                glyph: '✦', hint: 'inicio' },
-  { id: 'chat',      label: 'Hablar con el cóndor',    glyph: '▲', hint: 'chat IA' },
-  { id: 'kanban',    label: 'Bandeja priorizada',      glyph: '❒', hint: 'pendientes' },
-  { id: 'explorar',  label: 'Explorar siniestros',     glyph: '🔎', hint: 'buscar' },
-  { id: 'cargar',    label: 'Cargar casos nuevos',     glyph: '📥', hint: 'CSV+form' },
-  { id: 'evaluar',   label: 'Evaluar caso nuevo',      glyph: '⚡', hint: 'simular' },
-  { id: 'prevencion',label: 'Prevención',              glyph: '🛡', hint: 'temprano' },
-  { id: 'anomalias', label: 'Patrones inusuales',      glyph: '✨', hint: 'descubrir' },
-  { id: 'documents', label: 'Analizar documento',      glyph: '✎', hint: 'subir' },
-  { id: 'tejido',    label: 'Red de relaciones',       glyph: '◇', hint: 'conexiones' },
-  { id: 'reports',   label: 'Reportes',                glyph: '▦', hint: 'exportar' },
-  { id: 'ajustes',   label: 'Ajustes',                 glyph: '⚙', hint: 'pesos' },
-  { id: 'roles',     label: 'Cambiar de rol',          glyph: '⇄', hint: '7 vistas' },
-];
-
-interface SidebarProps {
-  active: string;
-  onNav: (s: string) => void;
-  role: string;
-}
-
-function Sidebar({ active, onNav, role }: SidebarProps) {
-  const r = (ROLES as any[]).find(x => x.id === role) || (ROLES as any[])[0];
-  return (
-    <aside
-      style={{
-        width: 220,
-        background: 'var(--condor-wing)',
-        color: 'var(--marfil)',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '18px 14px',
-        gap: 18,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 4px' }}>
-        <div
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: 11,
-            background: 'var(--marfil)',
-            display: 'grid',
-            placeItems: 'center',
-          }}
-        >
-          <Condor size={30} tone="wing" mood="idle" />
-        </div>
-        <div>
-          <div className="serif" style={{ fontSize: 19, fontWeight: 600, lineHeight: 1 }}>
-            Achach<span style={{ color: 'var(--andes-orange)' }}>AI</span>
-          </div>
-          <div
-            style={{
-              fontSize: 9.5,
-              letterSpacing: '.14em',
-              color: 'rgba(244,237,228,0.55)',
-              marginTop: 3,
-            }}
-          >
-            OJOS DE CÓNDOR
-          </div>
-        </div>
-      </div>
-
-      <div
-        onClick={() => onNav('roles')}
-        style={{
-          padding: '10px 12px',
-          borderRadius: 10,
-          background: 'rgba(244,237,228,0.06)',
-          cursor: 'pointer',
-          borderLeft: `3px solid ${r.color}`,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 9.5,
-            color: 'rgba(244,237,228,0.55)',
-            letterSpacing: '.1em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Sesión activa
-        </div>
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 500,
-            marginTop: 2,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <span>{r.icon}</span> María Yánez
-        </div>
-        <div style={{ fontSize: 10.5, color: 'rgba(244,237,228,0.6)', marginTop: 1 }}>{r.name}</div>
-        <div style={{ fontSize: 9.5, color: 'rgba(244,237,228,0.4)', marginTop: 4 }}>cambiar de rol →</div>
-      </div>
-
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-        {NAV.map(n => {
-          const isActive = active === n.id || (active === 'investigation' && n.id === 'kanban');
-          return (
-            <button
-              key={n.id}
-              onClick={() => onNav(n.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '9px 12px',
-                borderRadius: 8,
-                background: isActive ? 'rgba(244,237,228,0.10)' : 'transparent',
-                color: isActive ? 'var(--marfil)' : 'rgba(244,237,228,0.78)',
-                border: 0,
-                cursor: 'pointer',
-                fontSize: 13,
-                fontWeight: 500,
-                textAlign: 'left',
-                width: '100%',
-                borderLeft: isActive ? '2px solid var(--andes-orange)' : '2px solid transparent',
-              }}
-            >
-              <span style={{ width: 16, fontSize: 13, color: isActive ? 'var(--andes-orange)' : 'rgba(244,237,228,0.45)' }}>{n.glyph}</span>
-              <span style={{ flex: 1 }}>{n.label}</span>
-              <span style={{ fontSize: 9, color: 'rgba(244,237,228,0.35)', letterSpacing: '.1em' }}>{n.hint}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      <div
-        style={{
-          padding: '10px 12px',
-          borderRadius: 10,
-          background: 'rgba(244,237,228,0.04)',
-          fontSize: 10.5,
-          color: 'rgba(244,237,228,0.6)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--paramo-green)' }} />
-          Azure ML · v4.2.1 · sano
-        </div>
-        <div>25.460 siniestros · AUC 0.96</div>
-      </div>
-    </aside>
-  );
-}
-
-/** Mapa pantalla → label legible + hint para inyectar al agente. */
+/** Mapa pantalla -> label legible + hint para inyectar al agente. */
 const SCREEN_META: Record<string, { label: string; hint?: string }> = {
   home:          { label: 'Mi vista (home del rol)',         hint: 'El usuario está en su dashboard inicial' },
   chat:          { label: 'Conversación con el cóndor',      hint: 'Usuario en el chat full-screen' },
@@ -194,11 +42,39 @@ const SCREEN_META: Record<string, { label: string; hint?: string }> = {
   asegurado:     { label: 'Ficha del asegurado',             hint: 'Perfil + historial de un asegurado' },
 };
 
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 900px)');
+    const apply = () => setIsMobile(mql.matches);
+    apply();
+    mql.addEventListener?.('change', apply);
+    return () => mql.removeEventListener?.('change', apply);
+  }, []);
+  return isMobile;
+}
+
 export default function AchachaiApp() {
   const [screen, setScreen] = useState<string>('home');
   const [caseId, setCaseId] = useState<string>('SIN-100029');
   const [aseId, setAseId] = useState<string>('');
   const [role, setRole] = useState<string>('antifraude');
+
+  // Sidebar state
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  // Theme bootstrap (loaded ASAP via layout, but mount the hook so it's reactive)
+  const [theme] = useTheme();
+
+  // Activa el watermark solo en dark
+  const showWatermark = theme === 'dark';
+
+  function toggleSidebar() {
+    if (isMobile) setMobileOpen(o => !o);
+    else setCollapsed(c => !c);
+  }
 
   function pickRole(r: string) {
     setRole(r);
@@ -215,64 +91,114 @@ export default function AchachaiApp() {
     setScreen('asegurado');
   }
 
-  /** Handler que el AgentProvider invoca cuando el chat pide navegar. */
   function handleAgentNavigate(a: any) {
     if (a.type === 'investigate' && a.id) investigate(a.id);
     else if (a.type === 'verAsegurado' && a.id) verAsegurado(a.id);
     else if (a.type === 'goto' && a.screen) setScreen(a.screen);
   }
 
+  // Datos del header dinámicos según pantalla
+  const activeNav = SIDEBAR_NAV.find(n =>
+    n.id === screen || (screen === 'investigation' && n.id === 'kanban') || (screen === 'asegurado' && n.id === 'kanban'),
+  );
+  const activeRole = SIDEBAR_ROLES.find(r => r.id === role) || SIDEBAR_ROLES[1];
+
+  let topTitle = activeNav?.label || 'AchachAI';
+  let topSubtitle = activeRole.name;
+  if (screen === 'investigation') {
+    topTitle = `Investigación · ${caseId}`;
+    topSubtitle = 'Vista forense del siniestro';
+  } else if (screen === 'asegurado') {
+    topTitle = `Asegurado · ${aseId || '—'}`;
+    topSubtitle = 'Perfil e historial';
+  }
+
   return (
     <AgentProvider onNavigate={handleAgentNavigate}>
       <ContextSync screen={screen} caseId={caseId} aseId={aseId} role={role} />
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', height: '100vh' }}>
-        <Sidebar active={screen} onNav={setScreen} role={role} />
+      <div
+        className="app-shell"
+        data-collapsed={collapsed ? 'true' : 'false'}
+        data-mobile-open={mobileOpen ? 'true' : 'false'}
+      >
+        <Sidebar
+          active={screen}
+          onNav={setScreen}
+          role={role}
+          onRoleChange={pickRole}
+          collapsed={collapsed}
+          onCloseMobile={() => setMobileOpen(false)}
+        />
 
-        <main style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
-          {/* watermark global: cóndor planeando detrás de TODAS las pantallas */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute', inset: 0, zIndex: 0,
-              pointerEvents: 'none', overflow: 'hidden',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <CondorSilhouette
-              width={820}
-              color="var(--condor-wing)"
-              style={{
-                opacity: 0.07,
-                animation: 'condor-float 9s ease-in-out infinite',
-                transformOrigin: 'center',
-              }}
-            />
-          </div>
+        {/* Backdrop solo en mobile cuando el drawer está abierto */}
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
 
-          {/* cóndor extra planeando permanente en la esquina superior derecha */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute', top: 0, left: 0, right: 0, height: 56,
-              pointerEvents: 'none', overflow: 'hidden', zIndex: 0,
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute', top: 14,
-                animation: 'condor-glide 14s linear infinite',
-                filter: 'drop-shadow(0 0 8px rgba(232,122,79,0.35))',
-              }}
-            >
-              <CondorSilhouette width={42} color="var(--andes-orange)" style={{ opacity: 0.45 }} />
-            </div>
-          </div>
+        <main className="app-main">
+          <Topbar
+            title={topTitle}
+            subtitle={topSubtitle}
+            onToggleSidebar={toggleSidebar}
+            notifications={3}
+          />
 
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <LearningBar />
-          </div>
+          {/* Watermark sutil solo en dark mode */}
+          {showWatermark && (
+            <>
+              <div
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 0,
+                  pointerEvents: 'none',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <CondorSilhouette
+                  width={820}
+                  color="var(--accent)"
+                  style={{
+                    opacity: 0.05,
+                    animation: 'condor-float 9s ease-in-out infinite',
+                    transformOrigin: 'center',
+                  }}
+                />
+              </div>
+              <div
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: 'var(--topbar-h)',
+                  left: 0,
+                  right: 0,
+                  height: 56,
+                  pointerEvents: 'none',
+                  overflow: 'hidden',
+                  zIndex: 0,
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 14,
+                    animation: 'condor-glide 14s linear infinite',
+                    filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.35))',
+                  }}
+                >
+                  <CondorSilhouette width={42} color="var(--accent)" style={{ opacity: 0.45 }} />
+                </div>
+              </div>
+            </>
+          )}
 
-          <div style={{ flex: 1, minHeight: 0, position: 'relative', zIndex: 1 }}>
+          <div className="app-content" style={{ zIndex: 1 }}>
             {screen === 'home' && (
               <RoleHome role={role} onInvestigate={investigate} onGoChat={() => setScreen('chat')} />
             )}
@@ -330,7 +256,6 @@ function ContextSync({
     const payload: any = { role };
     if (screen === 'investigation') payload.caseId = caseId;
     if (screen === 'asegurado') payload.aseguradoId = aseId;
-    // Para investigation/asegurado, incluimos el id en el label para que se lea bien arriba.
     let label = meta.label;
     if (screen === 'investigation' && caseId) label = `Investigación · ${caseId}`;
     if (screen === 'asegurado' && aseId) label = `Asegurado · ${aseId}`;

@@ -128,9 +128,14 @@ AchachAI/
 ├── .env.example                    ← PLANTILLA — copiar a .env y rellenar
 ├── .gitignore
 ├── data/
-│   ├── raw/                        ← dataset sintético original
-│   ├── processed/                  ← 7 tablas normalizadas (parquet)
-│   └── synthetic/                  ← casos extremos inyectados
+│   ├── Data set documentos evento/ ← dataset OFICIAL del reto (xlsx 500 casos + PDFs reales)
+│   │   ├── Evento Datasets_Sinteticos_Fraude_500_v2.xlsx
+│   │   ├── FACTURAS/               ← 15 facturas PDF
+│   │   ├── PARTE POLICIAL/         ← 6 partes policiales PDF
+│   │   └── DECLARACIÓN DE ACCIDENTE/ ← 5 declaraciones PDF
+│   ├── raw/                        ← dataset legacy CSV (deprecated)
+│   ├── processed/                  ← 7 tablas normalizadas (parquet) + similitudes
+│   └── synthetic/                  ← casos extremos inyectados (RF-01..05)
 ├── notebooks/
 │   ├── 01_exploracion_datos.ipynb
 │   ├── 02_modelo_fraude.ipynb
@@ -191,11 +196,23 @@ Sin esto, `/chat` y `/evaluar-completo` fallan con `KeyError: 'AZURE_OPENAI_API_
 
 ### 3. Preparar datos (sólo primera vez)
 
+**Dataset oficial del reto** (xlsx con 500 casos multi-ramo + PDFs reales):
+
 ```bash
-python scripts/clean_dataset.py
-python scripts/normalize_tables.py        # genera 7 tablas parquet
-python scripts/inject_critical_cases.py   # casos para reglas RF-01..04
+python scripts/load_xlsx_dataset.py        # ingesta xlsx -> 7 parquets + similitudes
+python scripts/inject_critical_cases.py    # +40 casos extremos para demo RF-01..05
 ```
+
+`load_xlsx_dataset.py` reemplaza al viejo `clean_dataset.py + normalize_tables.py`
+(que quedan deprecated, sólo aplicables al CSV legacy en `data/raw/`). Lee:
+
+- `data/Data set documentos evento/Evento Datasets_Sinteticos_Fraude_500_v2.xlsx`
+- PDFs reales en `data/Data set documentos evento/{FACTURAS,PARTE POLICIAL,DECLARACIÓN DE ACCIDENTE}/`
+
+y genera los 7 parquets en `data/processed/` con el mismo esquema `snake_case`
+que el resto del pipeline ya consumía. La columna `ruta_pdf` en
+`documentos.parquet` apunta al PDF físico (26 documentos reales: 6 partes
+policiales + 5 declaraciones + 15 facturas).
 
 ### 4. Levantar backend
 

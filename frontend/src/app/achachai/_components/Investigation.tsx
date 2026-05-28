@@ -2,6 +2,30 @@
 // @ts-nocheck
 import { useEffect, useRef, useState } from 'react';
 import { Condor, VueloDelCondor } from './Condor';
+import { RiskScore } from './RiskScore';
+import {
+  FaArrowLeft,
+  FaUserCircle,
+  FaRedoAlt,
+  FaTheaterMasks,
+  FaShieldAlt,
+  FaSearch,
+  FaChartLine,
+  FaClipboardCheck,
+  FaTrafficLight,
+  FaFileAlt,
+  FaNetworkWired,
+  FaLightbulb,
+  FaCheckCircle,
+  FaExclamationTriangle,
+  FaTimesCircle,
+  FaBan,
+  FaShareSquare,
+  FaComments,
+  FaFileInvoice,
+  FaCamera,
+  FaCarCrash,
+} from 'react-icons/fa';
 
 /* ============================================================
    MODO INVESTIGACIÓN PROFUNDA — datos REALES del backend
@@ -118,35 +142,35 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
     return [
       {
         t: '00:01',
-        icon: '🦅',
+        icon: FaSearch,
         text: `Recuperando datos del siniestro ${sid} desde DuckDB…`,
         flag: 'ok',
         detail: [`Cobertura ${cobertura} · ciudad ${ciudad}`, `Monto reclamado ${fmtUSD(monto)}`],
       },
       {
         t: '00:03',
-        icon: '📊',
+        icon: FaChartLine,
         text: `Calculando score con XGBoost + reglas de negocio…`,
         flag: tone(score),
         detail: [`Score ${score}/100 · nivel ${nivel}`],
       },
       {
         t: '00:04',
-        icon: '📋',
+        icon: FaClipboardCheck,
         text: `Aplicando 7 reglas críticas RF-01..07 y 14 señales ponderadas…`,
         flag: reglas.length ? 'warn' : 'ok',
         detail: reglaTexts,
       },
       {
         t: '00:06',
-        icon: '🚦',
+        icon: FaTrafficLight,
         text: `Evaluando ${senales.length} señales activas sobre 14 totales…`,
         flag: senales.length >= 3 ? 'warn' : 'ok',
         detail: senalTexts,
       },
       {
         t: '00:08',
-        icon: '📄',
+        icon: FaFileAlt,
         text: `Auditando ${ndocs} documentos adjuntos al expediente…`,
         flag: ndocs < 3 ? 'warn' : 'ok',
         detail:
@@ -156,21 +180,21 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
       },
       {
         t: '00:11',
-        icon: '🔍',
+        icon: FaSearch,
         text: `Buscando narrativas similares (text-embedding-3-large)…`,
         flag: sims.length ? 'warn' : 'ok',
         detail: simTexts,
       },
       {
         t: '00:14',
-        icon: '🕸',
+        icon: FaNetworkWired,
         text: `Analizando red de relaciones del proveedor ${provId}…`,
         flag: 'ok',
-        detail: [`${provNombre || '—'}${d?.proveedor?.lista_restrictiva ? ' · ⚠ lista restrictiva' : ''}`],
+        detail: [`${provNombre || '—'}${d?.proveedor?.lista_restrictiva ? ' · lista restrictiva' : ''}`],
       },
       {
         t: '00:16',
-        icon: '✨',
+        icon: FaLightbulb,
         text: `Sintetizando informe ejecutivo 360°…`,
         flag: 'ok',
         detail: [d?.explicacion || 'explicación generada por el motor de reglas'],
@@ -228,53 +252,45 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
   const subLabel = `Confianza ${nivel} · ${reglas.length} regla(s) crítica(s) · ${senales.length} señal(es) activa(s)`;
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--marfil)' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
       {/* header */}
       <div
         style={{
-          padding: '20px 32px',
-          borderBottom: '1px solid var(--line)',
+          padding: '20px 28px',
+          borderBottom: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
           gap: 18,
-          background:
-            tone === 'red'
-              ? 'linear-gradient(180deg, rgba(197,51,58,0.06), transparent)'
-              : tone === 'amber'
-              ? 'linear-gradient(180deg, rgba(212,165,116,0.10), transparent)'
-              : 'linear-gradient(180deg, rgba(74,124,89,0.06), transparent)',
+          background: 'var(--bg-card)',
+          flexWrap: 'wrap',
         }}
       >
-        <button className="btn ghost" onClick={onBack} style={{ padding: '6px 10px', fontSize: 12 }}>
-          ← Volver
+        <button className="btn ghost" onClick={onBack} style={{ padding: '6px 12px', fontSize: 12 }}>
+          <FaArrowLeft size={11} /> Volver
         </button>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 240 }}>
           <div
             style={{
               fontSize: 10.5,
-              letterSpacing: '.18em',
-              color: tone === 'red' ? 'var(--guayaba-red)' : 'var(--andes-orange)',
+              letterSpacing: '0.16em',
+              color: tone === 'red' ? 'var(--danger)' : tone === 'amber' ? 'var(--warning)' : 'var(--accent)',
               fontWeight: 700,
               textTransform: 'uppercase',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            🦅 Modo Investigación Profunda · datos reales
+            <FaShieldAlt size={11} /> Modo Investigación Profunda
           </div>
-          <h2 style={{ fontSize: 24, marginTop: 2 }}>
-            {sid} ·{' '}
-            <span
-              style={{
-                color: 'var(--ink-mute)',
-                fontFamily: 'var(--sans)',
-                fontWeight: 400,
-                fontSize: 16,
-              }}
-            >
-              {veh} · {cob.toLowerCase()} · {ciudad}
+          <h2 className="display" style={{ fontSize: 22, marginTop: 4, color: 'var(--text-primary)' }}>
+            <span className="mono">{sid}</span>{' '}
+            <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--sans)', fontWeight: 500, fontSize: 15 }}>
+              · {veh} · {cob.toLowerCase()} · {ciudad}
             </span>
           </h2>
         </div>
-        <VueloDelCondor score={score} variant="md" />
+        <RiskScore score={score} variant="md" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {detail?.siniestro?.id_asegurado && onVerAsegurado && (
             <button
@@ -282,7 +298,7 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
               onClick={() => onVerAsegurado(detail.siniestro.id_asegurado)}
               style={{ fontSize: 11 }}
             >
-              👤 Ver asegurado {detail.siniestro.id_asegurado}
+              <FaUserCircle size={12} /> Ver asegurado {detail.siniestro.id_asegurado}
             </button>
           )}
           <button
@@ -290,10 +306,10 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
             onClick={() => setCommittee((c) => !c)}
             style={{ fontSize: 11 }}
           >
-            {committee ? 'Salir Modo Comité' : '🎬 Modo Comité'}
+            <FaTheaterMasks size={12} /> {committee ? 'Salir Modo Comité' : 'Modo Comité'}
           </button>
           <button className="btn ghost" onClick={reset} style={{ fontSize: 11 }} disabled={running}>
-            ↻ Reproducir investigación
+            <FaRedoAlt size={11} /> Reproducir investigación
           </button>
         </div>
       </div>
@@ -327,7 +343,7 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
                     {step + 1} de {BITACORA.length}
                   </>
                 ) : (
-                  <>✓ {BITACORA.length} pasos completados</>
+                  <><FaCheckCircle size={11} style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--success)' }} /> {BITACORA.length} pasos completados</>
                 )}
               </div>
             </div>
@@ -396,7 +412,7 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
                   alignItems: 'center',
                 }}
               >
-                <VueloDelCondor score={score} variant="lg" sublabel={subLabel} />
+                <RiskScore score={score} variant="lg" sublabel={subLabel} />
                 <div>
                   <p style={{ fontSize: 15, lineHeight: 1.6, margin: 0 }}>
                     “{detail.explicacion || 'Sin explicación generada por el motor de reglas.'}”
@@ -559,25 +575,25 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
               <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: docsSubidos.length ? 16 : 0 }}>
                 <div
                   style={{
-                    width: 64,
-                    height: 64,
+                    width: 56,
+                    height: 56,
                     borderRadius: 12,
-                    background: detail.n_documentos < 3 ? 'rgba(212,165,116,0.18)' : 'rgba(74,124,89,0.12)',
+                    background: detail.n_documentos < 3 ? 'var(--warning-soft)' : 'var(--success-soft)',
+                    color: detail.n_documentos < 3 ? 'var(--warning)' : 'var(--success)',
                     display: 'grid',
                     placeItems: 'center',
-                    fontSize: 26,
                   }}
                 >
-                  📄
+                  <FaFileAlt size={26} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 26, fontFamily: 'var(--serif)', fontWeight: 600 }}>
+                  <div className="display" style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>
                     {detail.n_documentos} documento{detail.n_documentos === 1 ? '' : 's'} en el expediente original
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--ink-mute)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                     {detail.n_documentos < 3
-                      ? '⚠ Cobertura documental por debajo del mínimo esperado (3+).'
-                      : '✓ Cobertura documental aceptable.'}
+                      ? <><FaExclamationTriangle size={11} style={{ color: 'var(--warning)' }} /> Cobertura documental por debajo del mínimo esperado (3+).</>
+                      : <><FaCheckCircle size={11} style={{ color: 'var(--success)' }} /> Cobertura documental aceptable.</>}
                   </div>
                 </div>
                 <div style={{ marginLeft: 'auto' }}>
@@ -608,8 +624,8 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
                           background: 'var(--marfil-paper)', borderRadius: 8,
                           borderLeft: `3px solid ${tc}`,
                         }}>
-                          <span style={{ fontSize: 18 }}>
-                            {d.tipo === 'factura' ? '🧾' : d.tipo === 'imagen_dano' ? '📷' : d.tipo === 'parte_policial' ? '🚓' : '📄'}
+                          <span style={{ color: tc, display: 'grid', placeItems: 'center' }}>
+                            {d.tipo === 'factura' ? <FaFileInvoice size={16} /> : d.tipo === 'imagen_dano' ? <FaCamera size={16} /> : d.tipo === 'parte_policial' ? <FaCarCrash size={16} /> : <FaFileAlt size={16} />}
                           </span>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -794,12 +810,12 @@ function FeedbackActions({ sid, score, nivel, onBack }: any) {
       });
       const d = await r.json();
       if (d?.ok) {
-        setSent(`✓ Registrado como "${decision}". Total feedbacks acumulados: ${d.total_feedbacks}.`);
+        setSent(`Registrado como "${decision}". Total feedbacks acumulados: ${d.total_feedbacks}.`);
       } else {
-        setSent('⚠ El backend respondió sin OK. Revisa logs.');
+        setSent('El backend respondió sin OK. Revisa logs.');
       }
     } catch (e: any) {
-      setSent(`⚠ Error: ${e?.message || e}`);
+      setSent(`Error: ${e?.message || e}`);
     } finally {
       setBusy(false);
     }
@@ -811,18 +827,19 @@ function FeedbackActions({ sid, score, nivel, onBack }: any) {
         style={{
           marginTop: 14,
           fontSize: 11.5,
-          color: 'var(--ink-mute)',
+          color: 'var(--text-secondary)',
           padding: '10px 12px',
-          background: 'var(--marfil-paper)',
+          background: 'var(--warning-soft)',
           borderRadius: 8,
-          borderLeft: '3px solid var(--andes-orange)',
+          borderLeft: '3px solid var(--warning)',
+          display: 'flex', alignItems: 'center', gap: 8,
         }}
       >
-        ⚠️ Esto es una recomendación generada por el cóndor. La decisión final es del analista humano.
+        <FaExclamationTriangle size={13} style={{ color: 'var(--warning)' }} /> Esto es una recomendación generada por el cóndor. La decisión final es del analista humano.
       </div>
 
-      <div style={{ marginTop: 14, padding: 12, background: 'white', border: '1px solid var(--line)', borderRadius: 10 }}>
-        <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 6, color: 'var(--condor-wing)' }}>
+      <div style={{ marginTop: 14, padding: 14, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
           Tu decisión sobre {sid}
         </div>
         <textarea
@@ -831,40 +848,43 @@ function FeedbackActions({ sid, score, nivel, onBack }: any) {
           placeholder="Justificación (opcional)…"
           rows={2}
           style={{
-            width: '100%', boxSizing: 'border-box', padding: '6px 10px',
-            border: '1px solid var(--line-strong)', borderRadius: 6,
-            fontSize: 12, fontFamily: 'inherit', resize: 'vertical', marginBottom: 8,
+            width: '100%', boxSizing: 'border-box', padding: '8px 10px',
+            border: '1px solid var(--border-color)', borderRadius: 6,
+            background: 'var(--bg-card-soft)', color: 'var(--text-primary)',
+            fontSize: 12, fontFamily: 'inherit', resize: 'vertical', marginBottom: 10,
           }}
         />
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn" disabled={busy} onClick={() => decidir('aprobar')}>
-            ✓ Aprobar pago
+          <button className="btn success" disabled={busy} onClick={() => decidir('aprobar')}>
+            <FaCheckCircle size={12} /> Aprobar pago
           </button>
           <button className="btn ghost" disabled={busy} onClick={() => decidir('retener')}>
-            ⏸ Retener
+            <FaExclamationTriangle size={12} /> Retener
           </button>
-          <button className="btn warm" disabled={busy} onClick={() => decidir('bloquear')}>
-            🚫 Bloquear pago
+          <button className="btn danger" disabled={busy} onClick={() => decidir('bloquear')}>
+            <FaBan size={12} /> Bloquear pago
           </button>
           <button className="btn ghost" disabled={busy} onClick={() => decidir('escalar')}>
-            📤 Escalar a comité
+            <FaShareSquare size={12} /> Escalar a comité
           </button>
           <span style={{ flex: 1 }} />
           <button className="btn ghost" onClick={onBack}>
-            💬 Volver al cóndor
+            <FaComments size={12} /> Volver al cóndor
           </button>
         </div>
         {sent && (
           <div
             style={{
               marginTop: 10,
-              padding: '6px 10px',
-              background: sent.startsWith('✓') ? 'rgba(74,124,89,0.10)' : 'rgba(197,51,58,0.08)',
+              padding: '8px 12px',
+              background: !sent.startsWith('Error') && !sent.startsWith('El backend') ? 'var(--success-soft)' : 'var(--danger-soft)',
               borderRadius: 6,
               fontSize: 11.5,
-              color: sent.startsWith('✓') ? 'var(--paramo-green)' : 'var(--guayaba-red)',
+              color: !sent.startsWith('Error') && !sent.startsWith('El backend') ? 'var(--success)' : 'var(--danger)',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
             }}
           >
+            {!sent.startsWith('Error') && !sent.startsWith('El backend') ? <FaCheckCircle size={12} /> : <FaExclamationTriangle size={12} />}
             {sent}
           </div>
         )}
@@ -1024,22 +1044,23 @@ function DynamicActions({ detail, similares }: any) {
 }
 
 function BitacoraStep({ b, latest }: any) {
-  const bg = b.flag === 'warn' ? 'rgba(212,165,116,0.08)' : 'white';
+  const bg = b.flag === 'warn' ? 'var(--warning-soft)' : 'var(--bg-card)';
+  const Icon = typeof b.icon === 'function' ? b.icon : null;
   return (
     <div
       className="fade-up"
       style={{
-        borderLeft: `2px solid var(--${b.flag === 'warn' ? 'andes-orange' : 'paramo-green'})`,
+        borderLeft: `2px solid var(--${b.flag === 'warn' ? 'warning' : 'success'})`,
         paddingLeft: 12,
         marginBottom: 12,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--ink-mute)' }}>
-          ⏱ {b.t}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+          {b.t}
         </span>
-        <span style={{ fontSize: 13 }}>{b.icon}</span>
-        {!latest && <span style={{ color: 'var(--paramo-green)', fontSize: 11 }}>✓</span>}
+        {Icon && <span style={{ color: b.flag === 'warn' ? 'var(--warning)' : 'var(--primary)', display: 'grid', placeItems: 'center' }}><Icon size={11} /></span>}
+        {!latest && <FaCheckCircle size={10} style={{ color: 'var(--success)' }} />}
       </div>
       <div
         style={{

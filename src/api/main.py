@@ -50,6 +50,8 @@ from src.document_analysis import (  # noqa: E402
     analyze_factura,
     analyze_imagen_dano,
     analyze_documento_generico,
+    analyze_parte_policial,
+    analyze_declaracion_accidente,
 )
 
 PROC = ROOT / "data" / "processed"
@@ -163,7 +165,7 @@ def get_casos(
     }[orden]
 
     total = con.execute(f"SELECT COUNT(*) FROM s {where_clause}").fetchone()[0]
-    rows = con.execute(f"""
+    _df = con.execute(f"""
         SELECT id_siniestro, id_poliza, id_asegurado, id_proveedor, id_vehiculo,
                cobertura, estado, fecha_ocurrencia, sucursal,
                monto_reclamado_usd, monto_pagado_usd, ciudad_evento,
@@ -171,7 +173,10 @@ def get_casos(
         FROM s {where_clause}
         ORDER BY {order_clause}
         LIMIT {limit} OFFSET {offset}
-    """).df().to_dict("records")
+    """).df()
+    # Convertir NaN/NaT a None para que FastAPI pueda serializar a JSON valido
+    _df = _df.astype(object).where(_df.notna(), None)
+    rows = _df.to_dict("records")
     return {
         "total": total,
         "limit": limit,
@@ -1478,6 +1483,7 @@ async def evaluar_completo(
     foto_dano: UploadFile | None = File(None),
     parte_policial_file: UploadFile | None = File(None),
     denuncia_file: UploadFile | None = File(None),
+    declaracion_accidente_file: UploadFile | None = File(None),
 ):
     """Evaluacion INTEGRAL: combina datos del siniestro + analisis de documentos + foto.
 
@@ -1516,15 +1522,18 @@ async def evaluar_completo(
             return
         try:
             file_bytes = await file.read()
+            ctx = {"fecha_ocurrencia": fecha_hoy, "descripcion": descripcion,
+                   "ciudad_evento": ciudad_evento, "sucursal": sucursal}
             if tipo == "factura":
                 r = analyze_factura(file_bytes, fecha_ocurrencia=fecha_hoy)
             elif tipo == "imagen_dano":
                 r = analyze_imagen_dano(file_bytes, descripcion)
+            elif tipo == "parte_policial":
+                r = analyze_parte_policial(file_bytes, contexto_siniestro=ctx)
+            elif tipo == "declaracion_accidente":
+                r = analyze_declaracion_accidente(file_bytes, contexto_siniestro=ctx)
             else:
-                r = analyze_documento_generico(
-                    file_bytes, tipo=tipo,
-                    contexto_siniestro={"fecha_ocurrencia": fecha_hoy, "descripcion": descripcion},
-                )
+                r = analyze_documento_generico(file_bytes, tipo=tipo, contexto_siniestro=ctx)
             d = r.to_dict()
             d["_etiqueta"] = name
             d["_nombre_archivo"] = file.filename
@@ -1545,6 +1554,7 @@ async def evaluar_completo(
     await _safe_analyze("Foto del dano", foto_dano, "imagen_dano")
     await _safe_analyze("Parte policial", parte_policial_file, "parte_policial")
     await _safe_analyze("Denuncia", denuncia_file, "denuncia")
+    await _safe_analyze("Declaracion de accidente", declaracion_accidente_file, "declaracion_accidente")
 
     # ===== 3) Score combinado — PONDERADO POR SEVERIDAD =====
     score_tabular = int(eval_tabular.get("score", 0))
