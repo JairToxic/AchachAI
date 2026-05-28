@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Condor, VueloDelCondor } from './Condor';
+import { CondorSilhouette } from './CondorSilhouette';
+import { EcuadorHeatMap } from './EcuadorHeatMap';
 
 /* Estilos para markdown del condor: tablas + listas con look del design system */
 const MD_STYLES: React.CSSProperties = {
@@ -137,6 +139,34 @@ function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: str
             animation: "scan-beam 3s linear infinite",
           }}/>
 
+          {/* cóndor planeando sobre el HUD mientras piensa */}
+          <div style={{
+            position: "absolute", top: 4, left: 0, right: 0, height: 40,
+            pointerEvents: "none", overflow: "hidden", zIndex: 0,
+          }}>
+            <div style={{
+              position: "absolute", top: 4,
+              animation: "condor-glide 7s linear infinite",
+              filter: "drop-shadow(0 0 8px rgba(232,122,79,0.55))",
+            }}>
+              <CondorSilhouette width={60} color="var(--andes-orange)" style={{ opacity: 0.75 }}/>
+            </div>
+          </div>
+
+          {/* segundo cóndor más pequeño, en sentido contrario */}
+          <div style={{
+            position: "absolute", bottom: 40, left: 0, right: 0, height: 28,
+            pointerEvents: "none", overflow: "hidden", zIndex: 0,
+          }}>
+            <div style={{
+              position: "absolute", top: 0,
+              animation: "condor-glide-fast 9s linear infinite 1.5s",
+              filter: "drop-shadow(0 0 6px rgba(232,122,79,0.4))",
+            }}>
+              <CondorSilhouette width={36} color="var(--pink-dawn)" flip style={{ opacity: 0.5 }}/>
+            </div>
+          </div>
+
           {/* Header HUD */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, position: "relative" }}>
             <div className="mono" style={{ fontSize: 10, letterSpacing: ".18em", color: "var(--andes-orange)", display: "flex", alignItems: "center", gap: 6 }}>
@@ -261,38 +291,267 @@ function JarvisStream({ phase, tools, currentTool }: { phase: string; tools: str
 const ID_REGEX = /(SIN-\d{4,7})/g;
 const PROV_REGEX = /(PRV-(?:NEW)?\d{3,5})/g;
 const NIVEL_REGEX = /\b(ROJO|AMARILLO|VERDE)\b/g;
-const SCORE_REGEX = /\b(\d{1,3})\s*\/\s*100\b/g;
+const SCORE_PAIR_REGEX = /\b(\d{1,3})\s*\/\s*100\b/g;
 
-function extractEvidence(text: string): { ids: string[]; provs: string[]; scores: number[]; niveles: string[] } {
-  return {
-    ids: Array.from(new Set((text.match(ID_REGEX) || []))),
-    provs: Array.from(new Set((text.match(PROV_REGEX) || []))),
-    scores: Array.from(new Set((text.match(SCORE_REGEX) || []).map(s => parseInt(s)))),
-    niveles: Array.from(new Set((text.match(NIVEL_REGEX) || []))),
-  };
+type CaseEv = { id: string; score: number | null; nivel: string | null };
+
+/**
+ * Parsea cada linea/fila de tabla markdown que contenga un SIN-ID
+ * y devuelve {id, score, nivel} por caso.
+ *
+ *   "| SIN-108538 | VERDE | 36 | Choque | ..."
+ *      -> { id: SIN-108538, nivel: VERDE, score: 36 }
+ */
+function extractCasesFromText(text: string): CaseEv[] {
+  const out: CaseEv[] = [];
+  const seen = new Set<string>();
+  // Separamos por lineas (incluye filas de tabla markdown porque cada fila esta en su linea)
+  const lines = text.split(/\r?\n/);
+  for (const rawLine of lines) {
+    const ids = rawLine.match(ID_REGEX);
+    if (!ids) continue;
+    // Si la linea tiene mas de un SIN-id, usamos el primero como ancla
+    // (las filas de tabla normales solo tienen 1, las listas inline tambien)
+    const id = ids[0];
+    if (seen.has(id)) continue;
+    seen.add(id);
+
+    // Buscamos nivel y score SOLO en esta linea, no en todo el texto
+    const nivelMatch = rawLine.match(NIVEL_REGEX);
+    const nivel = nivelMatch ? nivelMatch[0] : null;
+
+    // 1) Si la linea explicita "NN/100", usalo
+    const pair = rawLine.match(SCORE_PAIR_REGEX);
+    let score: number | null = null;
+    if (pair && pair.length > 0) {
+      score = parseInt(pair[0]);
+    } else {
+      // 2) Score sin "/100": buscar numero 0..100 que no sea parte de un monto
+      //    ni de un anio (4 digitos). Tomamos el PRIMER int 0..100 despues del id
+      //    e ignoramos cifras con $ o "USD" cerca, y digitos pegados a otros digitos.
+      const after = rawLine.slice(rawLine.indexOf(id) + id.length);
+      const tokens = after.match(/(?<![\d$])(\d{1,3})(?!\d)/g) || [];
+      for (const t of tokens) {
+        const n = parseInt(t);
+        if (n >= 0 && n <= 100) { score = n; break; }
+      }
+    }
+    out.push({ id, score, nivel });
+  }
+  return out;
 }
 
-/* Genera un score determinístico (estable) a partir del id para que se vea consistente */
-function scoreFromId(id: string, fallback: number): number {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  // mantener cerca del fallback ±10
-  const jitter = (hash % 21) - 10;
-  return Math.max(0, Math.min(100, fallback + jitter));
+function extractEvidence(text: string): { cases: CaseEv[]; provs: string[]; niveles: string[] } {
+  const cases = extractCasesFromText(text);
+  const provs = Array.from(new Set((text.match(PROV_REGEX) || [])));
+  // Niveles SOLO de los casos detectados, no del texto suelto
+  // (evita que la palabra "AMARILLO/ROJO" en un comentario meta inyecte chips)
+  const nivelesDeCasos = Array.from(new Set(cases.map(c => c.nivel).filter(Boolean) as string[]));
+  return { cases, provs, niveles: nivelesDeCasos };
+}
+
+/* Score visual cuando no pudimos parsear uno real */
+function scoreVisualPorNivel(nivel: string | null): number {
+  if (nivel === 'ROJO') return 82;
+  if (nivel === 'AMARILLO') return 52;
+  if (nivel === 'VERDE') return 22;
+  return 50;
+}
+
+/**
+ * Cuando el agente llama ranking_ciudades, fetchea el ranking y muestra
+ * el mapa de calor de Ecuador con tooltips y leyenda.
+ */
+function CityHeatmapAuto() {
+  const API = (typeof window !== "undefined" && (window as any).NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const [data, setData] = useState<any[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${API}/ciudades/ranking?top_n=15`)
+      .then(r => r.json())
+      .then(d => setData(d.top || []))
+      .catch(e => setErr(String(e?.message || e)));
+  }, []);
+
+  if (err) return (
+    <div style={{ padding: "10px 18px", fontSize: 11, color: "var(--guayaba-red)" }}>
+      No pude cargar el mapa de Ecuador: {err}
+    </div>
+  );
+  if (!data) return (
+    <div style={{ padding: "10px 18px", fontSize: 11, color: "var(--ink-mute)" }}>
+      🗺️ Dibujando mapa de calor de Ecuador…
+    </div>
+  );
+  if (data.length === 0) return null;
+
+  return (
+    <div style={{ padding: "10px 18px 14px" }}>
+      <EcuadorHeatMap
+        data={data}
+        metric="tasa"
+        title="Mapa de calor · Ecuador (tasa de alertas históricas por ciudad)"
+      />
+    </div>
+  );
+}
+
+/**
+ * Card flotante con botón de descarga cuando el agente generó un reporte PDF.
+ */
+function ReportePdfCard({ r }: { r: any }) {
+  const API = (typeof window !== "undefined" && (window as any).NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const fullUrl = r.url_descarga?.startsWith("http") ? r.url_descarga : `${API}${r.url_descarga}`;
+  const toneByTipo: Record<string, string> = {
+    ejecutivo: "var(--andes-orange)",
+    antifraude: "var(--guayaba-red)",
+    auditoria: "var(--paramo-green)",
+    directorio: "var(--mountain-blue)",
+  };
+  const iconByTipo: Record<string, string> = {
+    ejecutivo: "📋", antifraude: "🕵️", auditoria: "📑", directorio: "💼",
+  };
+  const tone = toneByTipo[r.tipo] || "var(--andes-orange)";
+
+  return (
+    <div style={{
+      padding: "14px 18px 16px",
+      background: "linear-gradient(180deg, var(--marfil-paper), white)",
+      borderTop: "1px solid var(--line)",
+    }}>
+      <div style={{
+        padding: 14, borderRadius: 10,
+        background: "white",
+        border: `1.5px solid ${tone}40`, borderLeft: `4px solid ${tone}`,
+        display: "flex", alignItems: "center", gap: 14,
+      }}>
+        <div style={{
+          fontSize: 32, width: 52, height: 52, borderRadius: 10,
+          background: `${tone}15`, display: "grid", placeItems: "center",
+        }}>{iconByTipo[r.tipo] || "📄"}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 10.5, color: tone, letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 700 }}>
+            📄 Reporte PDF generado
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--condor-wing)", marginTop: 2 }}>
+            {r.titulo}
+            <span className="chip mono" style={{ fontSize: 9, marginLeft: 6, background: `${tone}15`, color: tone }}>
+              {r.nivel_casos}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--ink-mute)", marginTop: 2 }}>
+            Audiencia: {r.audiencia} · click para abrir e imprimir como PDF
+          </div>
+        </div>
+        <a
+          href={fullUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            padding: "10px 18px", borderRadius: 8, textDecoration: "none",
+            background: `linear-gradient(135deg, ${tone}, ${tone}dd)`,
+            color: "white", fontWeight: 600, fontSize: 13,
+            boxShadow: `0 4px 12px ${tone}40`,
+            whiteSpace: "nowrap",
+            display: "flex", alignItems: "center", gap: 6,
+          }}
+        >
+          ⬇ Descargar PDF
+        </a>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Card visual con resultado de evaluar_caso_hipotetico desde el chat.
+ */
+function EvaluacionCard({ e, onInvestigate }: { e: any; onInvestigate?: (id: string) => void }) {
+  const nivel = e.nivel || "VERDE";
+  const tone = nivel === "ROJO" ? "var(--guayaba-red)"
+            : nivel === "AMARILLO" ? "var(--andes-orange)"
+            : "var(--paramo-green)";
+  const reglas = e.reglas_criticas_activadas || [];
+  const senales = e.senales_activadas || [];
+
+  return (
+    <div style={{
+      padding: "14px 18px 16px",
+      background: "linear-gradient(180deg, var(--marfil-paper), white)",
+      borderTop: "1px solid var(--line)",
+    }}>
+      <div style={{
+        padding: 16, borderRadius: 10,
+        background: "white", border: `1.5px solid ${tone}40`,
+        borderTop: `3px solid ${tone}`,
+      }}>
+        <div style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 14, alignItems: "center" }}>
+          {/* Score gauge mini */}
+          <svg viewBox="0 0 100 100" style={{ width: 90, height: 90 }}>
+            <circle cx="50" cy="50" r="42" fill="none" stroke="var(--line)" strokeWidth="6" />
+            <circle
+              cx="50" cy="50" r="42" fill="none" stroke={tone} strokeWidth="6"
+              strokeDasharray={`${(e.score/100) * 263.9} 263.9`}
+              strokeDashoffset="65.97"
+              transform="rotate(-90 50 50)"
+              strokeLinecap="round"
+              style={{ transition: "stroke-dasharray 0.8s ease" }}
+            />
+            <text x="50" y="52" textAnchor="middle" fontSize="24" fontWeight="600" fill={tone} fontFamily="var(--serif)">
+              {e.score}
+            </text>
+            <text x="50" y="68" textAnchor="middle" fontSize="8" fill="var(--ink-mute)">/100</text>
+          </svg>
+
+          <div>
+            <div style={{ fontSize: 10.5, letterSpacing: ".12em", textTransform: "uppercase", fontWeight: 700, color: tone }}>
+              ⚡ Evaluación en vivo
+            </div>
+            <div style={{ fontSize: 18, fontFamily: "var(--serif)", fontWeight: 600, color: tone, marginTop: 2 }}>
+              {nivel}
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--ink-soft)", marginTop: 4, lineHeight: 1.45 }}>
+              {e.input_resumido}
+            </div>
+            <div style={{ fontSize: 10.5, color: "var(--ink-mute)", marginTop: 4 }}>
+              {reglas.length} regla(s) crítica(s) · {senales.length} señal(es) · {e.puntos_totales_senales || 0} pts señales
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+            {reglas.slice(0, 3).map((r: any) => (
+              <span key={r.codigo} className="chip red mono" style={{ fontSize: 9 }}>{r.codigo}</span>
+            ))}
+            {senales.slice(0, 3).map((s: any) => (
+              <span key={s.id} className="chip amber mono" style={{ fontSize: 9 }}>S{s.id} +{s.puntos}</span>
+            ))}
+          </div>
+        </div>
+
+        {e.accion_sugerida && (
+          <div style={{
+            marginTop: 12, padding: "8px 12px",
+            background: `${tone}12`, borderLeft: `3px solid ${tone}`, borderRadius: 6,
+            fontSize: 12, color: "var(--ink-soft)",
+          }}>
+            <strong style={{ color: tone }}>🦅 Acción sugerida:</strong> {e.accion_sugerida}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function EvidencePreview({ summary, onInvestigate }: { summary: string; onInvestigate?: (id: string) => void }) {
   const ev = extractEvidence(summary);
-  if (ev.ids.length === 0 && ev.provs.length === 0) return null;
+  if (ev.cases.length === 0 && ev.provs.length === 0) return null;
 
-  // Score base por mención de nivel
-  const baseScore = ev.niveles.includes("ROJO") ? 80
-                  : ev.niveles.includes("AMARILLO") ? 52 : 22;
-
-  // Hasta 6 casos detectados → cada uno con score estable
-  const cards = ev.ids.slice(0, 6).map((id, i) => ({
-    id,
-    score: ev.scores[i] || scoreFromId(id, baseScore),
+  const cards = ev.cases.slice(0, 6).map(c => ({
+    id: c.id,
+    score: c.score != null ? c.score : scoreVisualPorNivel(c.nivel),
+    nivel: c.nivel,
+    scoreReal: c.score != null,
   }));
 
   return (
@@ -322,7 +581,10 @@ function EvidencePreview({ summary, onInvestigate }: { summary: string; onInvest
       {cards.length > 0 && (
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: ev.provs.length > 0 ? 14 : 0 }}>
           {cards.map(c => {
-            const level = c.score >= 70 ? "red" : c.score >= 40 ? "amber" : "green";
+            // El nivel manda. Si no hay nivel, caemos al score.
+            const level = c.nivel
+              ? (c.nivel === 'ROJO' ? 'red' : c.nivel === 'AMARILLO' ? 'amber' : 'green')
+              : (c.score >= 70 ? 'red' : c.score >= 40 ? 'amber' : 'green');
             const accent = level === "red" ? "var(--guayaba-red)" : level === "amber" ? "var(--andes-ocher)" : "var(--paramo-green)";
             return (
               <button key={c.id}
@@ -332,7 +594,7 @@ function EvidencePreview({ summary, onInvestigate }: { summary: string; onInvest
                   border: `1px solid ${accent}40`,
                   borderTop: `3px solid ${accent}`,
                   borderRadius: 12, padding: "12px 14px",
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
                   transition: "transform .15s, box-shadow .15s, border-color .15s",
                   minWidth: 130,
                 }}
@@ -341,6 +603,11 @@ function EvidencePreview({ summary, onInvestigate }: { summary: string; onInvest
               >
                 <VueloDelCondor score={c.score} variant="sm" />
                 <span className="mono" style={{ fontSize: 11, color: accent, fontWeight: 700, letterSpacing: ".04em" }}>{c.id}</span>
+                {c.nivel && (
+                  <span className={`chip ${level}`} style={{ fontSize: 9, padding: '1px 6px' }}>
+                    {c.nivel}{!c.scoreReal && ' · score~'}
+                  </span>
+                )}
                 <span style={{ fontSize: 10, color: "var(--ink-mute)", display: "flex", alignItems: "center", gap: 3 }}>
                   🦅 investigar profundo
                 </span>
@@ -553,6 +820,15 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
       setActiveTools([]);
       setCurrentPhase("");
 
+      // Extraer resultados completos de tools especiales (reportes, evaluaciones)
+      const toolsFull = data.tools_used || [];
+      const reporteResult = toolsFull.find((t: any) =>
+        t.tool === "generar_reporte_pdf" && t.result_full
+      )?.result_full;
+      const evaluacionResult = toolsFull.find((t: any) =>
+        t.tool === "evaluar_caso_hipotetico" && t.result_full
+      )?.result_full;
+
       const payload = {
         summary: data.response || "Sin respuesta.",
         tools: tools,
@@ -565,6 +841,8 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
           time: `${data.iterations || 1} it`,
           price: `~$${((data.tokens || 0) * 0.000002).toFixed(4)}`,
         },
+        reporteResult,
+        evaluacionResult,
       };
       setMessages(m => [...m, { role: "condor", kind: "answer", payload, time: now() }]);
     } catch (err) {
@@ -588,30 +866,45 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", height: "100%", background: "var(--marfil)" }}>
-      {/* main conversation column */}
-      <div style={{ display: "flex", flexDirection: "column", minHeight: 0, position: "relative" }}>
+      {/* main conversation column — el watermark global vive en page.tsx <main> */}
+      <div style={{ display: "flex", flexDirection: "column", minHeight: 0, position: "relative", overflow: "hidden" }}>
         {/* central condor stage (shrinks when chat scrolls) */}
         <div style={{
           padding: "28px 48px 8px", display: "flex", alignItems: "center", gap: 18,
           borderBottom: "1px solid var(--line)",
+          position: "relative", zIndex: 1, background: "var(--marfil)",
+          overflow: "hidden",
         }}>
-          <div style={{ position: "relative" }}>
+          {/* silueta decorativa en el header — más visible, alineada a la derecha */}
+          <div style={{
+            position: "absolute", right: -40, top: -10, bottom: -10,
+            display: "flex", alignItems: "center",
+            pointerEvents: "none", zIndex: 0,
+          }}>
+            <CondorSilhouette
+              width={260}
+              color="var(--mountain-blue)"
+              style={{ opacity: 0.22 }}
+            />
+          </div>
+
+          <div style={{ position: "relative", zIndex: 1 }}>
             <Condor size={56} mood={thinking ? "think" : "idle"} tone="wing" />
             <span style={{ position: "absolute", bottom: 0, right: -2, width: 10, height: 10, borderRadius: "50%", background: "var(--paramo-green)", border: "2px solid var(--marfil)" }}/>
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, position: "relative", zIndex: 1 }}>
             <h2 style={{ fontSize: 22, marginBottom: 2 }}>Conversación con el Cóndor</h2>
             <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>
               Modelo: <span className="mono">gpt-5-mini</span> · 10 tools activas · contexto: cartera vehicular 25.460 siniestros
             </div>
           </div>
-          <div className="chip blue">
+          <div className="chip blue" style={{ position: "relative", zIndex: 1 }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--paramo-green)" }}/> Conectado a Azure
           </div>
         </div>
 
         {/* messages */}
-        <div ref={scrollerRef} style={{ flex: 1, overflow: "auto", padding: "20px 48px 12px" }}>
+        <div ref={scrollerRef} style={{ flex: 1, overflow: "auto", padding: "20px 48px 12px", position: "relative", zIndex: 1 }}>
           {messages.map((m, i) => (
             <Message key={i} msg={m} onInvestigate={onInvestigate} />
           ))}
@@ -619,7 +912,7 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
         </div>
 
         {/* prompt suggestions + input */}
-        <div style={{ borderTop: "1px solid var(--line)", padding: "12px 48px 20px", background: "var(--marfil-paper)" }}>
+        <div style={{ borderTop: "1px solid var(--line)", padding: "12px 48px 20px", background: "var(--marfil-paper)", position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
             {suggestions.map((p, i) => (
               <button key={i}
@@ -782,6 +1075,17 @@ function Message({ msg, onInvestigate }) {
 
             {/* Evidencia visual auto-detectada en el texto: tarjetas Vuelo del Cóndor */}
             <EvidencePreview summary={a.summary} onInvestigate={onInvestigate} />
+
+            {/* Mapa de calor de Ecuador cuando el agente uso ranking_ciudades */}
+            {a.tools?.includes("ranking_ciudades") && (
+              <CityHeatmapAuto />
+            )}
+
+            {/* Botón de descarga cuando el agente generó un reporte PDF */}
+            {a.reporteResult && <ReportePdfCard r={a.reporteResult} />}
+
+            {/* Card de evaluación cuando el agente evaluó un caso hipotético */}
+            {a.evaluacionResult && <EvaluacionCard e={a.evaluacionResult} onInvestigate={onInvestigate} />}
 
             {a.tableRows && (
               <div style={{ padding: "10px 18px" }}>

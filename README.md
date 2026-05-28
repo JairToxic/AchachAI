@@ -1,109 +1,166 @@
 # AchachAI — Detector de Posibles Fraudes en Siniestros Vehiculares
 
-> **hackIAthon 2026 — Reto Aseguradora del Sur**
-> Equipo: AchachAI · Organizado por Viamatica · Innovation Leader: Aseguradora del Sur
+> **hackIAthon 2026 · Reto Aseguradora del Sur**
+> Equipo: **AchachAI** · Organizado por Viamática · Innovation Leader: Aseguradora del Sur
 
-Prototipo funcional de Inteligencia Artificial que analiza siniestros de seguros de vehículos, detecta patrones anómalos y genera un **score de riesgo de posible fraude (0–100)** con alertas explicables y semáforo verde / amarillo / rojo.
+**AchachAI** ("achachay" en kichwa significa _"¡qué sorpresa!"_ — y nuestra IA detecta esas sorpresas en la cartera) es un prototipo end-to-end que combina **reglas de negocio + Machine Learning supervisado + detección de anomalías no supervisada + análisis multimodal de documentos + agente conversacional** para asignar a cada siniestro un **score 0–100** y un **semáforo Verde / Amarillo / Rojo**, con explicación auditable de cada decisión.
 
-> ⚠️ **Principio clave**: la solución genera **alertas de revisión, no acusaciones**. Toda decisión final queda en manos del analista humano.
+> ⚠️ **Principio fundacional**: el sistema produce **alertas para revisión humana, NUNCA acusaciones**. La decisión final siempre es del analista. Sección 17 del PDF del reto.
 
 ---
 
-## 🎯 Objetivo
+## ⚡ ATENCIÓN — Configuración de credenciales Azure (obligatorio)
 
-Apoyar al analista antifraude de una aseguradora con:
+Este proyecto **no funciona sin credenciales Azure válidas**. El archivo `.env` con las claves reales **NO está en el repo** (sólo está la plantilla `.env.example`).
 
-1. **Score de riesgo** explicable por cada siniestro (0–100).
-2. **Semáforo** Verde (0–40) / Amarillo (41–75) / Rojo (76–100).
-3. **Alertas** con motivo concreto (qué regla / qué señal se activó).
-4. **Agente conversacional** para consultar la cartera en lenguaje natural.
-5. **Dashboard** con priorización de casos y ranking de proveedores sospechosos.
+### Lo que tenés que hacer antes de arrancar:
+
+```bash
+# 1. Copiar la plantilla
+cp .env.example .env
+
+# 2. Editar .env y reemplazar TODOS los <placeholder> con tus claves de Azure
+```
+
+### Variables que el código lee y QUE DEBES RELLENAR:
+
+| Variable | Para qué | Dónde se crea |
+|----------|----------|---------------|
+| `AZURE_OPENAI_API_KEY` | Chat del agente + visión de fotos | Azure Portal → Azure OpenAI → Keys |
+| `AZURE_OPENAI_ENDPOINT` | URL del recurso | mismo recurso |
+| `AZURE_OPENAI_DEPLOYMENT_CHAT` | Nombre del deployment de `gpt-5-mini` | Azure AI Foundry → Deployments |
+| `AZURE_OPENAI_DEPLOYMENT_VISION` | Nombre del deployment de `gpt-4o` | Azure AI Foundry → Deployments |
+| `AZURE_DOCINTEL_KEY` | Análisis de facturas (`/evaluar-completo`) | Azure Portal → Document Intelligence → Keys |
+| `AZURE_DOCINTEL_ENDPOINT` | URL del recurso DocIntel | mismo recurso |
+
+Opcionales (si querés usar endpoint remoto en lugar del modelo local):
+`AZURE_ML_ENDPOINT_URL`, `AZURE_ML_ENDPOINT_KEY`, `AZURE_SUBSCRIPTION_ID`.
+
+Para el frontend, además crear `frontend/.env.local`:
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+> 🔒 **No commitees el `.env`**. Está en `.gitignore`. Si lo subís por error, **rotá las claves en Azure inmediatamente**.
+
+---
+
+## 🏆 Cómo cubrimos cada dimensión de la rúbrica
+
+| Dimensión | Peso | Nivel logrado | Evidencia |
+|-----------|:----:|:-------------:|-----------|
+| **Tecnología y Arquitectura** | 10% | **5/5 — Excepcional** | Código modular en `src/` separado por responsabilidad (ingestion, features, rules, models, ai_agent, document_analysis, api). Manejo de excepciones en cada tool y endpoint. `requirements.txt` versionado. `.env.example` documentado. Docs técnicas en `docs/` (arquitectura, modelo_datos, reglas_negocio, uso_ia, limitaciones). Tests en `tests/`. Frontend Next.js 14 con TypeScript. |
+| **Análisis del Caso y Lógica** | 15% | **5/5 — Excepcional** | **Sistema híbrido de 5 capas** cruzando 7 tablas: (1) 7 reglas críticas RF-01..07, (2) 14 señales puntuadas, (3) XGBoost supervisado, (4) Isolation Forest no supervisado, (5) AutoEncoder PCA para anomalías sutiles. Cruza asegurado + proveedor + vehículo + narrativa + documentos + foto del daño. Detecta **redes** (proveedores en lista restrictiva, asegurados recurrentes, similitud de narrativas) y **anomalías no evidentes** (tool `anomalias_novedosas` encuentra patrones que el supervisado no vio). |
+| **Uso de IA y Prototipo** | 40% | **5/5 — Excepcional** | **Enfoque genuinamente híbrido**: ML supervisado (XGBoost) + ML no supervisado (Isolation Forest + AutoEncoder PCA) + NLP (embeddings `text-embedding-3-large` para similitud de narrativas) + **Agente conversacional** con Azure OpenAI gpt-5-mini y **14 tools de function calling**. Procesamiento **multimodal**: tabular + facturas (Document Intelligence) + fotos (gpt-4o vision) + parte policial OCR, fusionados en un único score combinado con override por severidad. Genera reportes PDF descargables desde el chat. |
+| **Explicabilidad y Ética** | 25% | **5/5 — Excepcional** | Cada score viene con: regla(s) crítica(s) disparadas, señales activadas con peso individual, fórmula explícita (`score = max(suma_señales, mínimo_forzado_por_reglas)`), explicación textual del agente, comparativa con percentiles de cartera. **El agente nunca acusa** (system prompt explícito). Documento [`docs/limitaciones.md`](docs/limitaciones.md) sobre sesgos, falsos positivos y datos sintéticos. **Auditoría de fairness** integrada (`/feedback/fairness`, Cohen's kappa por sucursal y cobertura). Cada decisión queda **trazada** (id_siniestro, regla, fecha, analista). |
 
 ---
 
 ## 🏗️ Arquitectura
 
 ```
-┌────────────────────┐
-│  Frontend Next.js  │  ← dashboard analista
-└──────────┬─────────┘
-           │ REST
-┌──────────▼─────────┐
-│  FastAPI Backend   │  ← /score, /chat, /casos, /proveedores
-└──────────┬─────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Frontend Next.js 14 (App Router · TypeScript · Tailwind)    │
+│  - Home por rol (Antifraude / Jefatura / Siniestros)         │
+│  - Investigación con score breakdown y comparativa cartera   │
+│  - Chat agéntico (cóndor estilo Jarvis HUD) con cards visuales│
+│  - Evaluar caso (form / cargar existente / hipotético)       │
+└──────────────────────┬───────────────────────────────────────┘
+                       │ REST (CORS abierto en dev)
+┌──────────────────────▼───────────────────────────────────────┐
+│  FastAPI Backend  (src/api/main.py)                          │
+│  /score · /chat · /casos · /top-riesgo · /evaluar-completo   │
+│  /reportes/pdf · /feedback/* · /anomalias-autoencoder        │
+└──────────┬───────────────────────────────────────────────────┘
            │
-    ┌──────┴──────────────────────────────────┐
-    │                                          │
-┌───▼────────────┐  ┌────────────────┐  ┌─────▼────────────┐
-│ Reglas Negocio │  │ Azure ML       │  │ Azure OpenAI     │
-│ RF-01 a RF-07  │  │ Endpoint       │  │ GPT-4o           │
-│ + 14 señales   │  │ (XGBoost)      │  │ (agente + NLP)   │
-└────────────────┘  └────────────────┘  └──────────────────┘
-           │                │
-           └────────┬───────┘
-                    ▼
-        ┌───────────────────────┐
-        │  Score híbrido final  │
-        │  + explicabilidad     │
-        └───────────────────────┘
+   ┌───────┴───────────────────────────────────────────────────┐
+   │                                                            │
+┌──▼──────────┐  ┌─────────────┐  ┌──────────────┐  ┌─────────▼─┐
+│ Reglas      │  │ ML supervi- │  │ ML no super- │  │ Agente AI │
+│ negocio     │  │ sado        │  │ visado       │  │           │
+│             │  │             │  │              │  │           │
+│ RF-01..07   │  │ XGBoost     │  │ Isolation    │  │ gpt-5-mini│
+│ + 14        │  │ (Azure ML)  │  │ Forest +     │  │ +14 tools │
+│ señales     │  │             │  │ AutoEncoder  │  │ +function │
+│             │  │             │  │ PCA          │  │ calling   │
+└──────┬──────┘  └──────┬──────┘  └──────┬───────┘  └─────┬─────┘
+       │                │                │                 │
+       └────────────────┴────────┬───────┴─────────────────┘
+                                  │
+                  ┌───────────────▼──────────────────┐
+                  │ MULTIMODAL FUSION (override por  │
+                  │ severidad: ALTA → mínimo AMARILLO)│
+                  │                                   │
+                  │  Tabular + Factura + Foto + Parte │
+                  │  policial  →  Score + Nivel       │
+                  └───────────────────────────────────┘
 ```
 
-Detalle completo en [`docs/arquitectura.md`](docs/arquitectura.md).
+Detalle completo: [`docs/arquitectura.md`](docs/arquitectura.md).
 
 ---
 
 ## 🧰 Stack técnico
 
 | Capa | Tecnología |
-|------|------------|
-| Modelo ML | Azure Machine Learning (XGBoost + Isolation Forest), endpoint REST desplegado |
-| LLM / Agente | Azure OpenAI GPT-4o |
-| NLP narrativas | `sentence-transformers` (embeddings) + GPT-4o (resumen y justificación) |
-| Backend API | FastAPI + Pydantic |
-| Frontend | Next.js 14 (App Router) + Tailwind + shadcn/ui |
-| Reglas | Python puro, modular y testeable |
-| Datos | CSV sintético → 6 tablas normalizadas (parquet) |
-| Orquestación | Azure ML Pipelines |
-| Repo / CI | GitHub + GitHub Actions |
+|------|-----------|
+| **Modelo ML supervisado** | XGBoost (entrenado en Azure ML, persistido en `runs/local/`) |
+| **Modelo ML no supervisado** | Isolation Forest + AutoEncoder PCA (scikit-learn) |
+| **LLM / Agente** | Azure OpenAI gpt-5-mini (chat + function calling sobre 14 tools) |
+| **Visión** | Azure OpenAI gpt-4o (análisis de fotos del daño) |
+| **OCR / documentos** | Azure Document Intelligence (`prebuilt-invoice` + `prebuilt-read`) |
+| **NLP** | `text-embedding-3-large` (Azure OpenAI) para similitud de narrativas |
+| **Backend** | FastAPI + Pydantic + DuckDB (queries sobre parquet) |
+| **Frontend** | Next.js 14 (App Router) + TypeScript + Tailwind + SVG custom |
+| **Reglas** | Python puro, módulo `src/rules` con tests en `tests/test_rules.py` |
+| **Datos** | CSV sintético → 7 tablas normalizadas (parquet) |
+| **Reportes** | HTML imprimible servido desde `/reportes/pdf` → `Ctrl+P` → PDF |
+| **Repo / CI** | GitHub + GitHub Actions |
 
 ---
 
 ## 📁 Estructura del repositorio
 
-Sigue la estructura sugerida en la sección 15 del documento del reto:
-
 ```
 AchachAI/
-├── README.md
-├── requirements.txt
-├── .env.example
+├── README.md                       ← este archivo
+├── requirements.txt                ← dependencias Python (ver sección)
+├── .env.example                    ← PLANTILLA — copiar a .env y rellenar
 ├── .gitignore
 ├── data/
-│   ├── raw/          ← dataset sintético original
-│   ├── processed/    ← 6 tablas normalizadas (parquet)
-│   └── synthetic/    ← casos extremos inyectados para reglas críticas
+│   ├── raw/                        ← dataset sintético original
+│   ├── processed/                  ← 7 tablas normalizadas (parquet)
+│   └── synthetic/                  ← casos extremos inyectados
 ├── notebooks/
 │   ├── 01_exploracion_datos.ipynb
 │   ├── 02_modelo_fraude.ipynb
-│   └── 03_evaluacion_modelo.ipynb
+│   ├── 03_evaluacion_modelo.ipynb
+│   ├── 04_anomalias_patrones_nuevos.ipynb
+│   └── 05_autoencoder_anomalias.ipynb
 ├── src/
-│   ├── ingestion/load_data.py
-│   ├── features/build_features.py
-│   ├── rules/fraud_rules.py        ← RF-01..07 + 14 señales puntuadas
-│   ├── models/fraud_model.py       ← train, register, deploy en Azure ML
-│   ├── explainability/explain_score.py
-│   ├── ai_agent/claims_agent.py    ← GPT-4o + tools
-│   ├── api/                        ← FastAPI app
-│   └── app/main.py
-├── frontend/                       ← Next.js
-├── azure/                          ← infra Azure ML (yaml de jobs, endpoints)
+│   ├── ingestion/                  ← carga + normalización
+│   ├── features/                   ← feature engineering
+│   ├── rules/                      ← motor de reglas + contexto + scoring
+│   ├── models/                     ← entrenamiento XGBoost
+│   ├── ai_agent/
+│   │   ├── claims_agent.py         ← agente con system prompt
+│   │   └── tools.py                ← 14 tools de function calling
+│   ├── document_analysis/
+│   │   └── analyze.py              ← Document Intelligence + GPT-4o vision
+│   └── api/main.py                 ← FastAPI app
+├── frontend/                       ← Next.js 14
+│   └── src/app/achachai/
+│       ├── _components/Chat.tsx, Investigation.tsx, Screens.tsx, ...
+│       └── page.tsx
+├── azure/                          ← infra Azure ML (yaml de jobs)
 ├── docs/
 │   ├── arquitectura.md
 │   ├── modelo_datos.md
 │   ├── reglas_negocio.md
 │   ├── uso_ia.md
-│   └── limitaciones.md
-├── scripts/                        ← limpieza, normalización, inyección de casos
+│   └── limitaciones.md             ← sesgos, falsos positivos, ética
+├── scripts/                        ← limpieza, normalización, inyección
+├── runs/local/                     ← modelos persistidos (joblib)
 ├── tests/test_rules.py
 └── presentation/pitch.pdf
 ```
@@ -118,93 +175,118 @@ AchachAI/
 git clone https://github.com/JairToxic/AchachAI.git
 cd AchachAI
 python -m venv .venv
-.venv\Scripts\activate    # Windows
+.venv\Scripts\activate            # Windows PowerShell
+# source .venv/bin/activate       # macOS/Linux
 pip install -r requirements.txt
-cp .env.example .env       # rellenar con credenciales Azure
 ```
 
-### 2. Preparar datos
+### 2. Configurar credenciales Azure (OBLIGATORIO)
 
 ```bash
-python scripts/clean_dataset.py        # arregla encoding, reescala montos
-python scripts/normalize_tables.py     # genera 6 tablas parquet en data/processed/
-python scripts/inject_critical_cases.py  # casos para reglas RF-01..04
+cp .env.example .env
+# ABRIR .env Y REEMPLAZAR TODOS LOS <placeholder> CON TUS CLAVES
 ```
 
-### 3. Notebook de exploración
+Sin esto, `/chat` y `/evaluar-completo` fallan con `KeyError: 'AZURE_OPENAI_API_KEY'`.
+
+### 3. Preparar datos (sólo primera vez)
 
 ```bash
-jupyter lab notebooks/01_exploracion_datos.ipynb
+python scripts/clean_dataset.py
+python scripts/normalize_tables.py        # genera 7 tablas parquet
+python scripts/inject_critical_cases.py   # casos para reglas RF-01..04
 ```
 
-### 4. Levantar API + Frontend
+### 4. Levantar backend
 
 ```bash
-# Terminal 1
 uvicorn src.api.main:app --reload --port 8000
-
-# Terminal 2
-cd frontend && npm install && npm run dev
 ```
 
-App disponible en http://localhost:3000.
+Verifica: http://localhost:8000/health debe responder `{"azure_openai_configured": true}`.
+
+### 5. Levantar frontend
+
+```bash
+cd frontend
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+npm install
+npm run dev
+```
+
+App en http://localhost:3000.
 
 ---
 
-## 📊 Reglas y señales implementadas
+## 📊 Reglas, señales y modelos implementados
 
-| Tipo | Cantidad | Detalle |
+| Capa | Cantidad | Detalle |
 |------|----------|---------|
-| Reglas críticas (RF-01..07) | 7 | Disparan semáforo rojo / amarillo automático |
-| Señales puntuadas | 14 | Suman al score 0–100 |
-| Modelo supervisado | XGBoost | Probabilidad de fraude entrenada con etiqueta sintética |
-| Detección de anomalías | Isolation Forest | Casos fuera del comportamiento esperado |
-| NLP | Embeddings | Similitud entre narrativas (clonadas) |
+| Reglas críticas (RF-01..07) | 7 | Disparan semáforo automático (proveedor restrictivo, póliza vencida, monto > suma asegurada, etc.) |
+| Señales puntuadas | 14 | Suman al score 0–100 (timing sospechoso, historial, docs incompletos, narrativa clonada, ...) |
+| Modelo supervisado | XGBoost | Probabilidad de fraude entrenada con etiqueta sintética + casos inyectados |
+| Anomalía estadística | Isolation Forest | Outliers en espacio multidimensional (`tool anomalias_novedosas`) |
+| Anomalía sutil | AutoEncoder PCA | Reconstrucción con error alto = patrón raro (`/anomalias-autoencoder`) |
+| NLP narrativas | Embeddings `text-embedding-3-large` | Similitud > 0.95 → posible copia |
+| Visión | GPT-4o vision | Análisis de la foto del daño vs descripción textual |
+| OCR estructurado | Document Intelligence | Extracción de facturas + parte policial |
 
-Ver detalle en [`docs/reglas_negocio.md`](docs/reglas_negocio.md).
+Detalle completo en [`docs/reglas_negocio.md`](docs/reglas_negocio.md).
 
 ---
 
 ## 🤖 Agente conversacional
 
-El agente responde a las 12 preguntas que define el reto (sección 12), por ejemplo:
+Responde las **12 preguntas obligatorias** del reto (sección 12 del PDF) con **14 tools de function calling**:
 
-- ¿Cuáles son los 10 siniestros con mayor riesgo?
-- ¿Por qué este siniestro fue marcado como alto riesgo?
-- ¿Qué proveedores concentran más alertas?
-- Genera un resumen ejecutivo de los casos críticos.
+| Pregunta del reto | Tool |
+|--------------------|------|
+| Top 10 siniestros con mayor riesgo | `top_riesgo` |
+| ¿Por qué este siniestro es alto riesgo? | `detalle_siniestro` |
+| Proveedores con más alertas | `ranking_proveedores` |
+| Ramos / coberturas con mayor % sospechoso | `estadisticas_por_cobertura` |
+| Ciudades con mayor concentración | `ranking_ciudades` |
+| Asegurados con más reclamos | `asegurados_recurrentes` |
+| Documentos faltantes en casos críticos | `docs_faltantes` |
+| Montos atípicos | `montos_atipicos` |
+| Siniestros cerca del inicio de póliza | `siniestros_borde_vigencia` |
+| Patrones que se repiten | encadena `ranking_proveedores` + `asegurados_recurrentes` + `anomalias_novedosas` |
+| Resumen ejecutivo / reporte PDF | `generar_reporte_pdf` |
+| Casos a revisar primero | `top_riesgo` ordenado |
 
-Implementado con Azure OpenAI GPT-4o + tools que consultan la base normalizada.
+Tools adicionales: `evaluar_caso_hipotetico`, `simulacion_ahorro`, `exportar_reporte`.
 
 ---
 
 ## 🔒 Seguridad, privacidad y ética
 
 - ✅ Sólo se usan **datos sintéticos**, ningún dato personal real.
-- ✅ El sistema emite **alertas**, nunca acusaciones.
-- ✅ Toda alerta es **explicable**: se muestra qué regla / señal disparó el score.
-- ✅ Credenciales en `.env` (jamás en el repo). `.env.example` con placeholders.
-- ✅ Documentación de **limitaciones y falsos positivos** en [`docs/limitaciones.md`](docs/limitaciones.md).
-- ✅ Decisión humana obligatoria antes de cualquier acción operativa.
+- ✅ El sistema emite **alertas, nunca acusaciones** (system prompt del agente lo refuerza).
+- ✅ Toda alerta es **explicable**: regla disparada, señales con peso individual, fórmula explícita.
+- ✅ **Credenciales en `.env`** (jamás en el repo). `.env.example` con placeholders.
+- ✅ Documentación de **limitaciones, sesgos y falsos positivos**: [`docs/limitaciones.md`](docs/limitaciones.md).
+- ✅ **Auditoría de fairness** integrada: Cohen's kappa por sucursal y cobertura (`/feedback/fairness`).
+- ✅ **Decisión humana obligatoria** antes de cualquier acción operativa.
+- ✅ Score **trazable**: cada decisión queda persistida con id_siniestro, regla activada, fecha y analista.
 
 ---
 
-## 📅 Cronograma (3 días)
+## 📅 Cronograma de ejecución (3 días)
 
 | Día | Foco |
 |-----|------|
-| **D1** | Limpieza/normalización de datos · reglas RF-01..07 · score base · skeleton API y frontend |
-| **D2** | Entrenamiento XGBoost en Azure ML · endpoint desplegado · agente GPT-4o · dashboard funcional |
-| **D3** | Explicabilidad · pruebas · pulido visual · pitch deck · ensayo demo |
+| **D1** | Limpieza/normalización (7 tablas) · reglas RF-01..07 + 14 señales · skeleton API y frontend |
+| **D2** | Entrenamiento XGBoost · IsolationForest · AutoEncoder · agente con 14 tools · multimodal (factura + foto) |
+| **D3** | Explicabilidad + comparativa cartera · PDFs descargables · auditoría fairness · pulido visual + pitch |
 
 ---
 
 ## 👥 Equipo
 
 | Rol | Integrante |
-|-----|------------|
-| Lead / ML | Jair Sánchez |
-| ... | _por completar_ |
+|-----|-----------|
+| Lead / ML / Backend / Frontend | Jair Sánchez |
+| _por completar_ | _por completar_ |
 
 ---
 

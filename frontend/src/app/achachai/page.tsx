@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Condor, CondorBubble, LearningBar } from './_components/Condor';
+import { CondorSilhouette } from './_components/CondorSilhouette';
 import { ChatScreen } from './_components/Chat';
 import { InvestigationScreen } from './_components/Investigation';
 import {
@@ -9,18 +10,31 @@ import {
   TejidoScreen,
   ReportsScreen,
   RolesScreen,
+  EvaluarScreen,
+  AseguradoScreen,
+  AjustesScreen,
+  AnomaliasScreen,
+  PrevencionScreen,
+  ExplorarScreen,
+  CargarCasosScreen,
   ROLES,
 } from './_components/Screens';
 import { RoleHome } from './_components/RoleHomes';
 
 const NAV = [
-  { id: 'home',      label: 'Mi vista',          glyph: '✦', hint: 'rol' },
-  { id: 'chat',      label: 'Cóndor agéntico',   glyph: '▲', hint: 'CU-05' },
-  { id: 'kanban',    label: 'Bandeja',           glyph: '❒', hint: 'CU-03' },
-  { id: 'documents', label: 'Documentos',        glyph: '✎', hint: 'CU-01' },
-  { id: 'tejido',    label: 'Tejido del fraude', glyph: '◇', hint: 'Red' },
-  { id: 'reports',   label: 'Reportes',          glyph: '▦', hint: 'CU-06' },
-  { id: 'roles',     label: 'Cambiar de rol',    glyph: '⇄', hint: '7 vistas' },
+  { id: 'home',      label: 'Mi vista',                glyph: '✦', hint: 'inicio' },
+  { id: 'chat',      label: 'Hablar con el cóndor',    glyph: '▲', hint: 'chat IA' },
+  { id: 'kanban',    label: 'Bandeja priorizada',      glyph: '❒', hint: 'pendientes' },
+  { id: 'explorar',  label: 'Explorar siniestros',     glyph: '🔎', hint: 'buscar' },
+  { id: 'cargar',    label: 'Cargar casos nuevos',     glyph: '📥', hint: 'CSV+form' },
+  { id: 'evaluar',   label: 'Evaluar caso nuevo',      glyph: '⚡', hint: 'simular' },
+  { id: 'prevencion',label: 'Prevención',              glyph: '🛡', hint: 'temprano' },
+  { id: 'anomalias', label: 'Patrones inusuales',      glyph: '✨', hint: 'descubrir' },
+  { id: 'documents', label: 'Analizar documento',      glyph: '✎', hint: 'subir' },
+  { id: 'tejido',    label: 'Red de relaciones',       glyph: '◇', hint: 'conexiones' },
+  { id: 'reports',   label: 'Reportes',                glyph: '▦', hint: 'exportar' },
+  { id: 'ajustes',   label: 'Ajustes',                 glyph: '⚙', hint: 'pesos' },
+  { id: 'roles',     label: 'Cambiar de rol',          glyph: '⇄', hint: '7 vistas' },
 ];
 
 interface SidebarProps {
@@ -163,6 +177,7 @@ function Sidebar({ active, onNav, role }: SidebarProps) {
 export default function AchachaiApp() {
   const [screen, setScreen] = useState<string>('home');
   const [caseId, setCaseId] = useState<string>('SIN-100029');
+  const [aseId, setAseId] = useState<string>('');
   const [role, setRole] = useState<string>('antifraude');
 
   function pickRole(r: string) {
@@ -175,24 +190,87 @@ export default function AchachaiApp() {
     setScreen('investigation');
   }
 
+  function verAsegurado(id: string) {
+    setAseId(id);
+    setScreen('asegurado');
+  }
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', height: '100vh' }}>
       <Sidebar active={screen} onNav={setScreen} role={role} />
 
-      <main style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
-        <LearningBar />
+      <main style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
+        {/* watermark global: cóndor planeando detrás de TODAS las pantallas */}
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute', inset: 0, zIndex: 0,
+            pointerEvents: 'none', overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <CondorSilhouette
+            width={820}
+            color="var(--condor-wing)"
+            style={{
+              opacity: 0.07,
+              animation: 'condor-float 9s ease-in-out infinite',
+              transformOrigin: 'center',
+            }}
+          />
+        </div>
 
-        <div style={{ flex: 1, minHeight: 0 }}>
+        {/* cóndor extra planeando permanente en la esquina superior derecha */}
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 56,
+            pointerEvents: 'none', overflow: 'hidden', zIndex: 0,
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute', top: 14,
+              animation: 'condor-glide 14s linear infinite',
+              filter: 'drop-shadow(0 0 8px rgba(232,122,79,0.35))',
+            }}
+          >
+            <CondorSilhouette width={42} color="var(--andes-orange)" style={{ opacity: 0.45 }} />
+          </div>
+        </div>
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <LearningBar />
+        </div>
+
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', zIndex: 1 }}>
           {screen === 'home' && (
             <RoleHome role={role} onInvestigate={investigate} onGoChat={() => setScreen('chat')} />
           )}
           {screen === 'chat' && <ChatScreen role={role} onInvestigate={investigate} />}
           {screen === 'investigation' && (
-            <InvestigationScreen caseId={caseId} onBack={() => setScreen('kanban')} />
+            <InvestigationScreen
+              caseId={caseId}
+              onBack={() => setScreen('kanban')}
+              onVerAsegurado={verAsegurado}
+            />
+          )}
+          {screen === 'asegurado' && (
+            <AseguradoScreen
+              aseguradoId={aseId}
+              onBack={() => setScreen(caseId ? 'investigation' : 'kanban')}
+              onInvestigate={investigate}
+            />
           )}
           {screen === 'kanban' && <KanbanScreen onInvestigate={investigate} />}
-          {screen === 'documents' && <DocumentsScreen />}
-          {screen === 'tejido' && <TejidoScreen />}
+          {screen === 'explorar' && <ExplorarScreen onInvestigate={investigate} />}
+          {screen === 'cargar' && <CargarCasosScreen onInvestigate={investigate} />}
+          {screen === 'evaluar' && <EvaluarScreen />}
+          {screen === 'prevencion' && <PrevencionScreen onInvestigate={investigate} />}
+          {screen === 'anomalias' && <AnomaliasScreen onInvestigate={investigate} />}
+          {screen === 'ajustes' && <AjustesScreen />}
+          {screen === 'documents' && <DocumentsScreen onInvestigate={investigate} />}
+          {screen === 'tejido' && <TejidoScreen onInvestigate={investigate} onVerAsegurado={verAsegurado} />}
           {screen === 'reports' && <ReportsScreen />}
           {screen === 'roles' && <RolesScreen currentRole={role} onPick={pickRole} />}
         </div>
