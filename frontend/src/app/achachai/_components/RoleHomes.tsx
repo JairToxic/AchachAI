@@ -102,6 +102,27 @@ function SectionTitle({ children, action }) {
   );
 }
 
+function Stat({ label, value, tone = "wing" }) {
+  const c = {
+    red: "var(--guayaba-red)",
+    green: "var(--paramo-green)",
+    orange: "var(--andes-orange)",
+    blue: "var(--mountain-blue)",
+    wing: "var(--condor-wing)",
+  }[tone];
+  return (
+    <div style={{
+      padding: "10px 12px",
+      background: "var(--marfil-paper)",
+      borderRadius: 8,
+      border: "1px solid var(--line)",
+    }}>
+      <div style={{ fontSize: 9.5, color: "var(--ink-mute)", letterSpacing: ".1em", textTransform: "uppercase" }}>{label}</div>
+      <div className="serif tabular" style={{ fontSize: 22, fontWeight: 500, color: c, lineHeight: 1, marginTop: 4 }}>{value}</div>
+    </div>
+  );
+}
+
 /* ============================================================
    1. ANTIFRAUDE — focused on a single critical case (datos reales)
    ============================================================ */
