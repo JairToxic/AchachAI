@@ -93,43 +93,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ## 🏗️ Arquitectura
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Frontend Next.js 14 (App Router · TypeScript · Tailwind)    │
-│  - Home por rol (Antifraude / Jefatura / Siniestros)         │
-│  - Investigación con score breakdown y comparativa cartera   │
-│  - Chat agéntico (cóndor estilo Jarvis HUD) con cards visuales│
-│  - Evaluar caso (form / cargar existente / hipotético)       │
-└──────────────────────┬───────────────────────────────────────┘
-                       │ REST (CORS abierto en dev)
-┌──────────────────────▼───────────────────────────────────────┐
-│  FastAPI Backend  (src/api/main.py)                          │
-│  /score · /chat · /casos · /top-riesgo · /evaluar-completo   │
-│  /reportes/pdf · /feedback/* · /anomalias-autoencoder        │
-└──────────┬───────────────────────────────────────────────────┘
-           │
-   ┌───────┴───────────────────────────────────────────────────┐
-   │                                                            │
-┌──▼──────────┐  ┌─────────────┐  ┌──────────────┐  ┌─────────▼─┐
-│ Reglas      │  │ ML supervi- │  │ ML no super- │  │ Agente AI │
-│ negocio     │  │ sado        │  │ visado       │  │           │
-│             │  │             │  │              │  │           │
-│ RF-01..07   │  │ XGBoost     │  │ Isolation    │  │ gpt-5-mini│
-│ + 14        │  │ (Azure ML)  │  │ Forest +     │  │ +14 tools │
-│ señales     │  │             │  │ AutoEncoder  │  │ +function │
-│             │  │             │  │ PCA          │  │ calling   │
-└──────┬──────┘  └──────┬──────┘  └──────┬───────┘  └─────┬─────┘
-       │                │                │                 │
-       └────────────────┴────────┬───────┴─────────────────┘
-                                  │
-                  ┌───────────────▼──────────────────┐
-                  │ MULTIMODAL FUSION (override por  │
-                  │ severidad: ALTA → mínimo AMARILLO)│
-                  │                                   │
-                  │  Tabular + Factura + Foto + Parte │
-                  │  policial  →  Score + Nivel       │
-                  └───────────────────────────────────┘
-```
+<img width="1536" height="1024" alt="Complete architecture of AchachAI" src="https://github.com/user-attachments/assets/edcf26ab-3900-4e4d-9185-e8f21305ab57" />
+
 
 Detalle completo: [`docs/arquitectura.md`](docs/arquitectura.md).
 
@@ -367,6 +332,10 @@ Tools adicionales: `evaluar_caso_hipotetico`, `simulacion_ahorro`, `exportar_rep
 | **Cristina Molina** | Datos sintéticos multi-ramo (39.960 siniestros), motor de reglas RF-01..07, calibración del modelo XGBoost, etiquetado y validación |
 
 ---
+
+## Demo
+
+https://youtu.be/Yx5kiuJ7PCU
 
 ## 📄 Licencia
 
