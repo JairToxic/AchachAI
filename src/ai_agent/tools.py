@@ -46,33 +46,37 @@ def _df_to_records(df: pd.DataFrame, limit: int = 50) -> list[dict]:
     return out
 
 
-# ===================== TOOL 1: top_riesgo =====================
-def top_riesgo(
-    limit: int = 10,
-    nivel: str | None = None,
-    ramo: str | None = None,
-    ciudad: str | None = None,
-) -> dict:
-    """Devuelve los siniestros con mayor score combinado, ordenados desc.
+# ===================== TOOL 1: top_riesgo (con cache en memoria) =====================
+_TOP_RIESGO_CACHE: dict = {"ts": 0.0, "mtime": 0.0, "evaluated": []}
+_TOP_RIESGO_TTL_SEC = 300  # 5 min
 
-    Usa el motor de reglas en vivo si los scores no estan precomputados,
-    o lee de una tabla cache si existe.
+
+def _compute_top_riesgo_all() -> list[dict]:
+    """Ejecuta la evaluacion costosa (sample 2000 + reglas) UNA vez.
+
+    Devuelve la lista completa de evaluados (sin filtros ni limites).
+    Se cachea por _TOP_RIESGO_TTL_SEC; si los parquets de siniestros cambian,
+    se invalida automaticamente via mtime check.
     """
+    import time
     from src.rules import build_contexto, evaluate_siniestro
+
+    sin_path = PROC / "siniestros.parquet"
+    mtime = sin_path.stat().st_mtime if sin_path.exists() else 0.0
+    now = time.time()
+    if (_TOP_RIESGO_CACHE["evaluated"]
+        and (now - _TOP_RIESGO_CACHE["ts"]) < _TOP_RIESGO_TTL_SEC
+        and _TOP_RIESGO_CACHE["mtime"] == mtime):
+        return _TOP_RIESGO_CACHE["evaluated"]
 
     con = _con()
     proveedores = con.execute("SELECT * FROM proveedores").df()
     siniestros = con.execute("SELECT * FROM siniestros").df()
 
-    # Cargar similitudes si existen (top-K)
     sim_path = PROC / "similitudes.parquet"
-    sim_df = None
-    if sim_path.exists():
-        sim_df = pd.read_parquet(sim_path)
-
+    sim_df = pd.read_parquet(sim_path) if sim_path.exists() else None
     ctx = build_contexto(siniestros, proveedores, similitudes_df=sim_df)
 
-    # Cargar todas las tablas a memoria para joins rapidos
     pol = con.execute("SELECT * FROM polizas").df().set_index("id_poliza")
     ase = con.execute("SELECT * FROM asegurados").df().set_index("id_asegurado")
     veh = con.execute("SELECT * FROM vehiculos").df().set_index("id_vehiculo")
@@ -83,36 +87,39 @@ def top_riesgo(
         lambda d: d.to_dict("records"), include_groups=False
     ).to_dict()
 
-    # Filtrado preliminar
-    f = siniestros
-    if ramo:
-        f = f[f["ramo"].str.contains(ramo, case=False, na=False)]
-    if ciudad:
-        f = f[f["ciudad_evento"].str.contains(ciudad, case=False, na=False)]
+    # Sample estratificado por ramo para que el cache sirva a todos los ramos
+    sample_rows = []
+    for ramo_val, grp in siniestros.groupby("ramo"):
+        n_sample = min(len(grp), max(1500, int(len(grp) * 0.5)))
+        sample_rows.append(grp.sample(min(n_sample, 1500), random_state=42))
+    f = pd.concat(sample_rows, ignore_index=True)
 
-    # Sample si hay muchos (para no evaluar 15K)
-    if len(f) > 2000:
-        f = f.sample(2000, random_state=42)
+    def _ok(v) -> bool:
+        return v is not None and not (isinstance(v, float) and pd.isna(v)) and str(v).strip() != ""
 
-    resultados = []
+    evaluated = []
     for _, sin in f.iterrows():
         try:
+            id_veh = sin.get("id_vehiculo")
+            id_cond = sin.get("id_conductor")
+            veh_dict = (veh.loc[id_veh].to_dict() | {"id_vehiculo": id_veh}) if (_ok(id_veh) and id_veh in veh.index) else None
+            cond_dict = (cond.loc[id_cond].to_dict() | {"id_conductor": id_cond}) if (_ok(id_cond) and id_cond in cond.index) else None
+
             r = evaluate_siniestro(
                 siniestro=sin.to_dict(),
                 poliza=pol.loc[sin["id_poliza"]].to_dict() | {"id_poliza": sin["id_poliza"]},
                 asegurado=ase.loc[sin["id_asegurado"]].to_dict() | {"id_asegurado": sin["id_asegurado"]},
-                vehiculo=veh.loc[sin["id_vehiculo"]].to_dict() | {"id_vehiculo": sin["id_vehiculo"]},
+                vehiculo=veh_dict,
                 proveedor=prov.loc[sin["id_proveedor"]].to_dict() | {"id_proveedor": sin["id_proveedor"]},
-                conductor=cond.loc[sin["id_conductor"]].to_dict() | {"id_conductor": sin["id_conductor"]},
+                conductor=cond_dict,
                 documentos=docs_por_sin.get(sin["id_siniestro"], []),
                 ctx=ctx,
             )
-            if nivel and r["nivel"] != nivel.upper():
-                continue
-            resultados.append({
+            evaluated.append({
                 "id_siniestro": sin["id_siniestro"],
                 "score": r["score"],
                 "nivel": r["nivel"],
+                "ramo": sin.get("ramo"),
                 "cobertura": sin["cobertura"],
                 "monto_reclamado_usd": float(sin["monto_reclamado_usd"]),
                 "ciudad": sin["ciudad_evento"],
@@ -123,8 +130,49 @@ def top_riesgo(
         except Exception:
             continue
 
-    resultados.sort(key=lambda x: -x["score"])
-    return {"total_evaluados": len(f), "top": resultados[:limit]}
+    evaluated.sort(key=lambda x: -x["score"])
+    _TOP_RIESGO_CACHE["evaluated"] = evaluated
+    _TOP_RIESGO_CACHE["ts"] = now
+    _TOP_RIESGO_CACHE["mtime"] = mtime
+    return evaluated
+
+
+def top_riesgo(
+    limit: int = 10,
+    nivel: str | None = None,
+    ramo: str | None = None,
+    ciudad: str | None = None,
+) -> dict:
+    """Devuelve los siniestros con mayor score combinado, ordenados desc.
+
+    Cacheado en memoria por 5 min: la primera llamada toma ~15-20s evaluando
+    2000+ siniestros; las siguientes (con cualquier filtro) son instantaneas.
+    """
+    evaluated = _compute_top_riesgo_all()
+
+    # Niveles aceptados: "ROJO", "AMARILLO", "VERDE", o lista "ROJO,AMARILLO"
+    # Default: si el usuario no pasa nivel, devolvemos ROJO + AMARILLO (lo que merece revision)
+    if nivel:
+        niveles_filtro = {n.strip().upper() for n in nivel.split(",") if n.strip()}
+    else:
+        niveles_filtro = {"ROJO", "AMARILLO"}
+
+    # Filtrar del cache (rapido: solo iteracion sobre lista en memoria)
+    resultados = []
+    for c in evaluated:
+        if c["nivel"] not in niveles_filtro:
+            continue
+        if ramo and not (c.get("ramo") or "").lower().startswith(ramo.lower()):
+            continue
+        if ciudad and ciudad.lower() not in (c.get("ciudad") or "").lower():
+            continue
+        resultados.append(c)
+
+    return {
+        "total_evaluados": len(evaluated),
+        "niveles_filtrados": sorted(niveles_filtro),
+        "top": resultados[:limit],
+    }
 
 
 # ===================== TOOL 2: detalle_siniestro =====================
@@ -140,11 +188,20 @@ def detalle_siniestro(id_siniestro: str) -> dict:
         return {"error": f"No encontre el siniestro {id_siniestro}"}
 
     sin = sin_df.iloc[0].to_dict()
-    pol = con.execute(f"SELECT * FROM polizas WHERE id_poliza = '{sin['id_poliza']}'").df().iloc[0].to_dict()
-    ase = con.execute(f"SELECT * FROM asegurados WHERE id_asegurado = '{sin['id_asegurado']}'").df().iloc[0].to_dict()
-    veh = con.execute(f"SELECT * FROM vehiculos WHERE id_vehiculo = '{sin['id_vehiculo']}'").df().iloc[0].to_dict()
-    prov = con.execute(f"SELECT * FROM proveedores WHERE id_proveedor = '{sin['id_proveedor']}'").df().iloc[0].to_dict()
-    cond = con.execute(f"SELECT * FROM conductores WHERE id_conductor = '{sin['id_conductor']}'").df().iloc[0].to_dict()
+
+    def _first_or_empty(query: str) -> dict:
+        d = con.execute(query).df()
+        return d.iloc[0].to_dict() if not d.empty else {}
+
+    def _ok(v) -> bool:
+        return v is not None and not (isinstance(v, float) and pd.isna(v)) and str(v).strip() != ""
+
+    pol = _first_or_empty(f"SELECT * FROM polizas WHERE id_poliza = '{sin['id_poliza']}'")
+    ase = _first_or_empty(f"SELECT * FROM asegurados WHERE id_asegurado = '{sin['id_asegurado']}'")
+    # Hogar y Salud no tienen vehiculo ni conductor
+    veh = _first_or_empty(f"SELECT * FROM vehiculos WHERE id_vehiculo = '{sin['id_vehiculo']}'") if _ok(sin.get("id_vehiculo")) else {}
+    prov = _first_or_empty(f"SELECT * FROM proveedores WHERE id_proveedor = '{sin['id_proveedor']}'")
+    cond = _first_or_empty(f"SELECT * FROM conductores WHERE id_conductor = '{sin['id_conductor']}'") if _ok(sin.get("id_conductor")) else {}
     docs = con.execute(f"SELECT * FROM documentos WHERE id_siniestro = '{id_siniestro}'").df().to_dict("records")
 
     all_sin = con.execute("SELECT * FROM siniestros").df()
@@ -168,8 +225,8 @@ def detalle_siniestro(id_siniestro: str) -> dict:
         "asegurado": {"id": ase["id_asegurado"], "segmento": ase.get("segmento"),
                       "score": ase.get("score_cliente_simulado"),
                       "reclamos_12m": ase.get("reclamos_ultimos_12_meses")},
-        "vehiculo": {"marca": veh.get("marca"), "modelo": veh.get("modelo"),
-                     "anio": int(veh.get("anio_vehiculo", 0))},
+        "vehiculo": ({"marca": veh.get("marca"), "modelo": veh.get("modelo"),
+                      "anio": int(veh.get("anio_vehiculo") or 0)} if veh else None),
         "proveedor": {"nombre": prov.get("nombre"), "tipo": prov.get("tipo"),
                       "lista_restrictiva": bool(prov.get("lista_restrictiva"))},
         "n_documentos": len(docs),
@@ -717,7 +774,7 @@ def evaluar_caso_hipotetico(
         "etiqueta_fraude_simulada": 0, "caso_inyectado": False,
     }
     pol = {"id_poliza": "POL-HIP", "suma_asegurada_usd": suma_asegurada_usd,
-           "prima_anual_usd": suma_asegurada_usd * 0.04,
+           "prima_usd": suma_asegurada_usd * 0.04,
            "deducible_usd": suma_asegurada_usd * 0.02}
     ase = {"id_asegurado": "ASE-HIP", "segmento": "Personas",
            "reclamos_ultimos_12_meses": historial_siniestros_asegurado,
@@ -829,13 +886,13 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "top_riesgo",
-            "description": "Devuelve los siniestros con mayor score de posible fraude. Util para 'top N casos sospechosos'.",
+            "description": "Devuelve los siniestros con mayor score de posible fraude. Cuando NO se pasa nivel, devuelve ROJO + AMARILLO por default (los que requieren revision). Usar 'nivel=ROJO' solo si el usuario pide explicitamente 'solo rojos'. Soporta 3 ramos: Vehiculos, Hogar, Salud.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "description": "Cuantos casos devolver (default 10)", "default": 10},
-                    "nivel": {"type": "string", "enum": ["VERDE", "AMARILLO", "ROJO"], "description": "Filtrar por nivel del semaforo"},
-                    "ramo": {"type": "string", "description": "Filtrar por ramo (ej. Vehiculos)"},
+                    "nivel": {"type": "string", "description": "Filtrar por nivel del semaforo. Acepta 'ROJO', 'AMARILLO', 'VERDE' o lista separada por coma 'ROJO,AMARILLO'. Si se omite, default = ROJO + AMARILLO."},
+                    "ramo": {"type": "string", "enum": ["Vehiculos", "Vehículos", "Hogar", "Salud"], "description": "Filtrar por ramo de seguro. Para preguntas sobre hospitalizacion/clinicas/cirugia usar 'Salud'. Para incendios/daño por agua/robo en domicilio usar 'Hogar'."},
                     "ciudad": {"type": "string", "description": "Filtrar por ciudad del evento"},
                 },
             },

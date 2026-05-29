@@ -4,6 +4,56 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Condor, VueloDelCondor } from './Condor';
+import { CondorLogo } from './CondorLogo';
+import { EmptyState } from './EmptyState';
+import {
+  FaSearch,
+  FaEye,
+  FaUpload,
+  FaDownload,
+  FaFileAlt,
+  FaFileInvoice,
+  FaCamera,
+  FaClipboardCheck,
+  FaShieldAlt,
+  FaExclamationTriangle,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaUserShield,
+  FaUserTie,
+  FaChartBar,
+  FaChartLine,
+  FaCog,
+  FaBriefcase,
+  FaUsers,
+  FaNetworkWired,
+  FaInbox,
+  FaPlus,
+  FaTrash,
+  FaTimes,
+  FaInfoCircle,
+  FaLightbulb,
+  FaBolt,
+  FaRedo,
+  FaSave,
+  FaBrain,
+  FaFlag,
+  FaArrowUp,
+  FaUserCircle,
+  FaPlug,
+  FaMapMarkerAlt,
+  FaFolderOpen,
+  FaEdit,
+  FaCar,
+  FaCalendarAlt,
+  FaDollarSign,
+  FaPencilAlt,
+  FaPaperclip,
+  FaCarCrash,
+  FaPlay,
+  FaBan,
+  FaGraduationCap,
+} from 'react-icons/fa';
 
 const useSc = useState;
 const useScE = useEffect;
@@ -105,12 +155,12 @@ export function KanbanScreen({ onInvestigate }) {
       {/* header */}
       <div style={{ padding: "20px 32px 16px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Condor size={28} mood={loadErr ? "alert" : "speak"} tone={loadErr ? "red" : "orange"} />
+          <CondorLogo size={32} />
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: 22 }}>
               Bandeja priorizada
               {loading && <span style={{ fontSize: 11, color: "var(--andes-orange)", marginLeft: 8 }}>● el cóndor está evaluando los 15K siniestros…</span>}
-              {loadErr && <span style={{ fontSize: 11, color: "var(--guayaba-red)", marginLeft: 8 }}>⚠ backend caído ({loadErr})</span>}
+              {loadErr && <span style={{ fontSize: 11, color: "var(--danger)", marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 4 }}><FaExclamationTriangle size={11} /> backend caído ({loadErr})</span>}
             </h2>
             <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>
               {liveData.rojo[0] ? (
@@ -127,8 +177,7 @@ export function KanbanScreen({ onInvestigate }) {
           {/* filtros */}
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <select
-              className="chip outline"
-              style={{ padding: "6px 10px", border: "1px solid var(--line-strong)" }}
+              style={{ padding: "6px 10px", border: "1px solid var(--border-color)", background: "var(--bg-card)", color: "var(--text-primary)", borderRadius: 8, fontSize: 12 }}
               value={filtroSucursal}
               onChange={(e) => setFiltroSucursal(e.target.value)}
             >
@@ -141,11 +190,10 @@ export function KanbanScreen({ onInvestigate }) {
             </select>
             {filtroSucursal && (
               <button
-                className="chip outline"
-                style={{ fontSize: 11, cursor: "pointer" }}
+                className="btn ghost sm"
                 onClick={() => setFiltroSucursal("")}
               >
-                ✕ limpiar
+                <FaTimes size={10} /> Limpiar
               </button>
             )}
             <a
@@ -153,7 +201,7 @@ export function KanbanScreen({ onInvestigate }) {
               style={{ fontSize: 12, textDecoration: "none" }}
               href={`${API}/exportar-reporte.csv?nivel=ROJO&limit=100`}
             >
-              ⬇ Exportar bandeja
+              <FaDownload size={12} /> Exportar bandeja
             </a>
           </div>
         </div>
@@ -162,21 +210,21 @@ export function KanbanScreen({ onInvestigate }) {
       {/* columns */}
       <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, padding: 20, overflow: "auto" }}>
         <KanbanColumn
-          title="🔴 Descenso"
+          title="Riesgo alto"
           subtitle="Revisión inmediata"
           tone="red"
           items={liveData.rojo}
           onInvestigate={onInvestigate}
         />
         <KanbanColumn
-          title="🟡 Observación"
+          title="Riesgo medio"
           subtitle="Requiere revisión"
           tone="amber"
           items={liveData.amarillo}
           onInvestigate={onInvestigate}
         />
         <KanbanColumn
-          title="🟢 Vuelo alto"
+          title="Riesgo bajo"
           subtitle="Pasar a trámite normal"
           tone="green"
           items={liveData.verde}
@@ -188,28 +236,37 @@ export function KanbanScreen({ onInvestigate }) {
 }
 
 function KanbanColumn({ title, subtitle, tone, items, onInvestigate }) {
-  const accent = { red: "var(--guayaba-red)", amber: "var(--andes-ocher)", green: "var(--paramo-green)" }[tone];
+  const accent = { red: "var(--danger)", amber: "var(--warning)", green: "var(--success)" }[tone];
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
       <div style={{
-        padding: "10px 14px", background: "white", borderRadius: "12px 12px 0 0",
-        border: "1px solid var(--line)", borderBottom: `3px solid ${accent}`,
+        padding: "12px 14px", background: "var(--bg-card)", borderRadius: "12px 12px 0 0",
+        border: "1px solid var(--border-color)", borderBottom: `3px solid ${accent}`,
         display: "flex", justifyContent: "space-between", alignItems: "baseline",
       }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: accent }}>{title}</div>
-          <div style={{ fontSize: 10.5, color: "var(--ink-mute)" }}>{subtitle}</div>
+          <div className="display" style={{ fontSize: 13, fontWeight: 700, color: accent }}>{title}</div>
+          <div style={{ fontSize: 10.5, color: "var(--text-secondary)" }}>{subtitle}</div>
         </div>
-        <span className="chip" style={{ fontSize: 11 }}>{items.length}</span>
+        <span className="chip" style={{ fontSize: 11, background: 'var(--bg-subtle)' }}>{items.length}</span>
       </div>
       <div style={{
         flex: 1, padding: 10, overflow: "auto",
-        background: "var(--marfil-paper)",
+        background: "var(--bg-card-soft)",
         borderRadius: "0 0 12px 12px",
-        border: "1px solid var(--line)", borderTop: 0,
+        border: "1px solid var(--border-color)", borderTop: 0,
         display: "flex", flexDirection: "column", gap: 8,
       }}>
-        {items.map(it => <CaseCard key={it.id} c={it} onInvestigate={onInvestigate} />)}
+        {items.length === 0 ? (
+          <EmptyState
+            compact
+            icon={FaInbox}
+            title="Sin casos en esta columna"
+            description="El cóndor no encontró siniestros para este nivel."
+          />
+        ) : (
+          items.map(it => <CaseCard key={it.id} c={it} onInvestigate={onInvestigate} />)
+        )}
       </div>
     </div>
   );
@@ -231,12 +288,10 @@ function CaseCard({ c, onInvestigate }) {
           {c.reglas.map(r => <span key={r} className="chip red" style={{ fontSize: 9, padding: "1px 6px" }}>{r}</span>)}
           <span className="chip mono" style={{ fontSize: 9, padding: "1px 6px" }}>{c.prov}</span>
         </div>
-        {c.score >= 70 && (
-          <button onClick={() => onInvestigate && onInvestigate(c.id)} className="chip outline"
-            style={{ marginTop: 8, fontSize: 10, cursor: "pointer", background: "white" }}>
-            🦅 Investigar profundo
-          </button>
-        )}
+        <button onClick={() => onInvestigate && onInvestigate(c.id)} className="btn ghost sm"
+          style={{ marginTop: 8, fontSize: 10 }}>
+          <FaSearch size={10} /> Investigar
+        </button>
       </div>
     </div>
   );
@@ -325,7 +380,7 @@ export function DocumentsScreen({ onInvestigate }: any = {}) {
   return (
     <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)", padding: 32 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
-        <Condor size={32} mood="alert" tone="orange" />
+        <CondorLogo size={36} />
         <div>
           <h2 style={{ fontSize: 22 }}>El cóndor escanea</h2>
           <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>
@@ -350,13 +405,13 @@ export function DocumentsScreen({ onInvestigate }: any = {}) {
             }}
           />
           {casoCtx && casoCtx.siniestro && (
-            <div style={{ fontSize: 10.5, color: "var(--paramo-green)", marginTop: 4 }}>
-              ✓ {casoCtx.siniestro.id_siniestro} · {casoCtx.siniestro.cobertura} · {String(casoCtx.siniestro.fecha_ocurrencia).slice(0,10)} · {casoCtx.siniestro.ciudad_evento}
+            <div style={{ fontSize: 10.5, color: "var(--success)", marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <FaCheckCircle size={10} /> {casoCtx.siniestro.id_siniestro} · {casoCtx.siniestro.cobertura} · {String(casoCtx.siniestro.fecha_ocurrencia).slice(0,10)} · {casoCtx.siniestro.ciudad_evento}
             </div>
           )}
           {vincularSin && !casoCtx && vincularSin.length >= 5 && (
-            <div style={{ fontSize: 10.5, color: "var(--guayaba-red)", marginTop: 4 }}>
-              ✗ No encontré ese siniestro. Verificá el ID.
+            <div style={{ fontSize: 10.5, color: "var(--danger)", marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <FaTimesCircle size={10} /> No encontré ese siniestro. Verificá el ID.
             </div>
           )}
         </div>
@@ -384,7 +439,7 @@ export function DocumentsScreen({ onInvestigate }: any = {}) {
               onClick={() => onInvestigate(casoCtx.siniestro.id_siniestro)}
               style={{ width: "100%", fontSize: 11 }}
             >
-              🦅 Ver caso en Modo Investigación →
+              <FaSearch size={11} /> Ver caso en Modo Investigación
             </button>
           )}
         </div>
@@ -400,9 +455,8 @@ export function DocumentsScreen({ onInvestigate }: any = {}) {
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14,
             overflow: "hidden",
           }}>
-            {/* condor planning */}
             <div style={{ animation: scanning ? "dive 1s infinite" : "glide 4s infinite ease-in-out" }}>
-              <Condor size={64} mood="still" tone="wing" />
+              <CondorLogo size={72} />
             </div>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 16, fontFamily: "var(--serif)", color: "var(--condor-wing)" }}>
@@ -445,15 +499,15 @@ export function DocumentsScreen({ onInvestigate }: any = {}) {
           {!done && !scanning && (
             <div style={{ color: "var(--ink-mute)", textAlign: "center", paddingTop: 80, fontSize: 13 }}>
               El resultado del escaneo aparecerá aquí.
-              <div style={{ marginTop: 14 }}>
-                <Condor size={36} mood="idle" tone="wing" />
+              <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center' }}>
+                <CondorLogo size={40} />
               </div>
             </div>
           )}
           {scanning && (
             <div style={{ paddingTop: 40, textAlign: "center" }}>
               <div className="mono" style={{ fontSize: 11, color: "var(--ink-mute)", marginBottom: 14 }}>
-                <Condor size={11} tone="orange" mood="still"/> el cóndor está leyendo…
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', marginRight: 6, animation: 'pulse-amber 1.2s infinite' }} /> el cóndor está leyendo…
               </div>
               <ScanProgress />
             </div>
@@ -489,7 +543,7 @@ export function DocumentsScreen({ onInvestigate }: any = {}) {
               {result.inconsistencias && result.inconsistencias.length > 0 && (
                 <div style={{ marginTop: 14, padding: 12, background: "rgba(197,51,58,0.08)", borderRadius: 10, borderLeft: "3px solid var(--guayaba-red)" }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: "var(--guayaba-red)", marginBottom: 6 }}>
-                    ⚠️ {result.inconsistencias.length} inconsistencia(s) detectada(s)
+                    <FaExclamationTriangle size={13} style={{ marginRight: 6 }} /> {result.inconsistencias.length} inconsistencia(s) detectada(s)
                   </div>
                   {result.inconsistencias.slice(0, 3).map((inc, i) => (
                     <div key={i} style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: 4 }}>
@@ -502,7 +556,7 @@ export function DocumentsScreen({ onInvestigate }: any = {}) {
                 marginTop: 14, padding: 12, background: "rgba(232,122,79,0.08)", borderRadius: 10,
                 fontSize: 12, color: "var(--condor-wing)", borderLeft: "3px solid var(--andes-orange)",
               }}>
-                <Condor size={14} tone="orange" mood="still" /> <strong>El cóndor opina:</strong> "{result.explicacion || 'Analizado.'}"
+                <CondorLogo size={16} /> <strong>El cóndor opina:</strong> "{result.explicacion || 'Analizado.'}"
               </div>
             </div>
           )}
@@ -553,7 +607,7 @@ function ScanProgress() {
           {k === i ? (
             <span style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid var(--andes-orange)", borderTopColor: "transparent", animation: "spin-slow 0.8s linear infinite" }}/>
           ) : (
-            <span style={{ color: "var(--paramo-green)" }}>✓</span>
+            <FaCheckCircle size={11} style={{ color: "var(--success)" }} />
           )}
           {it}
         </div>
@@ -605,7 +659,7 @@ export const TEJIDO_PHASES = [
   { id: 2, label: "Conectando hilos…" },
   { id: 3, label: "Detectando concentración…" },
   { id: 4, label: "Cruzando proveedores…" },
-  { id: 5, label: "Patrón detectado ✓" },
+  { id: 5, label: "Patrón detectado" },
 ];
 
 export function TejidoScreen({ onInvestigate, onVerAsegurado }: any = {}) {
@@ -660,12 +714,14 @@ export function TejidoScreen({ onInvestigate, onVerAsegurado }: any = {}) {
         background: "linear-gradient(180deg, rgba(232,122,79,0.06), transparent)",
         display: "flex", alignItems: "center", gap: 14,
       }}>
-        <Condor size={32} mood="speak" tone="wing" />
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <FaNetworkWired size={20} />
+        </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 10.5, letterSpacing: ".18em", color: "var(--andes-orange)", fontWeight: 700, textTransform: "uppercase" }}>
-            🕸 Red de relaciones · cruzando asegurados con proveedores
+          <div style={{ fontSize: 10.5, letterSpacing: ".16em", color: "var(--accent)", fontWeight: 700, textTransform: "uppercase", display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            Red de relaciones · cruzando asegurados con proveedores
           </div>
-          <h2 style={{ fontSize: 22, marginTop: 2 }}>¿Quién comparte taller con quién?</h2>
+          <h2 className="display" style={{ fontSize: 22, marginTop: 4, color: 'var(--text-primary)' }}>¿Quién comparte taller con quién?</h2>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 10, color: "var(--ink-mute)" }}>Densidad del grafo</div>
@@ -696,15 +752,15 @@ export function TejidoScreen({ onInvestigate, onVerAsegurado }: any = {}) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, fontSize: 12, lineHeight: 1.55, color: "var(--ink-soft)" }}>
             <div>
-              <div style={{ fontSize: 20, marginBottom: 4 }}>🎯</div>
+              <div style={{ marginBottom: 6, color: 'var(--warning)' }}><FaExclamationTriangle size={18} /></div>
               <strong>El problema:</strong> Un siniestro suelto puede parecer normal. Pero si 5 asegurados distintos pasan todos por el mismo taller chiquito en Quito, eso huele a coordinación.
             </div>
             <div>
-              <div style={{ fontSize: 20, marginBottom: 4 }}>🕸</div>
+              <div style={{ marginBottom: 6, color: 'var(--accent)' }}><FaNetworkWired size={18} /></div>
               <strong>Qué hace el cóndor:</strong> cruza todos los siniestros contra todos los proveedores y dibuja las conexiones. Cuanto más asegurados conecta UN proveedor, más sospechoso.
             </div>
             <div>
-              <div style={{ fontSize: 20, marginBottom: 4 }}>✋</div>
+              <div style={{ marginBottom: 6, color: 'var(--primary)' }}><FaSearch size={18} /></div>
               <strong>Qué hacés vos:</strong> click en un proveedor del grafo o de la lista → ves a quiénes conecta → investigás los casos uno por uno y decidís si es coincidencia o red organizada.
             </div>
           </div>
@@ -730,15 +786,15 @@ export function TejidoScreen({ onInvestigate, onVerAsegurado }: any = {}) {
               <strong>Grafo bipartito:</strong> asegurados (izquierda, azul) ←→ proveedores (derecha, rojo si lista restrictiva)
             </span>
             {selProv && (
-              <button className="chip outline" style={{ marginLeft: "auto", fontSize: 10, cursor: "pointer" }} onClick={() => setSelProv(null)}>
-                ✕ deseleccionar
+              <button className="btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => setSelProv(null)}>
+                <FaTimes size={10} /> Deseleccionar
               </button>
             )}
           </div>
           {loading ? (
             <div style={{ padding: 40, textAlign: "center" }}>
-              <Condor size={48} mood="think" tone="orange" />
-              <div style={{ marginTop: 10, fontSize: 12, color: "var(--ink-mute)" }}>Tejiendo la red…</div>
+              <div style={{ display: 'inline-block' }}><CondorLogo size={56} /></div>
+              <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-secondary)" }}>Tejiendo la red…</div>
             </div>
           ) : (
             <BipartiteGraph
@@ -788,7 +844,7 @@ export function TejidoScreen({ onInvestigate, onVerAsegurado }: any = {}) {
                   <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
                     <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--mountain-blue)" }}>{p.id}</span>
                     <span style={{ fontSize: 11.5, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.label}</span>
-                    {p.restrictiva && <span className="chip red mono" style={{ fontSize: 8.5 }}>⚠ lista restrictiva</span>}
+                    {p.restrictiva && <span className="chip red" style={{ fontSize: 9 }}><FaExclamationTriangle size={9} /> lista restrictiva</span>}
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4, fontSize: 10.5 }}>
                     <div title="Asegurados RECURRENTES (con varios siniestros) conectados a este proveedor en el filtro actual">
@@ -1183,56 +1239,50 @@ export function ReportsScreen() {
 
   const REPORT_TYPES = [
     {
-      id: "ejecutivo", label: "Resumen Ejecutivo", icon: "📋",
-      tone: "var(--andes-orange)",
+      id: "ejecutivo", label: "Resumen Ejecutivo", icon: FaFileAlt,
+      tone: "var(--primary)",
       desc: "Briefing 1-página con síntesis GPT del cóndor, KPIs y top casos.",
       audiencia: "Gerencia · Directorio",
     },
     {
-      id: "antifraude", label: "Comité Antifraude", icon: "🕵️",
-      tone: "var(--guayaba-red)",
+      id: "antifraude", label: "Comité Antifraude", icon: FaUserShield,
+      tone: "var(--danger)",
       desc: "Casos rojos con score, reglas, recomendaciones y firma digital.",
       audiencia: "Comité antifraude · Investigadores",
     },
     {
-      id: "auditoria", label: "Auditoría Interna", icon: "📑",
-      tone: "var(--paramo-green)",
+      id: "auditoria", label: "Auditoría Interna", icon: FaClipboardCheck,
+      tone: "var(--success)",
       desc: "Trazabilidad completa con hash, fecha y analista responsable.",
       audiencia: "Auditoría · SBS · Compliance",
     },
     {
-      id: "directorio", label: "Briefing Directorio", icon: "💼",
-      tone: "var(--mountain-blue)",
+      id: "directorio", label: "Briefing Directorio", icon: FaBriefcase,
+      tone: "var(--accent)",
       desc: "KPIs visuales para el board: ROI, exposición prevenida, cartera.",
       audiencia: "Directorio · Junta",
     },
   ];
 
   return (
-    <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)" }}>
+    <div style={{ height: "100%", overflow: "auto", background: "var(--bg-main)" }}>
       {/* === HERO === */}
       <div style={{
         position: "relative", overflow: "hidden",
         padding: "32px 32px 28px",
-        background: "linear-gradient(135deg, #FAF6EE 0%, #F4EDE4 60%, rgba(232,122,79,0.08) 100%)",
-        borderBottom: "1px solid var(--line)",
+        background: "var(--bg-card)",
+        borderBottom: "1px solid var(--border-color)",
       }}>
-        {/* cóndor flotando atrás */}
-        <div aria-hidden style={{
-          position: "absolute", right: 24, top: 12, fontSize: 140, opacity: 0.06,
-          pointerEvents: "none", animation: "condor-float 9s ease-in-out infinite",
-        }}>🦅</div>
-
         <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 16 }}>
-          <Condor size={42} mood="speak" tone="wing" />
+          <CondorLogo size={48} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, letterSpacing: ".22em", color: "var(--andes-orange)", fontWeight: 700, textTransform: "uppercase" }}>
+            <div style={{ fontSize: 11, letterSpacing: ".18em", color: "var(--accent)", fontWeight: 700, textTransform: "uppercase" }}>
               Centro de reportes · firmados digitalmente
             </div>
-            <h1 style={{ fontSize: 32, marginTop: 4, fontFamily: "var(--serif)", fontWeight: 500 }}>
+            <h1 className="display" style={{ fontSize: 28, marginTop: 4, fontWeight: 700, color: "var(--text-primary)" }}>
               El cóndor también redacta y firma.
             </h1>
-            <div style={{ fontSize: 13.5, color: "var(--ink-soft)", marginTop: 4, maxWidth: 720 }}>
+            <div style={{ fontSize: 13.5, color: "var(--text-secondary)", marginTop: 6, maxWidth: 720 }}>
               Genera reportes ejecutivos, de comité antifraude, de auditoría o de directorio.
               Cada uno con datos reales en vivo, síntesis GPT, hash de firma, y listo para guardar como PDF.
             </div>
@@ -1242,17 +1292,17 @@ export function ReportsScreen() {
         {/* Mini KPIs en fila */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 22 }}>
           {[
-            { lbl: "Cartera vigilada", val: totalSin ? totalSin.toLocaleString("en-US") : "…", c: "var(--condor-wing)" },
-            { lbl: "Alertas históricas", val: fraudes ? fraudes.toLocaleString("en-US") : "…", c: "var(--guayaba-red)" },
-            { lbl: "Monto USD total", val: monto ? `$${Math.round(monto/1000).toLocaleString("en-US")}K` : "…", c: "var(--paramo-green)" },
-            { lbl: "Docs inconsistentes", val: docsInc ? docsInc.toLocaleString("en-US") : "…", c: "var(--andes-orange)" },
+            { lbl: "Cartera vigilada",   val: totalSin ? totalSin.toLocaleString("en-US") : "…",                                  c: "var(--primary)" },
+            { lbl: "Alertas históricas", val: fraudes  ? fraudes.toLocaleString("en-US")  : "…",                                  c: "var(--danger)" },
+            { lbl: "Monto USD total",    val: monto    ? `$${Math.round(monto/1000).toLocaleString("en-US")}K` : "…",             c: "var(--success)" },
+            { lbl: "Docs inconsistentes",val: docsInc  ? docsInc.toLocaleString("en-US")  : "…",                                  c: "var(--warning)" },
           ].map((k, i) => (
-            <div key={k.lbl} className="fade-up" style={{
-              padding: "12px 14px", background: "white", borderRadius: 10,
+            <div key={k.lbl} className="card fade-up" style={{
+              padding: "14px 16px",
               borderTop: `3px solid ${k.c}`, animationDelay: `${i * 80}ms`,
             }}>
-              <div style={{ fontSize: 9.5, color: "var(--ink-mute)", letterSpacing: ".1em", textTransform: "uppercase" }}>{k.lbl}</div>
-              <div className="serif tabular" style={{ fontSize: 24, fontWeight: 500, color: k.c, marginTop: 2 }}>{k.val}</div>
+              <div style={{ fontSize: 10, color: "var(--text-secondary)", letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 600 }}>{k.lbl}</div>
+              <div className="display tabular" style={{ fontSize: 26, fontWeight: 700, color: k.c, marginTop: 4 }}>{k.val}</div>
             </div>
           ))}
         </div>
@@ -1296,19 +1346,24 @@ export function ReportsScreen() {
                     width: 24, height: 24, borderRadius: "50%",
                     background: rt.tone, color: "white",
                     display: "grid", placeItems: "center",
-                    fontSize: 13, fontWeight: 700,
-                    boxShadow: `0 2px 10px ${rt.tone}80`, border: "2px solid white",
-                  }}>✓</span>
+                    boxShadow: `0 2px 10px ${rt.tone}80`, border: "2px solid var(--bg-card)",
+                  }}><FaCheckCircle size={12} /></span>
                 )}
-                <div style={{ fontSize: 28, marginBottom: 8 }}>{rt.icon}</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: sel ? rt.tone : "var(--condor-wing)" }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 10,
+                  background: `${rt.tone}1A`, color: rt.tone,
+                  display: 'grid', placeItems: 'center', marginBottom: 12,
+                }}>
+                  {typeof rt.icon === 'function' ? <rt.icon size={22} /> : null}
+                </div>
+                <div className="display" style={{ fontSize: 14, fontWeight: 700, color: sel ? rt.tone : "var(--text-primary)" }}>
                   {rt.label}
                 </div>
-                <div style={{ fontSize: 11, color: "var(--ink-mute)", marginTop: 6, lineHeight: 1.45 }}>
+                <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 6, lineHeight: 1.5 }}>
                   {rt.desc}
                 </div>
-                <div style={{ fontSize: 9.5, color: rt.tone, marginTop: 10, fontWeight: 600, letterSpacing: ".05em", textTransform: "uppercase" }}>
-                  → {rt.audiencia}
+                <div style={{ fontSize: 10, color: rt.tone, marginTop: 10, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase" }}>
+                  {rt.audiencia}
                 </div>
               </div>
             );
@@ -1328,18 +1383,18 @@ export function ReportsScreen() {
             <div style={{ display: "flex", gap: 4 }}>
               {(["ROJO","AMARILLO","VERDE"] as const).map(n => {
                 const sel = nivelSel === n;
-                const c = n === "ROJO" ? "var(--guayaba-red)" : n === "AMARILLO" ? "var(--andes-orange)" : "var(--paramo-green)";
+                const c = n === "ROJO" ? "var(--danger)" : n === "AMARILLO" ? "var(--warning)" : "var(--success)";
+                const label = n === "ROJO" ? "Riesgo alto" : n === "AMARILLO" ? "Riesgo medio" : "Riesgo bajo";
                 return (
                   <button key={n}
                     onClick={() => setNivelSel(n)}
-                    className={`chip ${sel ? "" : "outline"}`}
                     style={{
-                      fontSize: 11, cursor: "pointer",
-                      background: sel ? c : "white",
-                      color: sel ? "white" : c,
-                      border: `1.5px solid ${c}`,
-                      padding: "5px 12px",
-                    }}>{n}</button>
+                      fontSize: 11, cursor: "pointer", fontWeight: 600,
+                      background: sel ? c : "var(--bg-card)",
+                      color: sel ? "#fff" : c,
+                      border: `1px solid ${c}`,
+                      padding: "6px 12px", borderRadius: 8,
+                    }}>{label}</button>
                 );
               })}
             </div>
@@ -1347,30 +1402,22 @@ export function ReportsScreen() {
           <div style={{ flex: 1 }} />
           <a className="btn ghost" style={{ fontSize: 12, textDecoration: "none" }}
              href={`${API}/exportar-reporte.csv?nivel=${nivelSel}&limit=200`}>
-            ⬇ CSV plano ({nivelSel})
+            <FaDownload size={11} /> CSV ({nivelSel})
           </a>
           <a className="btn ghost" style={{ fontSize: 12, textDecoration: "none" }}
              href={`${API}/kpis`} target="_blank" rel="noreferrer">
-            🔌 API JSON
+            <FaPlug size={11} /> API JSON
           </a>
           <button
-            className="btn warm"
+            className="btn"
             disabled={generandoPdf}
             onClick={() => descargarPdf(tipoSel, nivelSel, true)}
-            style={{
-              padding: "10px 18px", fontSize: 14, fontWeight: 600,
-              background: generandoPdf ? "var(--ink-mute)" : "linear-gradient(135deg, var(--andes-orange), var(--guayaba-red))",
-              border: 0, color: "white", borderRadius: 10,
-              boxShadow: generandoPdf ? "none" : "0 4px 14px rgba(232,122,79,0.4)",
-              cursor: generandoPdf ? "wait" : "pointer",
-              display: "flex", alignItems: "center", gap: 8,
-            }}>
-            <span style={{ fontSize: 16 }}>📄</span>
-            {generandoPdf ? "Abriendo PDF…" : "Generar y descargar PDF"}
+          >
+            <FaFileAlt size={12} /> {generandoPdf ? "Abriendo PDF…" : "Generar y descargar PDF"}
           </button>
         </div>
-        <div style={{ fontSize: 10.5, color: "var(--ink-mute)", marginTop: 6, paddingLeft: 4 }}>
-          💡 El PDF se abre en una pestaña nueva con el diálogo de impresión listo. Elegí <strong>"Guardar como PDF"</strong> en el destino.
+        <div style={{ fontSize: 10.5, color: "var(--text-secondary)", marginTop: 8, paddingLeft: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <FaLightbulb size={11} /> El PDF se abre en una pestaña nueva con el diálogo de impresión listo. Elegí <strong style={{ marginLeft: 4 }}>"Guardar como PDF"</strong> en el destino.
         </div>
       </div>
 
@@ -1384,31 +1431,32 @@ export function ReportsScreen() {
               return (
                 <div key={rep.id_reporte} style={{
                   display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto",
-                  gap: 12, alignItems: "center", padding: "8px 14px",
-                  background: "white", borderRadius: 8, fontSize: 11.5,
-                  border: `1px solid var(--line)`,
-                  borderLeft: `3px solid ${t?.tone || 'var(--ink-mute)'}`,
+                  gap: 12, alignItems: "center", padding: "10px 14px",
+                  background: "var(--bg-card)", borderRadius: 8, fontSize: 11.5,
+                  border: `1px solid var(--border-color)`,
+                  borderLeft: `3px solid ${t?.tone || 'var(--text-muted)'}`,
                 }}>
-                  <span style={{ fontSize: 16 }}>{t?.icon || '📄'}</span>
+                  <span style={{ color: t?.tone, display: 'grid', placeItems: 'center' }}>
+                    {t && typeof t.icon === 'function' ? <t.icon size={16} /> : <FaFileAlt size={16} />}
+                  </span>
                   <div>
-                    <span style={{ fontWeight: 600 }}>{t?.label || rep.tipo}</span>
-                    <span className="mono" style={{ fontSize: 10, color: "var(--ink-mute)", marginLeft: 8 }}>{rep.id_reporte}</span>
+                    <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{t?.label || rep.tipo}</span>
+                    <span className="mono" style={{ fontSize: 10, color: "var(--text-secondary)", marginLeft: 8 }}>{rep.id_reporte}</span>
                   </div>
                   <span className={`chip mono ${rep.nivel === 'ROJO' ? 'red' : rep.nivel === 'AMARILLO' ? 'amber' : 'green'}`} style={{ fontSize: 9.5 }}>
                     {rep.nivel}
                   </span>
-                  <span style={{ fontSize: 10.5, color: "var(--ink-mute)" }}>
+                  <span style={{ fontSize: 10.5, color: "var(--text-secondary)" }}>
                     {rep.n_casos} casos
                   </span>
-                  <span style={{ fontSize: 10.5, color: "var(--ink-mute)" }}>
+                  <span style={{ fontSize: 10.5, color: "var(--text-secondary)" }}>
                     {String(rep.fecha_generacion).slice(0,16).replace('T',' ')}
                   </span>
                   <button
-                    className="chip outline"
-                    style={{ fontSize: 10, cursor: "pointer" }}
+                    className="btn ghost sm"
                     onClick={() => descargarPdf(rep.tipo, rep.nivel, true)}
                   >
-                    ↻ regenerar
+                    <FaRedo size={10} /> Regenerar
                   </button>
                 </div>
               );
@@ -1421,7 +1469,7 @@ export function ReportsScreen() {
       <div style={{ padding: "20px 32px 0", textAlign: "center" }}>
         <button className="btn" onClick={generarResumen} disabled={loadingResumen}
           style={{ fontSize: 13, padding: "10px 18px" }}>
-          {loadingResumen ? "🦅 redactando síntesis con GPT…" : "🦅 Pedir síntesis ejecutiva en vivo al cóndor"}
+          <FaBrain size={13} /> {loadingResumen ? "Redactando síntesis con GPT…" : "Pedir síntesis ejecutiva en vivo"}
         </button>
       </div>
 
@@ -1433,15 +1481,15 @@ export function ReportsScreen() {
         <div style={{ padding: "26px 32px", background: "var(--marfil-paper)", borderBottom: "1px solid var(--line)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <div>
-              <div style={{ fontSize: 10.5, color: "var(--andes-orange)", letterSpacing: ".2em", textTransform: "uppercase" }}>AchachAI · Aseguradora del Sur</div>
-              <h1 style={{ fontSize: 30, fontFamily: "var(--serif)", fontWeight: 500, marginTop: 4 }}>
+              <div style={{ fontSize: 10.5, color: "var(--accent)", letterSpacing: ".2em", textTransform: "uppercase", fontWeight: 700 }}>AchachAI · Aseguradora del Sur</div>
+              <h1 className="display" style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: "var(--text-primary)" }}>
                 Resumen ejecutivo · datos reales
               </h1>
-              <div style={{ fontSize: 12, color: "var(--ink-mute)", marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>
                 Generado el {new Date().toLocaleString("es-EC")} · gpt-5-mini · v4.2.1
               </div>
             </div>
-            <Condor size={48} mood="speak" tone="wing" />
+            <CondorLogo size={48} />
           </div>
         </div>
 
@@ -1504,12 +1552,12 @@ export function ReportsScreen() {
 
           {resumen && (
             <div style={{
-              marginTop: 22, padding: 18, background: "linear-gradient(180deg, rgba(232,122,79,0.06), white)",
-              borderRadius: 10, borderLeft: "3px solid var(--andes-orange)",
+              marginTop: 22, padding: 18, background: "var(--accent-soft)",
+              borderRadius: 10, borderLeft: "3px solid var(--accent)",
               fontSize: 13, lineHeight: 1.65,
             }}>
-              <div style={{ fontSize: 10.5, color: "var(--andes-orange)", fontWeight: 700, letterSpacing: ".12em", marginBottom: 12 }}>
-                🦅 SÍNTESIS DEL CÓNDOR (GPT-5-mini · live)
+              <div style={{ fontSize: 10.5, color: "var(--accent)", fontWeight: 700, letterSpacing: ".14em", marginBottom: 12, display: 'inline-flex', alignItems: 'center', gap: 6, textTransform: 'uppercase' }}>
+                <FaBrain size={11} /> Síntesis del cóndor (GPT-5-mini · live)
               </div>
               <div className="reporte-md">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={reporteMdComponents}>
@@ -1521,7 +1569,7 @@ export function ReportsScreen() {
                   marginTop: 14, paddingTop: 10, borderTop: "1px dashed var(--line)",
                   fontSize: 10.5, color: "var(--ink-mute)",
                 }}>
-                  ⚙ Tools llamadas: {resumen.tools_used.map((t: any) => (
+                  <FaCog size={10} style={{ marginRight: 4 }} /> Tools llamadas: {resumen.tools_used.map((t: any) => (
                     <span key={t.name} className="chip mono" style={{ fontSize: 9.5, marginLeft: 4 }}>
                       {t.name}
                     </span>
@@ -1532,7 +1580,7 @@ export function ReportsScreen() {
           )}
           {!resumen && !loadingResumen && (
             <div style={{ marginTop: 22, padding: 14, background: "var(--marfil-paper)", borderRadius: 10, fontSize: 12, color: "var(--ink-mute)", textAlign: "center" }}>
-              ↑ Toca "🦅 Generar resumen ejecutivo (GPT)" para que el cóndor redacte la síntesis usando los tools.
+              Tocá "Pedir síntesis ejecutiva en vivo" para que el cóndor redacte la síntesis usando los tools.
             </div>
           )}
         </div>
@@ -1546,13 +1594,13 @@ export function ReportsScreen() {
    ROLES — 7 roles selector
    ============================================================ */
 export const ROLES = [
-  { id: "antifraude", name: "Analista Antifraude", icon: "🕵️", power: "Investigación profunda caso por caso", color: "var(--guayaba-red)" },
-  { id: "siniestros", name: "Analista de Siniestros", icon: "📋", power: "Mi día priorizado en orden", color: "var(--andes-orange)" },
-  { id: "jefatura", name: "Jefatura de Siniestros", icon: "📊", power: "Centro de operaciones", color: "var(--mountain-blue)" },
-  { id: "riesgos", name: "Riesgos", icon: "⚠️", power: "Mapa de exposición consolidada", color: "var(--andes-ocher)" },
-  { id: "auditoria", name: "Auditoría Interna", icon: "🔍", power: "Cadena de evidencia legal", color: "var(--paramo-green)" },
-  { id: "tecnologia", name: "Tecnología", icon: "🛠️", power: "Salud del sistema en tiempo real", color: "var(--mountain-blue-deep)" },
-  { id: "gerencia", name: "Gerencia", icon: "💼", power: "Pulso ejecutivo cartera", color: "var(--condor-wing)" },
+  { id: "antifraude", name: "Analista Antifraude",     icon: FaUserShield,     power: "Investigación profunda caso por caso", color: "var(--danger)" },
+  { id: "siniestros", name: "Analista de Siniestros",  icon: FaClipboardCheck, power: "Mi día priorizado en orden",            color: "var(--primary)" },
+  { id: "jefatura",   name: "Jefatura de Siniestros",  icon: FaChartBar,       power: "Centro de operaciones",                 color: "var(--accent)" },
+  { id: "riesgos",    name: "Riesgos",                 icon: FaExclamationTriangle, power: "Mapa de exposición consolidada",   color: "var(--warning)" },
+  { id: "auditoria",  name: "Auditoría Interna",       icon: FaSearch,         power: "Cadena de evidencia legal",             color: "var(--success)" },
+  { id: "tecnologia", name: "Tecnología",              icon: FaCog,            power: "Salud del sistema en tiempo real",      color: "var(--primary-dark)" },
+  { id: "gerencia",   name: "Gerencia",                icon: FaBriefcase,      power: "Pulso ejecutivo cartera",               color: "var(--text-primary)" },
 ];
 
 export function RolesScreen({ currentRole, onPick }) {
@@ -1569,45 +1617,49 @@ export function RolesScreen({ currentRole, onPick }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
-        {ROLES.map(r => (
+        {ROLES.map(r => {
+          const RoleIcon = r.icon;
+          const isActive = currentRole === r.id;
+          return (
           <div key={r.id}
             onClick={() => onPick(r.id)}
             className="card"
             style={{
               padding: 18, cursor: "pointer", position: "relative", overflow: "hidden",
               borderTop: `3px solid ${r.color}`,
-              transform: currentRole === r.id ? "translateY(-2px)" : "none",
-              boxShadow: currentRole === r.id ? "var(--shadow-lg)" : "var(--shadow-sm)",
+              transform: isActive ? "translateY(-2px)" : "none",
+              boxShadow: isActive ? "var(--shadow-lg)" : "var(--shadow-sm)",
             }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
               <div style={{
                 width: 44, height: 44, borderRadius: 12,
-                background: `${r.color}18`,
-                display: "grid", placeItems: "center", fontSize: 22,
-              }}>{r.icon}</div>
+                background: `${r.color}1A`, color: r.color,
+                display: "grid", placeItems: "center",
+              }}><RoleIcon size={20} /></div>
               <div>
-                <div style={{ fontSize: 15, fontFamily: "var(--serif)", fontWeight: 500 }}>{r.name}</div>
-                <div style={{ fontSize: 10, color: "var(--ink-mute)", letterSpacing: ".1em", textTransform: "uppercase" }}>Superpoder</div>
+                <div className="display" style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>{r.name}</div>
+                <div style={{ fontSize: 10, color: "var(--text-secondary)", letterSpacing: ".1em", textTransform: "uppercase" }}>Superpoder</div>
               </div>
             </div>
             <div style={{ fontSize: 12.5, color: "var(--ink-soft)", marginBottom: 12 }}>{r.power}</div>
             <div className="diamond-divider" style={{ marginBottom: 8 }}>Prompts sugeridos</div>
             {(ROLE_PROMPTS_PREVIEW[r.id] || []).map((p, i) => (
               <div key={i} style={{
-                fontSize: 11, color: "var(--ink-soft)", padding: "6px 8px",
-                background: "var(--marfil-paper)", borderRadius: 6, marginBottom: 4,
-                borderLeft: `2px solid ${r.color}66`,
+                fontSize: 11, color: "var(--text-secondary)", padding: "8px 10px",
+                background: "var(--bg-card-soft)", borderRadius: 8, marginBottom: 6,
+                border: "1px solid var(--border-soft)",
               }}>"{p}"</div>
             ))}
-            {currentRole === r.id && (
+            {isActive && (
               <div style={{
                 position: "absolute", top: 10, right: 10,
                 fontSize: 10, padding: "3px 8px", borderRadius: 999,
-                background: r.color, color: "white", fontWeight: 600,
+                background: r.color, color: "white", fontWeight: 700,
               }}>activo</div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1790,7 +1842,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
         background: "linear-gradient(180deg, rgba(232,122,79,0.08), transparent)",
         display: "flex", alignItems: "center", gap: 14,
       }}>
-        <Condor size={32} mood="think" tone="orange" />
+        <CondorLogo size={40} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10.5, letterSpacing: ".18em", color: "var(--andes-orange)", fontWeight: 700, textTransform: "uppercase" }}>
             Prueba de fuego · evaluar siniestro en vivo
@@ -1807,7 +1859,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* === SECCIÓN: Presets como cards visuales === */}
           <div className="card" style={{ padding: 16 }}>
-            <SectionHeader icon="⚡" title="Escenarios rápidos" hint={
+            <SectionHeader icon={FaBolt} title="Escenarios rápidos" hint={
               casoBaseId ? `caso base cargado: ${casoBaseId} — podés modificar y reevaluar` :
               presetSel ? `seleccionado: ${presetSel}` :
               "elegí un preset o cargá un caso existente"
@@ -1822,7 +1874,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
               alignItems: "center",
             }}>
               <input
-                placeholder="🔁 Cargar caso existente (ej. SIN-100029) para reevaluar"
+                placeholder="Cargar caso existente (ej. SIN-100029) para reevaluar"
                 value={cargarId}
                 onChange={e => setCargarId(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") cargarCasoExistente(); }}
@@ -1843,7 +1895,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
                   className="chip outline"
                   onClick={() => { setCasoBaseId(null); setCargarId(""); setCasoBaseScore(null); }}
                   style={{ fontSize: 10, cursor: "pointer", color: "var(--guayaba-red)" }}>
-                  ✕ limpiar
+                  <FaTimes size={10} /> Limpiar
                 </button>
               )}
             </div>
@@ -1857,7 +1909,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
                 fontSize: 11.5, color: "var(--ink-soft)", lineHeight: 1.55,
               }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "var(--andes-orange)", marginBottom: 4 }}>
-                  ⚠ Score original del caso: <span style={{ fontFamily: "var(--mono)" }}>{casoBaseScore.score}/100</span> · {casoBaseScore.nivel} · {casoBaseScore.reglas} regla(s) · {casoBaseScore.senales} señal(es)
+                  <FaExclamationTriangle size={11} style={{ marginRight: 4 }} /> Score original del caso: <span style={{ fontFamily: "var(--mono)" }}>{casoBaseScore.score}/100</span> · {casoBaseScore.nivel} · {casoBaseScore.reglas} regla(s) · {casoBaseScore.senales} señal(es)
                 </div>
                 <div>
                   La reevaluación puede dar un score <strong>menor</strong> que el original
@@ -1871,7 +1923,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginTop: 10 }}>
               {Object.entries(PRESETS).map(([nombre, vals], i) => {
                 const tone = i === 0 ? "var(--paramo-green)" : i === 1 ? "var(--andes-orange)" : i === 2 ? "var(--guayaba-red)" : "var(--mountain-blue)";
-                const ico = ["✓", "⚠", "🚨", "🔴"][i] || "⚡";
+                const ico = [null, null, null, null][i] || null;
                 const sel = presetSel === nombre;
                 return (
                   <button
@@ -1902,19 +1954,17 @@ export function EvaluarScreen({ onInvestigate }: any) {
                       (e.currentTarget as HTMLElement).style.boxShadow = "none";
                     }}
                   >
-                    {/* badge ✓ cuando esta seleccionado */}
+                    {/* badge cuando esta seleccionado */}
                     {sel && (
                       <span style={{
                         position: "absolute", top: -8, right: -8,
                         width: 20, height: 20, borderRadius: "50%",
                         background: tone, color: "white",
                         display: "grid", placeItems: "center",
-                        fontSize: 12, fontWeight: 700,
                         boxShadow: `0 2px 8px ${tone}80`,
-                        border: "2px solid white",
-                      }}>✓</span>
+                        border: "2px solid var(--bg-card)",
+                      }}><FaCheckCircle size={10} /></span>
                     )}
-                    <span style={{ fontSize: 20, color: tone }}>{ico}</span>
                     <span style={{
                       fontSize: 10.5, fontWeight: sel ? 700 : 600,
                       color: sel ? tone : "var(--condor-wing)",
@@ -1929,7 +1979,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
 
           {/* === SECCIÓN 1: Cobertura y montos === */}
           <div className="card" style={{ padding: 16 }}>
-            <SectionHeader icon="💰" title="1. Cobertura y montos" hint="qué se reclama y por cuánto" />
+            <SectionHeader icon={FaDollarSign} title="1. Cobertura y montos" hint="qué se reclama y por cuánto" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, fontSize: 12, marginTop: 10 }}>
               <FormField label="Cobertura">
                 <select value={form.cobertura} onChange={e => patch("cobertura", e.target.value)} style={fieldStyle}>
@@ -1958,7 +2008,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
 
           {/* === SECCIÓN 2: Cronología === */}
           <div className="card" style={{ padding: 16 }}>
-            <SectionHeader icon="📅" title="2. Cronología del siniestro" hint="cuándo pasó vs cuándo se reportó vs vigencia de la póliza" />
+            <SectionHeader icon={FaCalendarAlt} title="2. Cronología del siniestro" hint="cuándo pasó vs cuándo se reportó vs vigencia de la póliza" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, fontSize: 12, marginTop: 10 }}>
               <FormField label="Días desde inicio póliza" hint="≤2d → RF-05 ROJO">
                 <input type="number" value={form.dias_desde_inicio_poliza} onChange={e => patch("dias_desde_inicio_poliza", +e.target.value)} style={fieldStyle}/>
@@ -1974,7 +2024,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
 
           {/* === SECCIÓN 3: Asegurado y proveedor === */}
           <div className="card" style={{ padding: 16 }}>
-            <SectionHeader icon="👤" title="3. Asegurado y proveedor" hint="perfil del cliente y del taller / clínica" />
+            <SectionHeader icon={FaUserCircle} title="3. Asegurado y proveedor" hint="perfil del cliente y del taller / clínica" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12, marginTop: 10 }}>
               <FormField label="Siniestros previos del asegurado" hint="≥3 en 18m → señal S3">
                 <input type="number" value={form.historial_siniestros_asegurado} onChange={e => patch("historial_siniestros_asegurado", +e.target.value)} style={fieldStyle}/>
@@ -2009,7 +2059,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
 
           {/* === SECCIÓN 4: Narrativa === */}
           <div className="card" style={{ padding: 16 }}>
-            <SectionHeader icon="✍️" title="4. Narrativa del asegurado" hint="el relato del siniestro — clave para análisis NLP y visión" />
+            <SectionHeader icon={FaPencilAlt} title="4. Narrativa del asegurado" hint="el relato del siniestro — clave para análisis NLP y visión" />
             <textarea
               value={form.descripcion}
               onChange={e => patch("descripcion", e.target.value)}
@@ -2027,28 +2077,28 @@ export function EvaluarScreen({ onInvestigate }: any) {
             transition: "background 0.3s ease",
           }}>
             <SectionHeader
-              icon="📎"
+              icon={FaPaperclip}
               title="5. Documentos (opcional)"
               hint="Azure Document Intelligence + GPT-4o Vision · combinan con los datos en un solo veredicto"
             />
             {hayArchivos() && (
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -28, marginBottom: 8 }}>
-                <button className="chip outline" style={{ fontSize: 10, cursor: "pointer", background: "white" }} onClick={limpiarArchivos}>
-                  ✕ quitar todos
+                <button className="btn ghost sm" onClick={limpiarArchivos}>
+                  <FaTimes size={10} /> Quitar todos
                 </button>
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
-              <DropZone label="Factura del taller" icon="🧾" accept=".pdf,.jpg,.png"
+              <DropZone label="Factura del taller" icon={FaFileInvoice} accept=".pdf,.jpg,.png"
                         file={factura} onChange={setFactura}
                         engine="Azure DI · prebuilt-invoice" />
-              <DropZone label="Foto del daño" icon="📷" accept=".jpg,.jpeg,.png"
+              <DropZone label="Foto del daño" icon={FaCamera} accept=".jpg,.jpeg,.png"
                         file={fotoDano} onChange={setFotoDano}
                         engine="GPT-4o Vision" />
-              <DropZone label="Parte policial" icon="🚓" accept=".pdf,.jpg,.png"
+              <DropZone label="Parte policial" icon={FaFileAlt} accept=".pdf,.jpg,.png"
                         file={partePolicial} onChange={setPartePolicial}
                         engine="OCR + LLM" />
-              <DropZone label="Denuncia" icon="📄" accept=".pdf,.jpg,.png"
+              <DropZone label="Denuncia" icon={FaClipboardCheck} accept=".pdf,.jpg,.png"
                         file={denuncia} onChange={setDenuncia}
                         engine="OCR + LLM" />
             </div>
@@ -2071,12 +2121,11 @@ export function EvaluarScreen({ onInvestigate }: any) {
             onMouseEnter={(e) => { if (!loading) (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; }}
           >
-            <span style={{ fontSize: 18 }}>🦅</span>
+            <FaClipboardCheck size={15} />
             {loading
               ? hayArchivos() ? "Procesando datos + documentos…" : "Cóndor evaluando…"
               : hayArchivos() ? `Evaluar caso + ${[factura,fotoDano,partePolicial,denuncia].filter(Boolean).length} documento(s)`
                               : "Evaluar con AchachAI"}
-            {!loading && <span style={{ fontSize: 16 }}>→</span>}
           </button>
         </div>
 
@@ -2171,7 +2220,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
                   fontSize: 12.5, lineHeight: 1.55,
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 16 }}>⚠️</span>
+                    <FaExclamationTriangle size={14} />
                     <strong style={{ color: "var(--guayaba-red)" }}>Override por severidad ALTA aplicado</strong>
                   </div>
                   <div style={{ color: "var(--ink-soft)" }}>{result.override_severidad}</div>
@@ -2291,7 +2340,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
                               ))}
                             </ul>
                           )}
-                          {d.error && <div style={{ fontSize: 10.5, color: "var(--guayaba-red)" }}>⚠ {d.error}</div>}
+                          {d.error && <div style={{ fontSize: 10.5, color: "var(--danger)", display: 'inline-flex', alignItems: 'center', gap: 4 }}><FaExclamationTriangle size={10} /> {d.error}</div>}
                         </div>
                       );
                     })}
@@ -2305,7 +2354,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
                   marginTop: 14, padding: 12, background: `${nivelTone}10`,
                   borderRadius: 8, borderLeft: `3px solid ${nivelTone}`, fontSize: 12.5, lineHeight: 1.55,
                 }}>
-                  <strong style={{ color: nivelTone }}>🦅 Acción sugerida:</strong> {result.accion_sugerida}
+                  <strong style={{ color: nivelTone }}>Acción sugerida:</strong> {result.accion_sugerida}
                 </div>
               )}
 
@@ -2313,7 +2362,7 @@ export function EvaluarScreen({ onInvestigate }: any) {
                 marginTop: 14, padding: 10, background: "rgba(74,124,89,0.08)",
                 borderRadius: 8, borderLeft: "3px solid var(--paramo-green)", fontSize: 11.5,
               }}>
-                ⚖️ Este resultado es una <strong>alerta sugerida</strong>, no una acusación. La decisión final es del analista.
+                <FaInfoCircle size={12} style={{ marginRight: 6 }} /> Este resultado es una <strong>alerta sugerida</strong>, no una acusación. La decisión final es del analista.
               </div>
             </div>
           )}
@@ -2325,16 +2374,20 @@ export function EvaluarScreen({ onInvestigate }: any) {
 
 /* === Header con icono para secciones del form de Evaluar === */
 function SectionHeader({ icon, title, hint }: any) {
+  // icon: componente FA preferido, o string legacy
+  const IconCmp = typeof icon === 'function' ? icon : null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 8, borderBottom: "1px solid var(--line)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 10, borderBottom: "1px solid var(--border-color)" }}>
       <span style={{
-        width: 30, height: 30, borderRadius: 8,
-        background: "linear-gradient(135deg, rgba(232,122,79,0.15), rgba(197,51,58,0.08))",
-        display: "grid", placeItems: "center", fontSize: 16,
-      }}>{icon}</span>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--condor-wing)" }}>{title}</div>
-        {hint && <div style={{ fontSize: 10.5, color: "var(--ink-mute)", marginTop: 1 }}>{hint}</div>}
+        width: 32, height: 32, borderRadius: 8,
+        background: "var(--primary-soft)", color: "var(--primary)",
+        display: "grid", placeItems: "center",
+      }}>
+        {IconCmp ? <IconCmp size={15} /> : <span style={{ fontSize: 16 }}>{icon}</span>}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="display" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)" }}>{title}</div>
+        {hint && <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{hint}</div>}
       </div>
     </div>
   );
@@ -2345,6 +2398,7 @@ function DropZone({ label, icon, accept, file, onChange, engine }: any) {
   const id = `dz-${label.replace(/\s/g, "")}`;
   const isImg = file && /\.(jpe?g|png|gif)$/i.test(file.name);
   const [preview, setPreview] = useState<string | null>(null);
+  const IconCmp = typeof icon === 'function' ? icon : null;
 
   useEffect(() => {
     if (file && isImg) {
@@ -2359,13 +2413,13 @@ function DropZone({ label, icon, accept, file, onChange, engine }: any) {
     <label htmlFor={id} style={{
       position: "relative", overflow: "hidden",
       display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-      background: file ? "white" : "var(--marfil-paper)",
-      border: `1.5px ${file ? "solid var(--paramo-green)" : "dashed var(--line-strong)"}`,
+      background: file ? "var(--bg-card)" : "var(--bg-card-soft)",
+      border: `1.5px ${file ? "solid var(--success)" : "dashed var(--border-strong)"}`,
       borderRadius: 10, cursor: "pointer",
       minHeight: 56, transition: "all 0.18s ease",
     }}
-      onMouseEnter={(e) => { if (!file) (e.currentTarget as HTMLElement).style.borderColor = "var(--andes-orange)"; }}
-      onMouseLeave={(e) => { if (!file) (e.currentTarget as HTMLElement).style.borderColor = "var(--line-strong)"; }}
+      onMouseEnter={(e) => { if (!file) (e.currentTarget as HTMLElement).style.borderColor = "var(--primary)"; }}
+      onMouseLeave={(e) => { if (!file) (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)"; }}
     >
       <input id={id} type="file" accept={accept} style={{ display: "none" }}
              onChange={e => onChange(e.target.files?.[0] || null)} />
@@ -2373,12 +2427,15 @@ function DropZone({ label, icon, accept, file, onChange, engine }: any) {
       {/* Icono / preview */}
       <div style={{
         width: 38, height: 38, borderRadius: 8, flexShrink: 0,
-        background: file ? "rgba(74,124,89,0.10)" : "rgba(26,58,82,0.06)",
+        background: file ? "var(--success-soft)" : "var(--primary-soft)",
+        color: file ? "var(--success)" : "var(--primary)",
         display: "grid", placeItems: "center",
-        overflow: "hidden", border: "1px solid var(--line)",
+        overflow: "hidden", border: "1px solid var(--border-color)",
       }}>
         {preview ? (
           <img src={preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : IconCmp ? (
+          <IconCmp size={18} />
         ) : (
           <span style={{ fontSize: 20 }}>{icon}</span>
         )}
@@ -2386,13 +2443,13 @@ function DropZone({ label, icon, accept, file, onChange, engine }: any) {
 
       {/* Texto */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--condor-wing)" }}>{label}</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>{label}</div>
         {file ? (
-          <div className="mono" style={{ fontSize: 10, color: "var(--paramo-green)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            ✓ {file.name} · {(file.size / 1024).toFixed(0)} KB
+          <div className="mono" style={{ fontSize: 10, color: "var(--success)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <FaCheckCircle size={9} /> {file.name} · {(file.size / 1024).toFixed(0)} KB
           </div>
         ) : (
-          <div style={{ fontSize: 10, color: "var(--ink-mute)" }}>
+          <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>
             {engine ? `${engine} · ` : ""}click para subir {accept.replace(/\./g, "").toUpperCase()}
           </div>
         )}
@@ -2402,9 +2459,9 @@ function DropZone({ label, icon, accept, file, onChange, engine }: any) {
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); onChange(null); }}
-          style={{ background: "transparent", border: 0, color: "var(--guayaba-red)", cursor: "pointer", fontSize: 18, padding: 0, width: 24, height: 24 }}
+          style={{ background: "transparent", border: 0, color: "var(--danger)", cursor: "pointer", padding: 0, width: 24, height: 24, display: 'grid', placeItems: 'center' }}
           aria-label="Quitar archivo"
-        >×</button>
+        ><FaTimes size={14} /></button>
       )}
     </label>
   );
@@ -2446,7 +2503,7 @@ function EmptyStateEvaluar({ form, hayArchivos }: any) {
             }} />
           ))}
           <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
-            <Condor size={64} mood="think" tone="orange" />
+            <CondorLogo size={72} />
           </div>
         </div>
 
@@ -2464,7 +2521,7 @@ function EmptyStateEvaluar({ form, hayArchivos }: any) {
             textAlign: "left",
           }}>
             <div style={{ fontSize: 10.5, color: "var(--andes-orange)", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 6 }}>
-              🦅 Lo que ya predigo con tus valores actuales:
+              Lo que ya predigo con tus valores actuales:
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11.5, color: "var(--ink-soft)", lineHeight: 1.55 }}>
               {tips.slice(0, 4).map((t, i) => <li key={i}>{t}</li>)}
@@ -2479,15 +2536,15 @@ function EmptyStateEvaluar({ form, hayArchivos }: any) {
 /* === Loader con fases mientras procesa === */
 function LoadingStateEvaluar({ hayArchivos }: any) {
   const baseFases = [
-    { ic: "📊", txt: "Aplicando 7 reglas críticas + 14 señales", delay: 0 },
-    { ic: "🧮", txt: "Calculando score tabular con XGBoost", delay: 800 },
+    { ic: FaShieldAlt, txt: "Aplicando 7 reglas críticas + 14 señales", delay: 0 },
+    { ic: FaChartLine, txt: "Calculando score tabular con XGBoost", delay: 800 },
   ];
   const fasesDocs = hayArchivos ? [
-    { ic: "📄", txt: "Azure Document Intelligence procesando documentos", delay: 1400 },
-    { ic: "📷", txt: "GPT-4o Vision analizando imágenes", delay: 2400 },
-    { ic: "🧠", txt: "Combinando datos + documentos en veredicto único", delay: 3400 },
+    { ic: FaFileAlt, txt: "Azure Document Intelligence procesando documentos", delay: 1400 },
+    { ic: FaCamera, txt: "GPT-4o Vision analizando imágenes", delay: 2400 },
+    { ic: FaBrain, txt: "Combinando datos + documentos en veredicto único", delay: 3400 },
   ] : [];
-  const fases = [...baseFases, ...fasesDocs, { ic: "✨", txt: "Generando explicación en lenguaje natural", delay: hayArchivos ? 4200 : 1600 }];
+  const fases = [...baseFases, ...fasesDocs, { ic: FaLightbulb, txt: "Generando explicación en lenguaje natural", delay: hayArchivos ? 4200 : 1600 }];
 
   const [step, setStep] = useState(0);
   useEffect(() => {
@@ -2510,7 +2567,7 @@ function LoadingStateEvaluar({ hayArchivos }: any) {
             animation: "spin-slow 1.2s linear infinite",
           }} />
           <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
-            <Condor size={32} mood="think" tone="orange" />
+            <CondorLogo size={40} />
           </div>
         </div>
         <div>
@@ -2536,12 +2593,16 @@ function LoadingStateEvaluar({ hayArchivos }: any) {
             }}>
               <div style={{
                 width: 28, height: 28, borderRadius: "50%",
-                background: done ? "var(--paramo-green)" : active ? "var(--andes-orange)" : "white",
-                color: done || active ? "white" : "var(--ink-mute)",
-                display: "grid", placeItems: "center", fontSize: 14, fontWeight: 700,
-                border: pending ? "1px solid var(--line)" : "none",
+                background: done ? "var(--success)" : active ? "var(--primary)" : "var(--bg-card)",
+                color: done || active ? "white" : "var(--text-secondary)",
+                display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700,
+                border: pending ? "1px solid var(--border-color)" : "none",
               }}>
-                {done ? "✓" : active ? <span style={{ animation: "pulse-red 1s infinite" }}>{f.ic}</span> : i + 1}
+                {done ? <FaCheckCircle size={13} /> : active ? (
+                  typeof f.ic === 'function'
+                    ? <span style={{ animation: "pulse-amber 1.2s infinite", display: 'grid', placeItems: 'center' }}><f.ic size={12} /></span>
+                    : i + 1
+                ) : (i + 1)}
               </div>
               <div style={{
                 flex: 1, fontSize: 12.5,
@@ -2585,14 +2646,14 @@ function FileSlot({ label, accept, file, onChange }: any) {
       <span style={{ flex: 1, fontWeight: 500 }}>{label}</span>
       {file ? (
         <>
-          <span className="mono" style={{ fontSize: 10, color: "var(--paramo-green)", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 100, whiteSpace: "nowrap" }}>
-            ✓ {file.name}
+          <span className="mono" style={{ fontSize: 10, color: "var(--success)", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 100, whiteSpace: "nowrap", display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <FaCheckCircle size={9} /> {file.name}
           </span>
           <button
             type="button"
             onClick={(e) => { e.preventDefault(); onChange(null); }}
-            style={{ background: "transparent", border: 0, color: "var(--guayaba-red)", cursor: "pointer", fontSize: 14, padding: 0 }}
-          >×</button>
+            style={{ background: "transparent", border: 0, color: "var(--danger)", cursor: "pointer", padding: 0, display: 'grid', placeItems: 'center' }}
+          ><FaTimes size={12} /></button>
         </>
       ) : (
         <span style={{ fontSize: 10, color: "var(--ink-mute)" }}>elegir…</span>
@@ -2653,8 +2714,8 @@ export function AseguradoScreen({ aseguradoId, onBack, onInvestigate }: any) {
   if (!data) {
     return (
       <div style={{ padding: 32, textAlign: 'center' }}>
-        <Condor size={56} mood="think" tone="orange" />
-        <div style={{ marginTop: 10, fontSize: 13, color: 'var(--ink-mute)' }}>Recuperando expediente de {aseguradoId}…</div>
+        <CondorLogo size={64} />
+        <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text-secondary)' }}>Recuperando expediente de {aseguradoId}…</div>
       </div>
     );
   }
@@ -2675,7 +2736,7 @@ export function AseguradoScreen({ aseguradoId, onBack, onInvestigate }: any) {
         background: 'linear-gradient(180deg, rgba(44,95,141,0.08), transparent)',
         display: 'flex', alignItems: 'center', gap: 16 }}>
         <button className="btn ghost" onClick={onBack} style={{ padding: '6px 10px', fontSize: 12 }}>← Volver</button>
-        <Condor size={36} mood="speak" tone="wing" />
+        <CondorLogo size={40} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10.5, letterSpacing: '.18em', color: 'var(--mountain-blue)', fontWeight: 700, textTransform: 'uppercase' }}>
             Vista 360 del asegurado
@@ -2724,13 +2785,13 @@ export function AseguradoScreen({ aseguradoId, onBack, onInvestigate }: any) {
                   <div style={{ fontSize: 12 }}>{s.marca || ''} {s.modelo || ''} {s.anio_vehiculo || ''}</div>
                   <div style={{ fontSize: 10.5, color: 'var(--ink-mute)' }}>
                     {String(s.fecha_ocurrencia).slice(0,10)} · {s.cobertura} · {s.sucursal || s.ciudad_evento}
-                    {s.lista_restrictiva ? ' · ⚠ prov. lista restrictiva' : ''}
+                    {s.lista_restrictiva ? ' · prov. lista restrictiva' : ''}
                   </div>
                 </div>
                 <span className="tabular mono" style={{ fontSize: 11 }}>${(s.monto_reclamado_usd||0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                 <span className="chip mono" style={{ fontSize: 9 }}>{s.id_proveedor}</span>
-                <button className="chip outline" style={{ fontSize: 9.5, cursor: 'pointer' }} onClick={() => onInvestigate(s.id_siniestro)}>
-                  🦅 ver
+                <button className="btn ghost sm" onClick={() => onInvestigate(s.id_siniestro)}>
+                  <FaEye size={10} /> Ver
                 </button>
               </div>
             ))}
@@ -2941,7 +3002,7 @@ export function ExplorarScreen({ onInvestigate }: any) {
         background: "linear-gradient(180deg, rgba(44,95,141,0.06), transparent)",
         display: "flex", alignItems: "center", gap: 14,
       }}>
-        <Condor size={30} mood="speak" tone="wing" />
+        <CondorLogo size={36} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10.5, letterSpacing: ".18em", color: "var(--mountain-blue)", fontWeight: 700, textTransform: "uppercase" }}>
             Explorador de cartera
@@ -2966,7 +3027,7 @@ export function ExplorarScreen({ onInvestigate }: any) {
         display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8,
       }}>
         <input
-          placeholder="🔍 buscar id (SIN-...)"
+          placeholder="Buscar id (SIN-...)"
           value={filtros.q}
           onChange={e => patch("q", e.target.value)}
           style={expField}
@@ -3029,7 +3090,7 @@ export function ExplorarScreen({ onInvestigate }: any) {
         <div />
         <div />
         <button className="btn ghost" onClick={limpiarFiltros} style={{ fontSize: 11 }}>
-          ✕ Limpiar filtros
+          <FaTimes size={10} /> Limpiar filtros
         </button>
       </div>
 
@@ -3051,7 +3112,7 @@ export function ExplorarScreen({ onInvestigate }: any) {
         borderBottom: "1px solid var(--line)",
         fontSize: 11, color: "var(--ink-soft)",
       }}>
-        ℹ️ Las etiquetas <span className="chip amber" style={{ fontSize: 9, margin: "0 2px" }}>🚩 alerta</span> y
+        <FaInfoCircle size={12} style={{ marginRight: 6, verticalAlign: 'middle' }} /> Las etiquetas <span className="chip amber" style={{ fontSize: 9, margin: "0 2px" }}><FaFlag size={9} /> alerta</span> y
         <span className="chip" style={{ fontSize: 9, margin: "0 2px" }}>auditoría</span> son marcas históricas del dataset (etiqueta_fraude_simulada y caso_inyectado). <strong>NO son acusaciones</strong> — solo indican que el caso fue marcado como sospechoso por el equipo o sintetizado para auditar el modelo. La decisión final siempre la toma un analista humano.
       </div>
 
@@ -3088,7 +3149,7 @@ export function ExplorarScreen({ onInvestigate }: any) {
                     {c.etiqueta_fraude_simulada > 0 && (
                       <span className="chip amber" style={{ fontSize: 9, marginRight: 2 }}
                             title="Marcado históricamente como sospechoso. No es acusación.">
-                        🚩 alerta
+                        <FaFlag size={9} /> alerta
                       </span>
                     )}
                     {c.caso_inyectado && (
@@ -3100,8 +3161,8 @@ export function ExplorarScreen({ onInvestigate }: any) {
                     {!c.documentos_completos && <span className="chip" style={{ fontSize: 9, marginLeft: 2 }}>docs incompletos</span>}
                   </td>
                   <td style={{ padding: "8px 10px" }}>
-                    <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => onInvestigate && onInvestigate(c.id_siniestro)}>
-                      🦅 investigar
+                    <button className="btn ghost sm" onClick={() => onInvestigate && onInvestigate(c.id_siniestro)}>
+                      <FaSearch size={10} /> Investigar
                     </button>
                   </td>
                 </tr>
@@ -3232,23 +3293,21 @@ export function CargarCasosScreen({ onInvestigate }: any) {
       <div style={{
         position: "relative", overflow: "hidden",
         padding: "28px 32px",
-        background: "linear-gradient(135deg, #FAF6EE 0%, #F4EDE4 60%, rgba(74,124,89,0.08) 100%)",
-        borderBottom: "1px solid var(--line)",
+        background: "var(--bg-card)",
+        borderBottom: "1px solid var(--border-color)",
       }}>
-        <div aria-hidden style={{
-          position: "absolute", right: 32, top: 12, fontSize: 120, opacity: 0.06,
-          pointerEvents: "none", animation: "condor-float 9s ease-in-out infinite",
-        }}>📥</div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Condor size={36} mood="speak" tone="wing" />
+          <div style={{ width: 44, height: 44, borderRadius: 10, background: 'var(--success-soft)', color: 'var(--success)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            <FaUpload size={20} />
+          </div>
           <div>
-            <div style={{ fontSize: 11, letterSpacing: ".22em", color: "var(--paramo-green)", fontWeight: 700, textTransform: "uppercase" }}>
+            <div style={{ fontSize: 11, letterSpacing: ".18em", color: "var(--success)", fontWeight: 700, textTransform: "uppercase" }}>
               Carga de nuevos siniestros al dataset
             </div>
-            <h1 style={{ fontSize: 28, marginTop: 4, fontFamily: "var(--serif)", fontWeight: 500 }}>
+            <h1 className="display" style={{ fontSize: 26, marginTop: 4, fontWeight: 700, color: "var(--text-primary)" }}>
               Sumá casos nuevos al cóndor en segundos.
             </h1>
-            <div style={{ fontSize: 12.5, color: "var(--ink-soft)", marginTop: 4 }}>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 6 }}>
               Subí un CSV con muchos casos o cargá uno solo desde el formulario.
               Se agregan a <span className="mono">data/processed/siniestros.parquet</span> y aparecen inmediatamente en bandeja, explorador y agente.
             </div>
@@ -3266,15 +3325,16 @@ export function CargarCasosScreen({ onInvestigate }: any) {
               onClick={() => setTab(t)}
               style={{
                 padding: "10px 18px", fontSize: 13, fontWeight: 600,
-                background: sel ? "white" : "var(--marfil-paper)",
-                color: sel ? "var(--andes-orange)" : "var(--ink-mute)",
-                border: sel ? "1px solid var(--line)" : "1px solid transparent",
-                borderBottom: sel ? "1px solid white" : "1px solid var(--line)",
+                background: sel ? "var(--bg-card)" : "var(--bg-subtle)",
+                color: sel ? "var(--primary)" : "var(--text-secondary)",
+                border: sel ? "1px solid var(--border-color)" : "1px solid transparent",
+                borderBottom: sel ? "1px solid var(--bg-card)" : "1px solid var(--border-color)",
                 borderRadius: "8px 8px 0 0",
                 cursor: "pointer", marginBottom: -1,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
               }}
             >
-              {t === "csv" ? "📂 Subir CSV (bulk)" : "📝 Cargar uno solo (form)"}
+              {t === "csv" ? <><FaUpload size={12} /> Subir CSV (bulk)</> : <><FaEdit size={12} /> Cargar uno solo (form)</>}
             </button>
           );
         })}
@@ -3295,7 +3355,7 @@ export function CargarCasosScreen({ onInvestigate }: any) {
                 </div>
                 <a className="btn ghost" style={{ fontSize: 12, textDecoration: "none", whiteSpace: "nowrap" }}
                    href={`${API}/casos/plantilla.csv`}>
-                  ⬇ Descargar plantilla.csv
+                  <FaDownload size={11} /> Descargar plantilla.csv
                 </a>
               </div>
 
@@ -3310,36 +3370,38 @@ export function CargarCasosScreen({ onInvestigate }: any) {
 
               <label htmlFor="csv-input" style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
-                gap: 12, padding: "30px 20px",
-                background: archivo ? "rgba(74,124,89,0.08)" : "var(--marfil-paper)",
-                border: `2px dashed ${archivo ? "var(--paramo-green)" : "var(--line-strong)"}`,
+                gap: 14, padding: "30px 20px",
+                background: archivo ? "var(--success-soft)" : "var(--bg-card-soft)",
+                border: `2px dashed ${archivo ? "var(--success)" : "var(--border-strong)"}`,
                 borderRadius: 12, cursor: "pointer", textAlign: "center",
                 transition: "all 0.2s ease",
               }}
-              onMouseEnter={e => { if (!archivo) (e.currentTarget as HTMLElement).style.borderColor = "var(--andes-orange)"; }}
-              onMouseLeave={e => { if (!archivo) (e.currentTarget as HTMLElement).style.borderColor = "var(--line-strong)"; }}
+              onMouseEnter={e => { if (!archivo) (e.currentTarget as HTMLElement).style.borderColor = "var(--primary)"; }}
+              onMouseLeave={e => { if (!archivo) (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)"; }}
               >
                 <input id="csv-input" type="file" accept=".csv" style={{ display: "none" }}
                        onChange={e => handleFile(e.target.files?.[0] || null)} />
-                <div style={{ fontSize: 36 }}>{archivo ? "✓" : "📂"}</div>
+                <div style={{ color: archivo ? 'var(--success)' : 'var(--primary)' }}>
+                  {archivo ? <FaCheckCircle size={32} /> : <FaUpload size={32} />}
+                </div>
                 <div style={{ textAlign: "left" }}>
                   {archivo ? (
                     <>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--paramo-green)" }}>{archivo.name}</div>
-                      <div style={{ fontSize: 11, color: "var(--ink-mute)" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--success)" }}>{archivo.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
                         {(archivo.size / 1024).toFixed(1)} KB · click para cambiar
                       </div>
                     </>
                   ) : (
                     <>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>Click para elegir tu CSV</div>
-                      <div style={{ fontSize: 11, color: "var(--ink-mute)" }}>O arrastrá el archivo aquí</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Click para elegir tu CSV</div>
+                      <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>O arrastrá el archivo aquí</div>
                     </>
                   )}
                 </div>
                 {archivo && (
                   <button onClick={e => { e.preventDefault(); handleFile(null); }}
-                          style={{ background: "transparent", border: 0, fontSize: 18, color: "var(--guayaba-red)", cursor: "pointer" }}>×</button>
+                          style={{ background: "transparent", border: 0, color: "var(--danger)", cursor: "pointer", display: 'grid', placeItems: 'center' }}><FaTimes size={14} /></button>
                 )}
               </label>
 
@@ -3374,24 +3436,17 @@ export function CargarCasosScreen({ onInvestigate }: any) {
                 </div>
               )}
               {preview && preview[0]?.error && (
-                <div style={{ marginTop: 12, padding: 10, background: "rgba(197,51,58,0.06)", borderRadius: 8, fontSize: 12, color: "var(--guayaba-red)" }}>
-                  ⚠ {preview[0].error}
+                <div style={{ marginTop: 12, padding: 10, background: "var(--danger-soft)", borderRadius: 8, fontSize: 12, color: "var(--danger)", display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FaExclamationTriangle size={13} /> {preview[0].error}
                 </div>
               )}
 
               <button
                 onClick={subirCSV}
                 disabled={!archivo || subiendo}
-                className="btn warm"
-                style={{
-                  marginTop: 18, padding: "12px 18px", width: "100%",
-                  background: subiendo ? "var(--ink-mute)" : !archivo ? "var(--line-strong)"
-                          : "linear-gradient(135deg, var(--paramo-green), var(--mountain-blue))",
-                  color: "white", border: 0, borderRadius: 10, fontSize: 14, fontWeight: 600,
-                  cursor: (!archivo || subiendo) ? "not-allowed" : "pointer",
-                  boxShadow: archivo && !subiendo ? "0 4px 14px rgba(74,124,89,0.35)" : "none",
-                }}>
-                {subiendo ? "🦅 Cargando al dataset…" : !archivo ? "Elegí un CSV primero" : "🦅 Cargar al dataset del cóndor"}
+                className="btn block"
+                style={{ marginTop: 18 }}>
+                <FaUpload size={13} /> {subiendo ? "Cargando al dataset…" : !archivo ? "Elegí un CSV primero" : "Cargar al dataset"}
               </button>
             </>
           )}
@@ -3448,15 +3503,9 @@ export function CargarCasosScreen({ onInvestigate }: any) {
               <button
                 onClick={subirForm}
                 disabled={subiendo}
-                className="btn warm"
-                style={{
-                  marginTop: 16, padding: "12px 18px", width: "100%",
-                  background: subiendo ? "var(--ink-mute)" : "linear-gradient(135deg, var(--paramo-green), var(--mountain-blue))",
-                  color: "white", border: 0, borderRadius: 10, fontSize: 14, fontWeight: 600,
-                  cursor: subiendo ? "wait" : "pointer",
-                  boxShadow: subiendo ? "none" : "0 4px 14px rgba(74,124,89,0.35)",
-                }}>
-                {subiendo ? "🦅 Guardando…" : "🦅 Guardar caso en el dataset"}
+                className="btn block"
+                style={{ marginTop: 16 }}>
+                <FaSave size={13} /> {subiendo ? "Guardando…" : "Guardar caso en el dataset"}
               </button>
             </>
           )}
@@ -3465,11 +3514,11 @@ export function CargarCasosScreen({ onInvestigate }: any) {
           {resultado && (
             <div style={{
               marginTop: 18, padding: 16, borderRadius: 10,
-              background: resultado.ok ? "rgba(74,124,89,0.08)" : "rgba(197,51,58,0.08)",
-              borderLeft: `3px solid ${resultado.ok ? "var(--paramo-green)" : "var(--guayaba-red)"}`,
+              background: resultado.ok ? "var(--success-soft)" : "var(--danger-soft)",
+              borderLeft: `3px solid ${resultado.ok ? "var(--success)" : "var(--danger)"}`,
             }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: resultado.ok ? "var(--paramo-green)" : "var(--guayaba-red)" }}>
-                {resultado.ok ? "✓" : "⚠"} {resultado.mensaje}
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: resultado.ok ? "var(--success)" : "var(--danger)", display: 'flex', alignItems: 'center', gap: 8 }}>
+                {resultado.ok ? <FaCheckCircle size={13} /> : <FaExclamationTriangle size={13} />} {resultado.mensaje}
               </div>
               {resultado.ok && resultado.n_agregados > 0 && (
                 <>
@@ -3484,8 +3533,8 @@ export function CargarCasosScreen({ onInvestigate }: any) {
                       IDs generados: {resultado.ids_generados.map((id: string) => (
                         <button key={id}
                                 onClick={() => onInvestigate && onInvestigate(id)}
-                                className="mono chip outline" style={{ fontSize: 10, cursor: "pointer", marginRight: 4, marginTop: 4 }}>
-                          🦅 {id}
+                                className="btn ghost sm mono" style={{ marginRight: 4, marginTop: 4 }}>
+                          <FaSearch size={9} /> {id}
                         </button>
                       ))}
                     </div>
@@ -3516,7 +3565,7 @@ export function CargarCasosScreen({ onInvestigate }: any) {
           background: "rgba(232,122,79,0.05)", borderRadius: 8,
           borderLeft: "3px solid var(--andes-orange)",
         }}>
-          ⚖️ Los casos cargados se mezclan con el dataset existente. El próximo reentreno
+          <FaInfoCircle size={12} style={{ marginRight: 6, verticalAlign: 'middle' }} /> Los casos cargados se mezclan con el dataset existente. El próximo reentreno
           del modelo XGBoost / IsolationForest los incorporará. Mientras tanto, ya aparecen
           en bandeja, explorador, agente y mapa de Ecuador.
         </div>
@@ -3546,9 +3595,9 @@ export function PrevencionScreen({ onInvestigate }: any) {
 
   const sevColor = (s: string) => s === 'alta' ? 'var(--guayaba-red)' : s === 'media' ? 'var(--andes-orange)' : 'var(--paramo-green)';
   const tipoIcon: Record<string, string> = {
-    proveedor_uptick: '📈',
-    asegurado_recurrente: '👤',
-    cluster_geografico: '📍',
+    proveedor_uptick: FaChartLine,
+    asegurado_recurrente: FaUserCircle,
+    cluster_geografico: FaMapMarkerAlt,
   };
 
   return (
@@ -3558,13 +3607,15 @@ export function PrevencionScreen({ onInvestigate }: any) {
         background: "linear-gradient(180deg, rgba(74,124,89,0.10), transparent)",
         display: "flex", alignItems: "center", gap: 14,
       }}>
-        <Condor size={32} mood="alert" tone="wing" />
+        <div style={{ width: 44, height: 44, borderRadius: 10, background: 'var(--success-soft)', color: 'var(--success)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <FaShieldAlt size={20} />
+        </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 10.5, letterSpacing: ".18em", color: "var(--paramo-green)", fontWeight: 700, textTransform: "uppercase" }}>
-            🛡️ Sistema de prevención · antes de que pase
+          <div style={{ fontSize: 10.5, letterSpacing: ".16em", color: "var(--success)", fontWeight: 700, textTransform: "uppercase" }}>
+            Sistema de prevención · antes de que pase
           </div>
-          <h2 style={{ fontSize: 22, marginTop: 2 }}>Alertas tempranas y watchlist sugerida</h2>
-          <div style={{ fontSize: 11.5, color: "var(--ink-mute)", marginTop: 2 }}>
+          <h2 className="display" style={{ fontSize: 22, marginTop: 4, color: 'var(--text-primary)' }}>Alertas tempranas y watchlist sugerida</h2>
+          <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 4 }}>
             La mayoría de soluciones detectan fraude <em>después</em> del pago. AchachAI detecta los <strong>patrones formándose</strong> y sugiere intervenir antes de que generen pérdidas.
           </div>
         </div>
@@ -3586,8 +3637,8 @@ export function PrevencionScreen({ onInvestigate }: any) {
       <div style={{ padding: 24 }}>
         {loading && (
           <div style={{ textAlign: "center", padding: 40 }}>
-            <Condor size={48} mood="think" tone="wing" />
-            <div style={{ marginTop: 10, fontSize: 13, color: "var(--ink-mute)" }}>Buscando clusters en formación…</div>
+            <CondorLogo size={56} />
+            <div style={{ marginTop: 10, fontSize: 13, color: "var(--text-secondary)" }}>Buscando clusters en formación…</div>
           </div>
         )}
 
@@ -3609,8 +3660,8 @@ export function PrevencionScreen({ onInvestigate }: any) {
               borderLeft: `3px solid ${alertas.n_alertas > 0 ? "var(--andes-orange)" : "var(--paramo-green)"}`,
               borderRadius: 8, fontSize: 13,
             }}>
-              <strong style={{ color: alertas.n_alertas > 0 ? "var(--andes-orange)" : "var(--paramo-green)" }}>
-                🦅 El cóndor te avisa:
+              <strong style={{ color: alertas.n_alertas > 0 ? "var(--warning)" : "var(--success)" }}>
+                El cóndor te avisa:
               </strong> {alertas.mensaje}
               {alertas.diagnostico && (
                 <div style={{ marginTop: 6, fontSize: 11, color: "var(--ink-mute)" }}>
@@ -3626,9 +3677,12 @@ export function PrevencionScreen({ onInvestigate }: any) {
               <div className="card" style={{ padding: 18 }}>
                 <div className="diamond-divider" style={{ marginBottom: 12 }}>Clusters formándose</div>
                 {alertas.alertas?.length === 0 && (
-                  <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>
-                    ✓ Nada raro en la ventana actual. Sigue volando.
-                  </div>
+                  <EmptyState
+                    compact
+                    icon={FaCheckCircle}
+                    title="Nada raro en la ventana actual"
+                    description="La cartera luce estable. Seguimos vigilando."
+                  />
                 )}
                 <div style={{ display: "grid", gap: 10 }}>
                   {alertas.alertas?.map((a: any, i: number) => (
@@ -3638,8 +3692,13 @@ export function PrevencionScreen({ onInvestigate }: any) {
                       borderLeft: `4px solid ${sevColor(a.severidad)}`,
                       border: "1px solid var(--line)",
                     }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-                        <span style={{ fontSize: 18 }}>{tipoIcon[a.tipo] || '⚠️'}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <span style={{ color: sevColor(a.severidad), display: 'grid', placeItems: 'center' }}>
+                          {(() => {
+                            const I = tipoIcon[a.tipo] || FaExclamationTriangle;
+                            return <I size={15} />;
+                          })()}
+                        </span>
                         <span style={{ fontSize: 13, fontWeight: 600, flex: 1, color: sevColor(a.severidad) }}>
                           {a.titulo}
                         </span>
@@ -3764,9 +3823,9 @@ export function AjustesScreen() {
         body: JSON.stringify(cfg),
       });
       const d = await r.json();
-      setSavedMsg(d?.ok ? `✓ Pesos guardados. Cache invalidado.` : `⚠ ${JSON.stringify(d)}`);
+      setSavedMsg(d?.ok ? `Pesos guardados. Cache invalidado.` : `Error: ${JSON.stringify(d)}`);
     } catch (e: any) {
-      setSavedMsg(`✗ ${e?.message || e}`);
+      setSavedMsg(`Error: ${e?.message || e}`);
     } finally {
       setBusy(false);
     }
@@ -3778,11 +3837,11 @@ export function AjustesScreen() {
     try {
       await fetch(`${API}/config/pesos/reset`, { method: "POST" });
       await load();
-      setSavedMsg("✓ Restaurado a default del PDF.");
+      setSavedMsg("Restaurado a default del PDF.");
     } finally { setBusy(false); }
   }
 
-  if (!cfg) return <div style={{ padding: 40 }}><Condor size={48} mood="think" tone="orange" /> Cargando configuración…</div>;
+  if (!cfg) return <div style={{ padding: 40, display: 'flex', alignItems: 'center', gap: 12 }}><CondorLogo size={36} /> Cargando configuración…</div>;
 
   function patchSenalMax(id: string, max: number) {
     setCfg((c: any) => ({ ...c, senales: { ...c.senales, [id]: { ...c.senales[id], max } } }));
@@ -3798,24 +3857,26 @@ export function AjustesScreen() {
   }
 
   return (
-    <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)" }}>
+    <div style={{ height: "100%", overflow: "auto", background: "var(--bg-main)" }}>
       <div style={{
-        padding: "20px 32px", borderBottom: "1px solid var(--line)",
-        background: "linear-gradient(180deg, rgba(232,122,79,0.08), transparent)",
+        padding: "20px 32px", borderBottom: "1px solid var(--border-color)",
+        background: "var(--bg-card)",
         display: "flex", alignItems: "center", gap: 14,
       }}>
-        <Condor size={30} mood="speak" tone="orange" />
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--primary-soft)', color: 'var(--primary)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <FaCog size={18} />
+        </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 10.5, letterSpacing: ".18em", color: "var(--andes-orange)", fontWeight: 700, textTransform: "uppercase" }}>
+          <div style={{ fontSize: 10.5, letterSpacing: ".16em", color: "var(--primary)", fontWeight: 700, textTransform: "uppercase" }}>
             Ajustes · calibración de pesos
           </div>
-          <h2 style={{ fontSize: 22, marginTop: 2 }}>Reglas y señales editables</h2>
-          <div style={{ fontSize: 11.5, color: "var(--ink-mute)", marginTop: 2 }}>
+          <h2 className="display" style={{ fontSize: 22, marginTop: 4, color: 'var(--text-primary)' }}>Reglas y señales editables</h2>
+          <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 4 }}>
             Cambiá los pesos del PDF, desactivá reglas críticas, ajustá umbrales rojo/amarillo/verde. Los cambios persisten en <span className="mono">data/processed/pesos_config.json</span> e invalidan el cache.
           </div>
         </div>
-        <button className="btn ghost" onClick={resetDefault} disabled={busy}>↺ Restaurar default PDF</button>
-        <button className="btn warm" onClick={save} disabled={busy}>{busy ? "Guardando…" : "💾 Guardar y aplicar"}</button>
+        <button className="btn ghost" onClick={resetDefault} disabled={busy}><FaRedo size={11} /> Restaurar default</button>
+        <button className="btn" onClick={save} disabled={busy}><FaSave size={12} /> {busy ? "Guardando…" : "Guardar y aplicar"}</button>
       </div>
 
       <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 20 }}>
@@ -3880,14 +3941,14 @@ export function AjustesScreen() {
               </FormField>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 12, fontSize: 10.5, textAlign: "center" }}>
-              <div style={{ padding: 8, background: "rgba(74,124,89,0.15)", borderRadius: 6 }}>
-                🟢 VERDE<br/><span className="mono">0 – {cfg.umbrales_score?.verde_hasta || 40}</span>
+              <div style={{ padding: 10, background: "var(--success-soft)", color: "var(--success)", borderRadius: 6, fontWeight: 600 }}>
+                Riesgo bajo<br/><span className="mono" style={{ fontWeight: 500 }}>0 – {cfg.umbrales_score?.verde_hasta || 40}</span>
               </div>
-              <div style={{ padding: 8, background: "rgba(212,165,116,0.20)", borderRadius: 6 }}>
-                🟡 AMARILLO<br/><span className="mono">{(cfg.umbrales_score?.verde_hasta || 40)+1} – {cfg.umbrales_score?.amarillo_hasta || 75}</span>
+              <div style={{ padding: 10, background: "var(--warning-soft)", color: "var(--warning)", borderRadius: 6, fontWeight: 600 }}>
+                Riesgo medio<br/><span className="mono" style={{ fontWeight: 500 }}>{(cfg.umbrales_score?.verde_hasta || 40)+1} – {cfg.umbrales_score?.amarillo_hasta || 75}</span>
               </div>
-              <div style={{ padding: 8, background: "rgba(197,51,58,0.15)", borderRadius: 6 }}>
-                🔴 ROJO<br/><span className="mono">{(cfg.umbrales_score?.amarillo_hasta || 75)+1} – 100</span>
+              <div style={{ padding: 10, background: "var(--danger-soft)", color: "var(--danger)", borderRadius: 6, fontWeight: 600 }}>
+                Riesgo alto<br/><span className="mono" style={{ fontWeight: 500 }}>{(cfg.umbrales_score?.amarillo_hasta || 75)+1} – 100</span>
               </div>
             </div>
           </div>
@@ -3896,7 +3957,7 @@ export function AjustesScreen() {
 
       {savedMsg && (
         <div style={{ position: "fixed", bottom: 24, right: 24, padding: "10px 16px",
-          background: savedMsg.startsWith("✓") ? "var(--paramo-green)" : "var(--guayaba-red)",
+          background: !savedMsg.startsWith("Error") ? "var(--success)" : "var(--danger)",
           color: "white", borderRadius: 8, fontSize: 12, boxShadow: "var(--shadow-lg)" }}>
           {savedMsg}
         </div>
@@ -3907,7 +3968,7 @@ export function AjustesScreen() {
         {/* Fairness analysis */}
         <div className="card" style={{ padding: 18 }}>
           <div className="diamond-divider" style={{ marginBottom: 12 }}>
-            🎯 Auditoría de sesgo · acuerdo humano vs modelo
+            <FaChartBar size={13} style={{ verticalAlign: 'middle', marginRight: 6 }} /> Auditoría de sesgo · acuerdo humano vs modelo
           </div>
           {!fairness && (
             <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>Cargando fairness…</div>
@@ -4024,7 +4085,7 @@ export function AjustesScreen() {
         {/* Admin de modelos + reentreno on-demand */}
         <div className="card" style={{ padding: 18 }}>
           <div className="diamond-divider" style={{ marginBottom: 12 }}>
-            🔧 Estado de modelos · reentreno on-demand
+            <FaCog size={13} style={{ verticalAlign: 'middle', marginRight: 6 }} /> Estado de modelos · reentreno on-demand
           </div>
 
           {modelInfo && (
@@ -4040,7 +4101,7 @@ export function AjustesScreen() {
                     <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase" }}>{k}</span>
                       {m.existe
-                        ? <span className="chip green mono" style={{ fontSize: 9 }}>✓ {m.size_kb} KB</span>
+                        ? <span className="chip green mono" style={{ fontSize: 9 }}><FaCheckCircle size={9} /> {m.size_kb} KB</span>
                         : <span className="chip red mono" style={{ fontSize: 9 }}>no entrenado</span>}
                     </div>
                     {m.mtime && (
@@ -4070,7 +4131,7 @@ export function AjustesScreen() {
             onClick={reentrenarIForest}
             style={{ width: "100%", padding: "10px 14px" }}
           >
-            {retraining ? "🦅 Reentrenando IsolationForest…" : "⚡ Reentrenar IsolationForest ahora"}
+            <FaRedo size={12} /> {retraining ? "Reentrenando IsolationForest…" : "Reentrenar IsolationForest ahora"}
           </button>
 
           {retrainLog && (
@@ -4082,7 +4143,7 @@ export function AjustesScreen() {
               fontSize: 11.5,
             }}>
               <div style={{ fontWeight: 600, marginBottom: 6 }}>
-                {retrainLog.ok ? "✓" : "✗"} {retrainLog.mensaje}
+                {retrainLog.ok ? <FaCheckCircle size={11} /> : <FaTimesCircle size={11} />} {retrainLog.mensaje}
               </div>
               {retrainLog.stdout && (
                 <details style={{ marginTop: 4 }}>
@@ -4133,17 +4194,28 @@ export function AnomaliasScreen({ onInvestigate }: any) {
       const d = await r.json();
       setExplicaciones((m) => ({ ...m, [id]: d }));
     } catch (e: any) {
-      setExplicaciones((m) => ({ ...m, [id]: { explicacion_condor: `⚠ ${e?.message || e}` } }));
+      setExplicaciones((m) => ({ ...m, [id]: { explicacion_condor: `${e?.message || e}` } }));
     } finally {
       setExplicando((m) => ({ ...m, [id]: false }));
     }
   }
 
+  const [loadErr, setLoadErr] = useSc<string | null>(null);
   useScE(() => {
     setLoading(true);
+    setLoadErr(null);
     fetch(`${API}/anomalias-novedosas?limit=20&contamination=${contamination}`)
-      .then(r => r.json()).then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(async r => {
+        if (!r.ok) {
+          const txt = await r.text().catch(() => "");
+          let msg = `HTTP ${r.status}`;
+          try { const j = JSON.parse(txt); if (j?.detail) msg = j.detail; } catch {}
+          throw new Error(msg);
+        }
+        return r.json();
+      })
+      .then(d => { setData(d); setLoading(false); })
+      .catch(e => { setLoadErr(String(e?.message || e)); setData(null); setLoading(false); });
   }, [contamination]);
 
   return (
@@ -4153,7 +4225,7 @@ export function AnomaliasScreen({ onInvestigate }: any) {
         background: "linear-gradient(180deg, rgba(44,95,141,0.08), transparent)",
         display: "flex", alignItems: "center", gap: 14,
       }}>
-        <Condor size={32} mood="alert" tone="wing" />
+        <CondorLogo size={40} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10.5, letterSpacing: ".18em", color: "var(--mountain-blue)", fontWeight: 700, textTransform: "uppercase" }}>
             Patrones nuevos · IsolationForest no supervisado
@@ -4181,14 +4253,27 @@ export function AnomaliasScreen({ onInvestigate }: any) {
       <div style={{ padding: 24 }}>
         {loading && (
           <div style={{ textAlign: "center", padding: 60 }}>
-            <Condor size={56} mood="think" tone="wing" />
-            <div style={{ marginTop: 10, fontSize: 13, color: "var(--ink-mute)" }}>
+            <CondorLogo size={64} />
+            <div style={{ marginTop: 10, fontSize: 13, color: "var(--text-secondary)" }}>
               Entrenando IsolationForest sobre 25K siniestros…
             </div>
           </div>
         )}
 
-        {!loading && data && (
+        {!loading && loadErr && (
+          <div className="card" style={{ padding: 22, borderLeft: '3px solid var(--danger)' }}>
+            <div style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FaExclamationTriangle size={14} /> No se pudo cargar Patrones inusuales
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 6 }}>{loadErr}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10 }}>
+              Esta vista requiere <span className="mono">scikit-learn</span> en el backend. Instalá con:{' '}
+              <span className="mono">.venv/Scripts/pip install scikit-learn</span> y reinicia uvicorn.
+            </div>
+          </div>
+        )}
+
+        {!loading && !loadErr && data && Array.isArray(data.items) && (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 18 }}>
               <MiniKpi label="Casos atípicos detectados" value={data.total} tone="orange"/>
@@ -4222,10 +4307,10 @@ export function AnomaliasScreen({ onInvestigate }: any) {
                       </div>
                       <span className="tabular mono" style={{ fontSize: 11 }}>${(it.monto_reclamado_usd||0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                       <div style={{ display: "flex", gap: 4 }}>
-                        {it.novedoso && <span className="chip red" style={{ fontSize: 9 }}>✨ patrón nuevo</span>}
+                        {it.novedoso && <span className="chip red" style={{ fontSize: 9 }}>patrón nuevo</span>}
                         {it.etiqueta_fraude_simulada > 0 && (
                           <span className="chip amber" style={{ fontSize: 9 }} title="Marcado históricamente. No es acusación.">
-                            🚩 alerta
+                            <FaFlag size={9} /> alerta
                           </span>
                         )}
                         {it.caso_inyectado && (
@@ -4235,14 +4320,13 @@ export function AnomaliasScreen({ onInvestigate }: any) {
                         )}
                       </div>
                       <button
-                        className="chip outline"
-                        style={{ fontSize: 10, cursor: "pointer" }}
+                        className="btn ghost sm"
                         disabled={isExp}
                         onClick={() => pedirExplicacion(it.id_siniestro)}
                       >
-                        {isExp ? "🦅 pensando…" : exp ? "🦅 explicación ↑" : "🦅 que me explique"}
+                        <FaBrain size={10} /> {isExp ? "Pensando…" : exp ? "Ver explicación" : "Explicame"}
                       </button>
-                      <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => onInvestigate(it.id_siniestro)}>🔍 ver</button>
+                      <button className="btn ghost sm" onClick={() => onInvestigate(it.id_siniestro)}><FaEye size={10} /> Ver</button>
                     </div>
                     {exp && (
                       <div style={{
@@ -4252,7 +4336,7 @@ export function AnomaliasScreen({ onInvestigate }: any) {
                         fontSize: 12.5, lineHeight: 1.65, color: "var(--condor-wing)",
                       }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                          <Condor size={18} mood="speak" tone="orange" />
+                          <CondorLogo size={22} />
                           <span style={{ fontSize: 10.5, color: "var(--andes-orange)", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>
                             Cóndor (GPT-5-mini)
                           </span>
@@ -4280,8 +4364,9 @@ export function AnomaliasScreen({ onInvestigate }: any) {
                   );
                 })}
               </div>
-              <div style={{ marginTop: 14, padding: 10, background: "rgba(44,95,141,0.08)", borderRadius: 8, fontSize: 11, borderLeft: "3px solid var(--mountain-blue)" }}>
-                💡 <strong>Cómo leerlo:</strong> Los casos marcados <span className="chip red" style={{ fontSize: 9 }}>✨ patrón nuevo</span> son los más interesantes: el algoritmo los considera estadísticamente raros, PERO no tienen alerta histórica ni fueron casos de auditoría. Pueden ser falsos positivos o patrones genuinamente nuevos que el modelo supervisado no ve. <strong>No son acusación de fraude</strong> — son sugerencias de revisión humana prioritaria.
+              <div style={{ marginTop: 14, padding: 12, background: "var(--primary-soft)", borderRadius: 8, fontSize: 11.5, borderLeft: "3px solid var(--primary)", display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <FaLightbulb size={13} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: 2 }} />
+                <div><strong>Cómo leerlo:</strong> Los casos marcados <span className="chip red" style={{ fontSize: 9 }}>patrón nuevo</span> son los más interesantes: el algoritmo los considera estadísticamente raros, PERO no tienen alerta histórica ni fueron casos de auditoría. Pueden ser falsos positivos o patrones genuinamente nuevos que el modelo supervisado no ve. <strong>No son acusación de fraude</strong> — son sugerencias de revisión humana prioritaria.</div>
               </div>
             </div>
           </>

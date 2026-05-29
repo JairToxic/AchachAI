@@ -28,7 +28,7 @@ def evaluate_siniestro(
     siniestro: dict,
     poliza: dict,
     asegurado: dict,
-    vehiculo: dict,
+    vehiculo: dict | None = None,
     proveedor: dict,
     conductor: dict | None = None,
     documentos: list[dict] | None = None,

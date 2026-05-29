@@ -20,6 +20,14 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Condor } from './Condor';
+import { CondorLogo } from './CondorLogo';
+import {
+  FaTimes,
+  FaBolt,
+  FaCoins,
+  FaDollarSign,
+  FaCog,
+} from 'react-icons/fa';
 import {
   MD, EvidencePreview, JarvisStream, CityHeatmapAuto,
   ReportePdfCard, EvaluacionCard, TOOL_NARRATIVE,
@@ -135,19 +143,19 @@ export function AgentFAB({ mood = 'idle', message }: { mood?: any; message?: str
     }}>
       {showMsg && message && (
         <div className="fade-up" style={{
-          maxWidth: 280, background: 'white', border: '1px solid var(--line)',
-          padding: '10px 14px', borderRadius: 14, boxShadow: 'var(--shadow-lg)',
-          fontSize: 12.5, color: 'var(--condor-wing)', position: 'relative',
+          maxWidth: 280, background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+          padding: '12px 14px', borderRadius: 14, boxShadow: 'var(--shadow-lg)',
+          fontSize: 12.5, color: 'var(--text-primary)', position: 'relative',
         }}>
           <div style={{
-            fontSize: 10, color: 'var(--andes-orange)', fontWeight: 600,
-            marginBottom: 4, letterSpacing: '.08em',
-          }}>EL CÓNDOR DICE</div>
+            fontSize: 10, color: 'var(--accent)', fontWeight: 700,
+            marginBottom: 4, letterSpacing: '.1em', textTransform: 'uppercase',
+          }}>El cóndor dice</div>
           {message}
           <div style={{
             position: 'absolute', bottom: -6, right: 24, width: 12, height: 12,
-            background: 'white', borderRight: '1px solid var(--line)',
-            borderBottom: '1px solid var(--line)', transform: 'rotate(45deg)',
+            background: 'var(--bg-card)', borderRight: '1px solid var(--border-color)',
+            borderBottom: '1px solid var(--border-color)', transform: 'rotate(45deg)',
           }}/>
         </div>
       )}
@@ -156,21 +164,21 @@ export function AgentFAB({ mood = 'idle', message }: { mood?: any; message?: str
         style={{
           width: 64, height: 64, borderRadius: '50%',
           background: mood === 'alert'
-            ? 'linear-gradient(135deg, #C5333A, #7A1F25)'
-            : 'linear-gradient(135deg, var(--mountain-blue), var(--condor-wing))',
-          border: '3px solid var(--marfil-paper)', boxShadow: 'var(--shadow-lg)',
-          display: 'grid', placeItems: 'center', color: 'var(--marfil)', position: 'relative',
+            ? 'linear-gradient(135deg, var(--danger), var(--danger-strong))'
+            : 'linear-gradient(135deg, var(--accent), var(--primary))',
+          border: '3px solid var(--bg-card)', boxShadow: 'var(--shadow-lg)',
+          display: 'grid', placeItems: 'center', position: 'relative',
           animation: mood === 'alert' ? 'pulse-red 1.2s infinite' : 'none',
           cursor: 'pointer',
         }}
         aria-label="Hablar con el cóndor"
       >
-        <Condor size={40} tone="marfil" mood={mood}/>
+        <CondorLogo size={44} />
         {mood === 'alert' && (
           <span style={{
             position: 'absolute', top: -4, right: -4, width: 14, height: 14,
-            borderRadius: '50%', background: 'var(--guayaba-red)',
-            border: '2px solid var(--marfil-paper)',
+            borderRadius: '50%', background: 'var(--danger)',
+            border: '2px solid var(--bg-card)',
           }}/>
         )}
       </button>
@@ -252,9 +260,9 @@ export function AgentDrawer({ role = 'antifraude' }: { role?: string }) {
     setActiveTools([]);
     setCurrentTool(null);
 
-    setCurrentPhase('🛫 Conectando con Azure AI Foundry…');
+    setCurrentPhase('Conectando con Azure AI Foundry…');
     await sleep(280);
-    setCurrentPhase('🧠 Resolviendo intención · eligiendo tools…');
+    setCurrentPhase('Resolviendo intención · eligiendo tools…');
     await sleep(320);
 
     // Inyectar contexto de pantalla actual ANTES del mensaje del usuario.
@@ -270,7 +278,7 @@ export function AgentDrawer({ role = 'antifraude' }: { role?: string }) {
         content: m.text || (m.payload && m.payload.summary) || '',
       }));
 
-    setCurrentPhase('📡 Consultando base de 25.460 siniestros…');
+    setCurrentPhase('Consultando base de 39.960 siniestros multi-ramo…');
 
     try {
       const resp = await fetch(`${API}/chat`, {
@@ -291,7 +299,7 @@ export function AgentDrawer({ role = 'antifraude' }: { role?: string }) {
       }
 
       setCurrentTool(null);
-      setCurrentPhase('✨ Sintetizando insights…');
+      setCurrentPhase('Sintetizando insights…');
       await sleep(400);
 
       setThinking(false);
@@ -307,7 +315,7 @@ export function AgentDrawer({ role = 'antifraude' }: { role?: string }) {
         tools,
         sources: tools.map((t: string) => {
           const nar = TOOL_NARRATIVE[t];
-          return nar ? `${nar.icon} ${nar.phrase} (${t})` : `Llamé tool '${t}'`;
+          return nar ? `${nar.phrase} (${t})` : `Llamé tool '${t}'`;
         }),
         cost: {
           tokens: data.tokens || 0,
@@ -326,7 +334,7 @@ export function AgentDrawer({ role = 'antifraude' }: { role?: string }) {
       setMessages(m => [...m, {
         role: 'condor', kind: 'answer',
         payload: {
-          summary: `⚠️ Error consultando al backend: \`${err?.message || err}\`. Verificá que FastAPI esté en \`localhost:8000\`.`,
+          summary: `Error consultando al backend: \`${err?.message || err}\`. Verificá que FastAPI esté en \`localhost:8000\`.`,
           tools: [], sources: [], cost: { tokens: 0, time: '0s', price: '$0' },
         },
         time: nowHHMM(),
@@ -377,7 +385,7 @@ export function AgentDrawer({ role = 'antifraude' }: { role?: string }) {
           borderBottom: '1px solid var(--line)',
         }}>
           <div style={{ position: 'relative' }}>
-            <Condor size={36} tone="wing" mood={thinking ? 'think' : 'idle'} />
+            <CondorLogo size={40} />
             <span style={{
               position: 'absolute', bottom: 0, right: -1, width: 8, height: 8,
               borderRadius: '50%', background: 'var(--paramo-green)',
@@ -388,21 +396,21 @@ export function AgentDrawer({ role = 'antifraude' }: { role?: string }) {
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--condor-wing)' }}>
               Cóndor · copiloto
             </div>
-            <div style={{ fontSize: 10.5, color: 'var(--ink-mute)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {screenContext?.label
-                ? <>📍 viendo: <strong style={{ color: 'var(--mountain-blue)' }}>{screenContext.label}</strong></>
-                : <>📍 vista general</>}
+                ? <>Viendo: <strong style={{ color: 'var(--primary)' }}>{screenContext.label}</strong></>
+                : <>Vista general</>}
             </div>
           </div>
           <button
             onClick={closeAgent}
             aria-label="Cerrar"
+            className="icon-btn"
             style={{
-              width: 32, height: 32, borderRadius: 8, border: '1px solid var(--line)',
-              background: 'white', cursor: 'pointer', fontSize: 16, color: 'var(--ink-soft)',
-              display: 'grid', placeItems: 'center',
+              width: 32, height: 32, border: '1px solid var(--border-color)',
+              background: 'var(--bg-card)',
             }}
-          >✕</button>
+          ><FaTimes size={14} /></button>
         </header>
 
         {/* Mensajes */}
@@ -441,7 +449,7 @@ export function AgentDrawer({ role = 'antifraude' }: { role?: string }) {
             borderRadius: 14, padding: '6px 6px 6px 14px',
             boxShadow: 'var(--shadow-sm)',
           }}>
-            <Condor size={18} tone="orange" mood="idle" />
+            <CondorLogo size={22} />
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -515,7 +523,7 @@ function DrawerMessage({ msg, onInvestigate }: { msg: any; onInvestigate: (id: s
     const a = msg.payload;
     return (
       <div className="fade-up" style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-        <Condor size={22} mood="speak" tone="wing" />
+        <CondorLogo size={26} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             background: 'white', border: '1px solid var(--line)',
@@ -540,18 +548,18 @@ function DrawerMessage({ msg, onInvestigate }: { msg: any; onInvestigate: (id: s
                 cursor: 'pointer', fontSize: 11, color: 'var(--mountain-blue)', fontWeight: 600,
               }}>▾ ¿Cómo lo resolví?</summary>
               <ul style={{ margin: '6px 0 4px 14px', padding: 0, fontSize: 11, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
-                {a.sources.map((s: string, i: number) => <li key={i}>⚡ {s}</li>)}
+                {a.sources.map((s: string, i: number) => <li key={i}><FaBolt size={9} style={{ marginRight: 4 }} /> {s}</li>)}
               </ul>
               <div style={{
-                display: 'flex', gap: 10, fontSize: 10, color: 'var(--ink-mute)',
-                marginTop: 8, paddingTop: 6, borderTop: '1px dashed var(--line)', flexWrap: 'wrap',
+                display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-secondary)',
+                marginTop: 8, paddingTop: 6, borderTop: '1px dashed var(--border-color)', flexWrap: 'wrap',
               }}>
-                <span>⏱ {a.cost.time}</span>
-                <span>🪙 {a.cost.tokens} tk</span>
-                <span>💵 {a.cost.price}</span>
+                <span>{a.cost.time}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><FaCoins size={9} /> {a.cost.tokens} tk</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><FaDollarSign size={9} /> {a.cost.price}</span>
                 {a.tools.length > 0 && (
-                  <span style={{ flexBasis: '100%', marginTop: 4 }}>
-                    🔧 {a.tools.map((t: string) => <span key={t} className="mono" style={{ marginRight: 4 }}>[{t}]</span>)}
+                  <span style={{ flexBasis: '100%', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <FaCog size={9} /> {a.tools.map((t: string) => <span key={t} className="mono" style={{ marginRight: 4 }}>[{t}]</span>)}
                   </span>
                 )}
               </div>
@@ -566,7 +574,7 @@ function DrawerMessage({ msg, onInvestigate }: { msg: any; onInvestigate: (id: s
   // greeting / proactive
   return (
     <div className="fade-up" style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-      <Condor size={22} mood="idle" tone="wing" />
+      <CondorLogo size={26} />
       <div style={{
         flex: 1, background: 'white', border: '1px solid var(--line)',
         padding: '10px 14px', borderRadius: '4px 14px 14px 14px',

@@ -78,14 +78,16 @@ def build() -> pd.DataFrame:
 
     # Conteo siniestros 18m por entidad (precomputado para todo el dataset)
     log("Conteo de siniestros recientes por entidad...")
-    df["fecha_oc_dt"] = pd.to_datetime(df["fecha_ocurrencia"])
+    df["fecha_oc_dt"] = pd.to_datetime(df["fecha_ocurrencia"], errors="coerce")
     fecha_max = df["fecha_oc_dt"].max()
     limite = fecha_max - pd.DateOffset(months=18)
     recent = df[df["fecha_oc_dt"] >= limite]
     for col_key, col_out in [("id_asegurado", "n_siniestros_18m_asegurado"),
                               ("id_vehiculo",  "n_siniestros_18m_vehiculo"),
                               ("id_conductor", "n_siniestros_18m_conductor")]:
-        counts = recent.groupby(col_key).size().rename(col_out)
+        # Filtrar None/NaN antes del groupby para no inflar conteos en Hogar/Salud
+        recent_valid = recent[recent[col_key].notna()]
+        counts = recent_valid.groupby(col_key).size().rename(col_out)
         df = df.merge(counts, on=col_key, how="left")
         df[col_out] = df[col_out].fillna(0).astype(int)
 
@@ -107,8 +109,8 @@ def build() -> pd.DataFrame:
     fecha_oc = pd.to_datetime(df["fecha_ocurrencia"], errors="coerce")
     df["edad_vehiculo"] = (fecha_oc.dt.year - df["anio_vehiculo"]).fillna(0).clip(lower=0)
 
-    # 3. Es robo: bandera explicita (RF-01 relacionada)
-    df["es_robo"] = (df["cobertura"] == "Robo").astype(int) if "cobertura" in df.columns else 0
+    # 3. Es robo: bandera explicita (RF-01 relacionada). Multi-ramo: cubre Vehiculos y Hogar
+    df["es_robo"] = df["cobertura"].isin(["Robo", "Robo en domicilio", "Robo de Accesorios"]).astype(int) if "cobertura" in df.columns else 0
 
     # 4. Es borde de vigencia (señal 1)
     df["es_borde_vigencia"] = (
@@ -160,9 +162,9 @@ def build() -> pd.DataFrame:
         df["monto_reclamado_usd"] / df["monto_promedio_reclamado_usd"].replace(0, np.nan)
     )
 
-    # 12. Es PTxRB candidate (cobertura Robo + monto>95% suma)
+    # 12. Es PTxRB candidate (cobertura Robo o Robo domicilio + monto>95% suma)
     df["es_ptxrb_candidato"] = (
-        (df["cobertura"] == "Robo") &
+        df["cobertura"].isin(["Robo", "Robo en domicilio"]) &
         (df["ratio_reclamado_suma"] > 0.95)
     ).astype(int) if "cobertura" in df.columns else 0
 

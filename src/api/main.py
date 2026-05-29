@@ -50,6 +50,9 @@ from src.document_analysis import (  # noqa: E402
     analyze_factura,
     analyze_imagen_dano,
     analyze_documento_generico,
+    analyze_parte_policial,
+    analyze_declaracion_accidente,
+    analyze_visual_forensics,
 )
 
 PROC = ROOT / "data" / "processed"
@@ -114,6 +117,7 @@ def health():
 def get_casos(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    ramo: str | None = None,
     ciudad: str | None = None,
     sucursal: str | None = None,
     cobertura: str | None = None,
@@ -140,6 +144,7 @@ def get_casos(
     def _esc(v: str) -> str:
         return v.replace("'", "''")
 
+    if ramo: where.append(f"ramo ILIKE '%{_esc(ramo)}%'")
     if ciudad: where.append(f"ciudad_evento ILIKE '%{_esc(ciudad)}%'")
     if sucursal: where.append(f"sucursal ILIKE '%{_esc(sucursal)}%'")
     if cobertura: where.append(f"cobertura ILIKE '%{_esc(cobertura)}%'")
@@ -163,15 +168,18 @@ def get_casos(
     }[orden]
 
     total = con.execute(f"SELECT COUNT(*) FROM s {where_clause}").fetchone()[0]
-    rows = con.execute(f"""
+    _df = con.execute(f"""
         SELECT id_siniestro, id_poliza, id_asegurado, id_proveedor, id_vehiculo,
-               cobertura, estado, fecha_ocurrencia, sucursal,
+               ramo, cobertura, estado, fecha_ocurrencia, sucursal,
                monto_reclamado_usd, monto_pagado_usd, ciudad_evento,
                documentos_completos, etiqueta_fraude_simulada, caso_inyectado
         FROM s {where_clause}
         ORDER BY {order_clause}
         LIMIT {limit} OFFSET {offset}
-    """).df().to_dict("records")
+    """).df()
+    # Convertir NaN/NaT a None para que FastAPI pueda serializar a JSON valido
+    _df = _df.astype(object).where(_df.notna(), None)
+    rows = _df.to_dict("records")
     return {
         "total": total,
         "limit": limit,
@@ -180,7 +188,7 @@ def get_casos(
         "items": rows,
         "filtros_aplicados": {
             k: v for k, v in {
-                "ciudad": ciudad, "sucursal": sucursal, "cobertura": cobertura,
+                "ramo": ramo, "ciudad": ciudad, "sucursal": sucursal, "cobertura": cobertura,
                 "estado": estado, "proveedor": proveedor, "asegurado": asegurado,
                 "q": q, "monto_min": monto_min, "monto_max": monto_max,
                 "fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta,
@@ -549,6 +557,10 @@ def get_top_riesgo(limit: int = 10, nivel: str | None = None, force: bool = Fals
 
     Cacheado en memoria por 5 minutos para no rebanar el dataset en cada visita
     a la bandeja/home. Usar ?force=true para invalidar manualmente.
+
+    Cuando NO se pasa nivel, devuelve un mix BALANCEADO entre ROJO y AMARILLO
+    (no satura con solo rojos): 60% ROJO + 40% AMARILLO aprox. Para la bandeja
+    priorizada esto garantiza que el analista vea casos de los dos niveles.
     """
     import time
     now = time.time()
@@ -556,18 +568,42 @@ def get_top_riesgo(limit: int = 10, nivel: str | None = None, force: bool = Fals
     if not force and cached is not None and (now - _top_riesgo_cache["ts"]) < _TOP_RIESGO_TTL_SEC:
         items = cached.get("top", [])
     else:
-        # Pedimos un buffer grande UNA vez y filtramos/cortamos en cliente
-        result = top_riesgo(limit=120)  # buffer para servir varios queries con el cache
+        # Pedimos un buffer grande UNA vez y filtramos/cortamos en cliente.
+        # top_riesgo() ya devuelve ROJO + AMARILLO por default (nuevo).
+        result = top_riesgo(limit=400)  # buffer amplio para asegurar mix de niveles
         _top_riesgo_cache["data"] = result
         _top_riesgo_cache["ts"] = now
         items = result.get("top", [])
 
     if nivel:
-        items = [c for c in items if c.get("nivel") == nivel.upper()]
-    return {"total_evaluados": (_top_riesgo_cache["data"] or {}).get("total_evaluados", 0),
-            "top": items[:limit],
-            "cached": (now - _top_riesgo_cache["ts"]) < 1.0 is False,
-            "age_sec": round(now - _top_riesgo_cache["ts"], 1)}
+        wanted = {n.strip().upper() for n in nivel.split(",") if n.strip()}
+        items = [c for c in items if c.get("nivel") in wanted]
+        out = items[:limit]
+    else:
+        # Mix balanceado: 60% ROJO + 40% AMARILLO (ambos ordenados por score desc)
+        rojos = [c for c in items if c.get("nivel") == "ROJO"]
+        amarillos = [c for c in items if c.get("nivel") == "AMARILLO"]
+        n_rojo = max(1, int(limit * 0.60))
+        n_amar = max(1, limit - n_rojo)
+        # Si falta de un lado, completar con el otro
+        out_rojo = rojos[:n_rojo]
+        out_amar = amarillos[:n_amar]
+        out = out_rojo + out_amar
+        # Si no llegamos al limit, rellenar con el sobrante
+        if len(out) < limit:
+            extra = (rojos[n_rojo:] + amarillos[n_amar:])
+            out = out + extra[: (limit - len(out))]
+        # Ordenar final por score desc para que el ROJO mas alto siga arriba en cada bucket
+        out.sort(key=lambda x: -x.get("score", 0))
+
+    return {
+        "total_evaluados": (_top_riesgo_cache["data"] or {}).get("total_evaluados", 0),
+        "n_rojos_disponibles": sum(1 for c in items if c.get("nivel") == "ROJO"),
+        "n_amarillos_disponibles": sum(1 for c in items if c.get("nivel") == "AMARILLO"),
+        "top": out,
+        "cached": (now - _top_riesgo_cache["ts"]) < 1.0 is False,
+        "age_sec": round(now - _top_riesgo_cache["ts"], 1),
+    }
 
 
 @app.get("/asegurados/buscar")
@@ -655,7 +691,7 @@ def get_asegurado(id_asegurado: str):
     """).df()
 
     polizas = con.execute(f"""
-        SELECT id_poliza, ramo, fecha_inicio, fecha_fin, prima_anual_usd,
+        SELECT id_poliza, ramo, fecha_inicio, fecha_fin, prima_usd,
                suma_asegurada_usd, deducible_usd, canal_venta, estado_poliza
         FROM po WHERE id_asegurado = '{id_asegurado}'
         ORDER BY fecha_inicio DESC
@@ -697,6 +733,35 @@ def chat(req: ChatRequest):
     except Exception as exc:
         log.exception("Error en /chat")
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+@app.post("/chat/stream")
+def chat_stream(req: ChatRequest):
+    """Streaming del agente: emite NDJSON (un evento JSON por linea).
+
+    Eventos del stream (cada uno termina con '\\n'):
+      {"type":"tool_call","tool":"top_riesgo","args":{...}}
+      {"type":"tool_result","tool":"top_riesgo","summary":"..."}
+      {"type":"delta","text":"chunk de texto"}
+      {"type":"done","tokens":N,"tools_used":[...],"iterations":N}
+      {"type":"error","message":"..."}
+    """
+    import json as _json
+    from fastapi.responses import StreamingResponse
+
+    def event_generator():
+        try:
+            for event in get_agent().chat_stream(req.message, history=req.history):
+                yield _json.dumps(event, ensure_ascii=False, default=str) + "\n"
+        except Exception as exc:
+            log.exception("Error en /chat/stream")
+            yield _json.dumps({"type": "error", "message": f"{type(exc).__name__}: {exc}"}) + "\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/reportes/ejecutivo")
@@ -1478,6 +1543,7 @@ async def evaluar_completo(
     foto_dano: UploadFile | None = File(None),
     parte_policial_file: UploadFile | None = File(None),
     denuncia_file: UploadFile | None = File(None),
+    declaracion_accidente_file: UploadFile | None = File(None),
 ):
     """Evaluacion INTEGRAL: combina datos del siniestro + analisis de documentos + foto.
 
@@ -1516,18 +1582,48 @@ async def evaluar_completo(
             return
         try:
             file_bytes = await file.read()
+            ctx = {"fecha_ocurrencia": fecha_hoy, "descripcion": descripcion,
+                   "ciudad_evento": ciudad_evento, "sucursal": sucursal}
             if tipo == "factura":
                 r = analyze_factura(file_bytes, fecha_ocurrencia=fecha_hoy)
             elif tipo == "imagen_dano":
                 r = analyze_imagen_dano(file_bytes, descripcion)
+            elif tipo == "parte_policial":
+                r = analyze_parte_policial(file_bytes, contexto_siniestro=ctx)
+            elif tipo == "declaracion_accidente":
+                r = analyze_declaracion_accidente(file_bytes, contexto_siniestro=ctx)
             else:
-                r = analyze_documento_generico(
-                    file_bytes, tipo=tipo,
-                    contexto_siniestro={"fecha_ocurrencia": fecha_hoy, "descripcion": descripcion},
-                )
+                r = analyze_documento_generico(file_bytes, tipo=tipo, contexto_siniestro=ctx)
             d = r.to_dict()
             d["_etiqueta"] = name
             d["_nombre_archivo"] = file.filename
+
+            # ===== Forensia visual SOLO para PDFs (no para imagenes de daño que ya van por vision) =====
+            if tipo != "imagen_dano" and (file.filename or "").lower().endswith(".pdf"):
+                try:
+                    forensia = analyze_visual_forensics(file_bytes, tipo=tipo)
+                    f = forensia.to_dict()
+                    visual_incs = f.get("inconsistencias") or []
+                    if visual_incs:
+                        # Mergear inconsistencias visuales al doc principal
+                        for inc in visual_incs:
+                            inc["origen"] = "forensia_visual"
+                        d["inconsistencias"] = list(d.get("inconsistencias") or []) + visual_incs
+                        # Subir score si la forensia detecto algo importante
+                        d["score_doc"] = max(int(d.get("score_doc") or 0), int(f.get("score_doc") or 0))
+                        # Si la forensia es ROJO, el doc completo es ROJO
+                        if f.get("nivel_riesgo_doc") == "ROJO":
+                            d["nivel_riesgo_doc"] = "ROJO"
+                        # Anotar las observaciones visuales para el informe
+                        d.setdefault("forensia_visual", {})
+                        d["forensia_visual"]["documento_parece_autentico"] = f.get("extracted_fields", {}).get("documento_parece_autentico")
+                        d["forensia_visual"]["observaciones"] = f.get("extracted_fields", {}).get("observaciones_visuales", [])
+                        d["forensia_visual"]["score"] = f.get("score_doc")
+                        d["forensia_visual"]["nivel"] = f.get("nivel_riesgo_doc")
+                        d["forensia_visual"]["explicacion"] = f.get("explicacion", "")
+                except Exception as ef:
+                    log.warning("forensia visual %s fallo: %s", name, ef)
+
             docs_analizados.append(d)
         except Exception as e:
             log.warning("analisis %s fallo: %s", name, e)
@@ -1545,6 +1641,7 @@ async def evaluar_completo(
     await _safe_analyze("Foto del dano", foto_dano, "imagen_dano")
     await _safe_analyze("Parte policial", parte_policial_file, "parte_policial")
     await _safe_analyze("Denuncia", denuncia_file, "denuncia")
+    await _safe_analyze("Declaracion de accidente", declaracion_accidente_file, "declaracion_accidente")
 
     # ===== 3) Score combinado — PONDERADO POR SEVERIDAD =====
     score_tabular = int(eval_tabular.get("score", 0))
@@ -1696,7 +1793,7 @@ def evaluar_siniestro_nuevo(req: EvaluarReq):
         "caso_inyectado": False,
     }
     pol = {"id_poliza": "POL-HIP", "suma_asegurada_usd": req.suma_asegurada_usd,
-           "prima_anual_usd": req.suma_asegurada_usd * 0.04,
+           "prima_usd": req.suma_asegurada_usd * 0.04,
            "deducible_usd": req.suma_asegurada_usd * 0.02}
     ase = {"id_asegurado": "ASE-HIP", "segmento": "Personas",
            "reclamos_ultimos_12_meses": req.historial_siniestros_asegurado,

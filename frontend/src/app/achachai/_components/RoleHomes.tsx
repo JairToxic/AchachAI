@@ -3,6 +3,39 @@
 import { useEffect, useRef, useState } from 'react';
 import { Condor, VueloDelCondor, CondorMini } from './Condor';
 import { EcuadorHeatMap } from './EcuadorHeatMap';
+import { CondorLogo } from './CondorLogo';
+import { RiskScore } from './RiskScore';
+import { MetricCard } from './MetricCard';
+import { Chip } from './Chip';
+import { CondorNarration } from './CondorNarration';
+import {
+  FaUserShield,
+  FaShieldAlt,
+  FaFileAlt,
+  FaUserNurse,
+  FaSearch,
+  FaExclamationTriangle,
+  FaClipboardCheck,
+  FaChartLine,
+  FaBolt,
+  FaMagic,
+  FaBrain,
+  FaDatabase,
+  FaEye,
+  FaBriefcase,
+  FaUserTie,
+  FaBalanceScale,
+  FaUsers,
+  FaCog,
+  FaArrowRight,
+  FaExternalLinkAlt,
+  FaNetworkWired,
+  FaCheckCircle,
+  FaInbox,
+  FaDownload,
+  FaUpload,
+  FaShareAlt,
+} from 'react-icons/fa';
 
 const useRH = useState;
 const useRHE = useEffect;
@@ -32,7 +65,7 @@ function fbQuick(id_siniestro: string, decision: string, score_modelo: number, n
   })
     .then(r => r.json())
     .then(d => {
-      if (d?.ok) console.log(`✓ feedback registrado para ${id_siniestro}: ${decision} (total: ${d.total_feedbacks})`);
+      if (d?.ok) console.log(`feedback registrado para ${id_siniestro}: ${decision} (total: ${d.total_feedbacks})`);
     })
     .catch(e => console.warn('feedback failed', e));
 }
@@ -58,22 +91,28 @@ export function RoleHome({ role, onInvestigate, onGoChat }) {
 
 /* ---------- shared frame ---------- */
 function RoleFrame({ icon, title, super: superPower, accent, children, extra }) {
+  // icon puede ser un componente FA (React.ComponentType) o un emoji legacy (string)
+  const IconCmp = typeof icon === 'function' ? icon : null;
   return (
-    <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)" }}>
+    <div style={{ height: "100%", overflow: "auto", background: "var(--bg-main)" }}>
       <div style={{
-        padding: "20px 32px 18px", borderBottom: "1px solid var(--line)",
-        background: `linear-gradient(180deg, ${accent}10, transparent)`,
-        display: "flex", alignItems: "center", gap: 14,
+        padding: "22px 32px 20px", borderBottom: "1px solid var(--border-color)",
+        background: "var(--bg-card)",
+        display: "flex", alignItems: "center", gap: 16,
       }}>
         <div style={{
-          width: 44, height: 44, borderRadius: 12,
-          background: `${accent}20`, display: "grid", placeItems: "center", fontSize: 22,
-        }}>{icon}</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 10.5, letterSpacing: ".18em", color: accent, fontWeight: 700, textTransform: "uppercase" }}>
+          width: 46, height: 46, borderRadius: 12,
+          background: `${accent}1A`, color: accent,
+          display: "grid", placeItems: "center", fontSize: 18,
+          flexShrink: 0,
+        }}>
+          {IconCmp ? <IconCmp size={20} /> : icon}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10.5, letterSpacing: ".16em", color: accent, fontWeight: 700, textTransform: "uppercase" }}>
             Superpoder · {superPower}
           </div>
-          <h2 style={{ fontSize: 24, marginTop: 2 }}>{title}</h2>
+          <h2 className="display" style={{ fontSize: 22, marginTop: 4, color: "var(--text-primary)" }}>{title}</h2>
         </div>
         {extra}
       </div>
@@ -215,37 +254,74 @@ function AntifraudeHome({ onInvestigate }) {
     ? topCases.filter((c: any) => c.id_proveedor === provId).slice(0, 5)
     : topCases.slice(1, 6);
 
+  const accent = '#EF4444';
+  const nivelTone =
+    nivel === 'ROJO' ? 'var(--danger)' : nivel === 'AMARILLO' ? 'var(--warning)' : 'var(--success)';
+
+  // Narration items para CondorNarration
+  const narrationItems: any[] = [
+    ...reglas.slice(0, 3).map((r: any) => ({
+      title: <><strong>{r.codigo}</strong> · {r.nombre}</>,
+      detail: r.evidencia,
+      tone: 'danger',
+    })),
+    ...senales.slice(0, Math.max(0, 3 - reglas.length)).map((s: any) => ({
+      title: <><strong>S{s.id}</strong> · {s.nombre} (+{s.puntos} pts)</>,
+      detail: s.evidencia,
+      tone: 'warning',
+    })),
+  ];
+  if (narrationItems.length === 0) {
+    narrationItems.push({
+      title: `Score ${score}/100 · nivel ${nivel}`,
+      detail: 'Sin alertas binarias, pero el modelo lo prioriza.',
+      tone: 'info',
+    });
+  }
+
+  const suggestionTone =
+    nivel === 'ROJO' ? 'danger' : nivel === 'AMARILLO' ? 'warning' : 'primary';
+  const suggestionText =
+    nivel === 'ROJO'
+      ? 'revisar documentación, bloquear pago pendiente y escalar a la unidad antifraude.'
+      : nivel === 'AMARILLO'
+      ? 'retener el pago y solicitar documentación complementaria antes de aprobar.'
+      : 'continuar el flujo normal, pero mantener este caso bajo monitoreo.';
+
   return (
     <RoleFrame
-      icon="🕵️"
+      icon={FaUserShield}
       title="Caso del día"
       super="Investigación profunda caso por caso"
-      accent="#C5333A"
+      accent={accent}
       extra={
         <button
           className="btn"
           disabled={!topId}
           onClick={() => topId && onInvestigate(topId)}
         >
-          🦅 Investigar profundo
+          <FaSearch size={13} /> Investigar profundo
         </button>
       }
     >
       {loading && (
-        <div className="card" style={{ padding: 22, marginBottom: 18, textAlign: 'center' }}>
-          <Condor size={48} mood="think" tone="orange" />
-          <div style={{ marginTop: 10, fontSize: 13, color: 'var(--ink-mute)' }}>
+        <div className="card" style={{ padding: 28, marginBottom: 18, textAlign: 'center' }}>
+          <CondorLogo size={56} />
+          <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-secondary)' }}>
             El cóndor está sobrevolando los 15K siniestros para elegirte el caso del día…
           </div>
         </div>
       )}
 
       {err && !loading && (
-        <div className="card" style={{ padding: 22, marginBottom: 18, borderLeft: '3px solid var(--guayaba-red)' }}>
-          <div style={{ fontSize: 13, color: 'var(--guayaba-red)', fontWeight: 600 }}>
-            No pude consultar al backend: {err}
+        <div
+          className="card"
+          style={{ padding: 18, marginBottom: 18, borderLeft: '3px solid var(--danger)' }}
+        >
+          <div style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <FaExclamationTriangle size={14} /> No pude consultar al backend: {err}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--ink-mute)', marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>
             Verifica que <span className="mono">uvicorn</span> esté corriendo en {API}.
           </div>
         </div>
@@ -253,58 +329,143 @@ function AntifraudeHome({ onInvestigate }) {
 
       {!loading && top && (
         <>
-          {/* Critical case spotlight — real data */}
-          <div className="card" style={{
-            padding: 22, marginBottom: 18,
-            borderTop: `3px solid ${nivel === 'ROJO' ? 'var(--guayaba-red)' : nivel === 'AMARILLO' ? 'var(--andes-orange)' : 'var(--paramo-green)'}`,
-            display: "grid", gridTemplateColumns: "230px 1fr", gap: 26, alignItems: "center",
-          }}>
-            <VueloDelCondor score={score} variant="lg"/>
-            <div>
-              <div className="mono" style={{ fontSize: 11, color: "var(--mountain-blue)", fontWeight: 600 }}>{topId}</div>
-              <h2 style={{ fontSize: 22, marginTop: 2 }}>
+          {/* ============================================================
+              CASO DEL DIA — card blanca, score circular a la izquierda
+              ============================================================ */}
+          <div
+            className="card"
+            style={{
+              padding: 22,
+              marginBottom: 18,
+              borderTop: `3px solid ${nivelTone}`,
+              display: 'grid',
+              gridTemplateColumns: 'minmax(200px, 220px) 1fr',
+              gap: 26,
+              alignItems: 'center',
+            }}
+          >
+            <RiskScore score={score} variant="lg" />
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 10.5,
+                  letterSpacing: '0.16em',
+                  color: 'var(--accent)',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  marginBottom: 6,
+                }}
+              >
+                <FaSearch size={11} /> Investigación profunda
+              </div>
+              <div className="mono" style={{ fontSize: 11.5, color: 'var(--primary)', fontWeight: 600 }}>
+                {topId}
+              </div>
+              <h2
+                className="display"
+                style={{ fontSize: 22, marginTop: 4, color: 'var(--text-primary)' }}
+              >
                 {veh !== '—' ? veh : 'Vehículo'} · {cob} · {ciudad}
               </h2>
-              <p style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 8, lineHeight: 1.55 }}>
-                {detail?.explicacion || `Score ${score}/100 · nivel ${nivel}. Caso prioritario según el motor de reglas + modelo.`}
+              <p
+                style={{
+                  fontSize: 13,
+                  color: 'var(--text-secondary)',
+                  marginTop: 8,
+                  lineHeight: 1.55,
+                }}
+              >
+                {detail?.explicacion ||
+                  `Score ${score}/100 · nivel ${nivel}. Caso prioritario según el motor de reglas + modelo.`}
               </p>
-              <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+              <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
                 {reglas.slice(0, 3).map((r: any) => (
-                  <span key={r.codigo} className="chip red" style={{ fontSize: 10.5 }}>{r.codigo} · {r.nombre.split(' ').slice(0,3).join(' ')}</span>
+                  <Chip key={r.codigo} tone="red" icon={FaExclamationTriangle}>
+                    {r.codigo} · {r.nombre.split(' ').slice(0, 3).join(' ')}
+                  </Chip>
                 ))}
                 {senales.slice(0, 3).map((s: any) => (
-                  <span key={s.id} className="chip amber" style={{ fontSize: 10.5 }}>S{s.id} +{s.puntos}</span>
+                  <Chip key={s.id} tone="amber">
+                    S{s.id} +{s.puntos}
+                  </Chip>
                 ))}
                 {reglas.length === 0 && senales.length === 0 && (
-                  <span className="chip green" style={{ fontSize: 10.5 }}>sin alertas activas</span>
+                  <Chip tone="green" icon={FaCheckCircle}>
+                    sin alertas activas
+                  </Chip>
                 )}
               </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-                <button className="btn warm" onClick={() => onInvestigate(topId)}>Abrir investigación →</button>
-                <button className="btn ghost" onClick={() => window.open(`${API}/casos/${encodeURIComponent(topId)}`, '_blank')}>Ver JSON</button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+                <button className="btn" onClick={() => onInvestigate(topId)}>
+                  Abrir investigación <FaArrowRight size={11} />
+                </button>
+                <button
+                  className="btn ghost"
+                  onClick={() =>
+                    window.open(`${API}/casos/${encodeURIComponent(topId)}`, '_blank')
+                  }
+                >
+                  <FaExternalLinkAlt size={11} /> Ver evidencia (JSON)
+                </button>
               </div>
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18 }}>
-            {/* Patrón detectado — real */}
-            <div className="card" style={{ padding: 18 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: 16,
+            }}
+          >
+            {/* Patrón detectado — provider + casos vinculados */}
+            <div className="card" style={{ padding: 18, gridColumn: 'span 2', minWidth: 0 }}>
               <SectionTitle>Patrón detectado esta semana</SectionTitle>
               {topProv ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: "var(--marfil-paper)", borderRadius: 10, marginBottom: 12 }}>
-                  <Condor size={36} tone="red" mood="alert"/>
-                  <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 14,
+                    padding: '12px 14px',
+                    background: 'var(--bg-card-soft)',
+                    borderRadius: 10,
+                    marginBottom: 14,
+                    border: '1px solid var(--border-soft)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      background: 'var(--danger-soft)',
+                      color: 'var(--danger)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <FaNetworkWired size={18} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>
-                      <span className="mono">{topProv.id_proveedor}</span> · {topProv.nombre || '—'} concentra {topProv.n_siniestros} siniestros
+                      <span className="mono">{topProv.id_proveedor}</span> · {topProv.nombre || '—'}
                     </div>
-                    <div style={{ fontSize: 11.5, color: "var(--ink-mute)" }}>
-                      {topProv.ciudad || '—'} · monto promedio {fmtUSD(topProv.monto_promedio)}
-                      {topProv.lista_restrictiva ? ' · ⚠ lista restrictiva' : ''}
+                    <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>
+                      Concentra {topProv.n_siniestros} siniestros · {topProv.ciudad || '—'} ·
+                      promedio {fmtUSD(topProv.monto_promedio)}
                     </div>
                   </div>
+                  {topProv.lista_restrictiva && (
+                    <Chip tone="red" icon={FaExclamationTriangle}>lista restrictiva</Chip>
+                  )}
                 </div>
               ) : (
-                <div style={{ fontSize: 12, color: 'var(--ink-mute)', marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 14 }}>
                   Sin ranking de proveedores disponible.
                 </div>
               )}
@@ -315,173 +476,252 @@ function AntifraudeHome({ onInvestigate }) {
                   : <>Otros casos de alto riesgo</>}
               </SectionTitle>
               {vinculados.length === 0 && (
-                <div style={{ fontSize: 12, color: 'var(--ink-mute)' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                   No hay otros casos del mismo proveedor en el top-riesgo actual.
                 </div>
               )}
-              {vinculados.map((c: any) => (
-                <div key={c.id_siniestro} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, marginBottom: 4 }}>
-                  <VueloDelCondor score={c.score} variant="sm"/>
-                  <div style={{ flex: 1 }}>
-                    <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{c.id_siniestro}</span>
-                    <span style={{ marginLeft: 8, fontSize: 11, color: "var(--ink-mute)" }}>{c.ciudad || '—'}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {vinculados.map((c: any) => (
+                  <div
+                    key={c.id_siniestro}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      background: 'var(--bg-card-soft)',
+                      border: '1px solid var(--border-soft)',
+                    }}
+                  >
+                    <RiskScore score={c.score} variant="sm" withCondor={false} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {c.id_siniestro}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                        {c.ciudad || '—'}
+                      </div>
+                    </div>
+                    <span className="tabular mono" style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                      {fmtUSD(c.monto_reclamado_usd)}
+                    </span>
+                    <button
+                      className="btn ghost"
+                      onClick={() => onInvestigate(c.id_siniestro)}
+                      style={{ padding: '5px 10px', fontSize: 11 }}
+                    >
+                      <FaSearch size={10} /> Investigar
+                    </button>
                   </div>
-                  <span className="tabular mono" style={{ fontSize: 11 }}>{fmtUSD(c.monto_reclamado_usd)}</span>
-                  <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => onInvestigate(c.id_siniestro)}>investigar →</button>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
-            {/* Cóndor narration — real */}
-            <div className="card" style={{ padding: 18, background: "linear-gradient(180deg, white, var(--marfil-paper))" }}>
-              <SectionTitle>El cóndor te narra</SectionTitle>
-              <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                <Condor size={38} tone="wing" mood="speak"/>
-                <div style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--condor-wing)" }}>
-                  {reglas.length + senales.length > 0
-                    ? <>"Este caso me llamó la atención por <strong>{reglas.length + senales.length} señal(es)</strong>:"</>
-                    : <>"Es el caso más prioritario hoy según el modelo XGBoost, aunque sin reglas críticas disparadas."</>}
-                </div>
-              </div>
-              <ol style={{ margin: "0 0 0 16px", padding: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--ink-soft)" }}>
-                {reglas.slice(0, 3).map((r: any) => (
-                  <li key={r.codigo}>
-                    <strong>{r.codigo}</strong> — {r.nombre}
-                    {r.evidencia && <div style={{ fontSize: 10.5, color: 'var(--ink-mute)' }}>{r.evidencia}</div>}
-                  </li>
-                ))}
-                {senales.slice(0, Math.max(0, 3 - reglas.length)).map((s: any) => (
-                  <li key={s.id}>
-                    <strong>S{s.id}</strong> — {s.nombre} (+{s.puntos} pts)
-                    {s.evidencia && <div style={{ fontSize: 10.5, color: 'var(--ink-mute)' }}>{s.evidencia}</div>}
-                  </li>
-                ))}
-                {reglas.length === 0 && senales.length === 0 && (
-                  <li>Score {score}/100, nivel {nivel}. Sin alertas binarias, pero el modelo lo prioriza.</li>
-                )}
-              </ol>
-              <div style={{ marginTop: 14, padding: 12, background: "rgba(232,122,79,0.10)", borderRadius: 10, borderLeft: "3px solid var(--andes-orange)", fontSize: 12 }}>
-                <strong>Sugerencia:</strong>{' '}
-                {nivel === 'ROJO'
-                  ? 'bloquear pago pendiente y abrir investigación al proveedor.'
-                  : nivel === 'AMARILLO'
-                  ? 'retener el pago y solicitar documentación complementaria antes de aprobar.'
-                  : 'continuar el flujo normal, pero mantener este caso bajo monitoreo.'}
-              </div>
-            </div>
+            {/* Cóndor narration */}
+            <CondorNarration
+              intro={
+                reglas.length + senales.length > 0
+                  ? <>Este caso llamó mi atención por <strong>{reglas.length + senales.length} señal(es)</strong>:</>
+                  : 'Es el caso más prioritario hoy según el modelo XGBoost, aunque sin reglas críticas disparadas.'
+              }
+              items={narrationItems}
+              suggestion={suggestionText}
+              suggestionTone={suggestionTone as any}
+            />
           </div>
 
-          {/* ================================================================
-              FILA NUEVA: KPIs personales + aprendizaje + alertas + anomalías
-              ================================================================ */}
-
-          {/* KPIs de cartera reales */}
+          {/* ============================================================
+              MÉTRICAS DE CARTERA · estilo Konrix
+              ============================================================ */}
           {kpis && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 20 }}>
-              <KpiCard
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: 14,
+                marginTop: 20,
+              }}
+            >
+              <MetricCard
+                icon={FaDatabase}
+                tone="primary"
                 label="Cartera total"
                 value={(kpis.totales?.siniestros || 0).toLocaleString('en-US')}
                 sub="siniestros vigilados 24/7"
-                tone="wing"
               />
-              <KpiCard
+              <MetricCard
+                icon={FaExclamationTriangle}
+                tone="danger"
                 label="Alertas históricas"
                 value={(kpis.totales?.fraudes_simulados || 0).toLocaleString('en-US')}
                 sub={`${((kpis.totales?.tasa_fraude_simulada || 0) * 100).toFixed(1)}% de la cartera`}
-                tone="red"
               />
-              <KpiCard
+              <MetricCard
+                icon={FaFileAlt}
+                tone="warning"
                 label="Documentos inconsistentes"
                 value={(kpis.totales?.documentos_inconsistentes || 0).toLocaleString('en-US')}
                 sub={`de ${(kpis.totales?.documentos_totales || 0).toLocaleString('en-US')} analizados`}
-                tone="orange"
               />
-              <KpiCard
+              <MetricCard
+                icon={FaUserShield}
+                tone="accent"
                 label="Proveedores en lista restrictiva"
                 value={kpis.totales?.proveedores_lista_restrictiva || 0}
                 sub="bloqueados preventivamente"
-                tone="orange"
               />
             </div>
           )}
 
-          {/* === Segunda fila: 3 cards (aprendizaje + alertas tempranas + anomalías) === */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 16 }}>
-            {/* CARD 1: Lo que el cóndor aprendió de MI */}
-            <div className="card" style={{
-              padding: 18,
-              background: "linear-gradient(180deg, white, rgba(232,122,79,0.05))",
-              borderTop: "3px solid var(--andes-orange)",
-            }}>
-              <SectionTitle>🦅 Mi aprendizaje del cóndor</SectionTitle>
+          {/* ============================================================
+              SEGUNDA FILA · aprendizaje + alertas + anomalías
+              ============================================================ */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 16,
+              marginTop: 16,
+            }}
+          >
+            {/* CARD 1: aprendizaje */}
+            <div className="card" style={{ padding: 18, borderTop: '3px solid var(--accent)' }}>
+              <SectionTitle>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <FaBrain size={14} style={{ color: 'var(--accent)' }} />
+                  Mi aprendizaje del cóndor
+                </span>
+              </SectionTitle>
               {!fbStats || fbStats.total === 0 ? (
-                <div style={{ fontSize: 12, color: "var(--ink-mute)", lineHeight: 1.5 }}>
-                  Todavía no registraste decisiones. Investigá un caso y al final
-                  presioná <strong>Aprobar / Retener / Bloquear / Escalar</strong> para empezar
-                  a entrenar al cóndor con tu criterio.
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Todavía no registraste decisiones. Investigá un caso y al final presioná{' '}
+                  <strong>Aprobar / Retener / Bloquear / Escalar</strong> para empezar a entrenar
+                  al cóndor con tu criterio.
                 </div>
               ) : (
                 <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <Stat label="Decisiones acumuladas" value={fbStats.total} />
-                    <Stat label="Esta semana" value={fbStats.ultimas_7d} tone={fbStats.ultimas_7d > 0 ? "orange" : "wing"} />
+                    <Stat
+                      label="Esta semana"
+                      value={fbStats.ultimas_7d}
+                      tone={fbStats.ultimas_7d > 0 ? 'orange' : 'wing'}
+                    />
                   </div>
                   {fbStats.alineacion_con_modelo_pct != null && (
                     <div style={{ marginTop: 12 }}>
-                      <div style={{ fontSize: 10.5, color: "var(--ink-mute)", marginBottom: 4 }}>
+                      <div
+                        style={{
+                          fontSize: 10.5,
+                          color: 'var(--text-secondary)',
+                          marginBottom: 4,
+                        }}
+                      >
                         Alineación con el nivel sugerido del modelo
                       </div>
-                      <div style={{ height: 6, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{
-                          width: `${fbStats.alineacion_con_modelo_pct}%`,
-                          height: "100%",
-                          background: fbStats.alineacion_con_modelo_pct >= 80 ? "var(--paramo-green)"
-                                   : fbStats.alineacion_con_modelo_pct >= 60 ? "var(--andes-orange)"
-                                   : "var(--guayaba-red)",
-                        }} />
+                      <div
+                        style={{
+                          height: 6,
+                          background: 'var(--bg-subtle)',
+                          borderRadius: 3,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${fbStats.alineacion_con_modelo_pct}%`,
+                            height: '100%',
+                            background:
+                              fbStats.alineacion_con_modelo_pct >= 80
+                                ? 'var(--success)'
+                                : fbStats.alineacion_con_modelo_pct >= 60
+                                ? 'var(--warning)'
+                                : 'var(--danger)',
+                          }}
+                        />
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--condor-wing)", marginTop: 4, fontWeight: 600 }}>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: 'var(--text-primary)',
+                          marginTop: 4,
+                          fontWeight: 600,
+                        }}
+                      >
                         {fbStats.alineacion_con_modelo_pct}%
                       </div>
                     </div>
                   )}
-                  <div style={{ marginTop: 12, fontSize: 10.5, color: "var(--ink-mute)", lineHeight: 1.5 }}>
-                    Tus decisiones se persisten en parquet y alimentan el próximo reentreno mensual del XGBoost.
-                  </div>
                 </>
               )}
             </div>
 
-            {/* CARD 2: Alertas tempranas */}
-            <div className="card" style={{
-              padding: 18,
-              background: "linear-gradient(180deg, white, rgba(74,124,89,0.04))",
-              borderTop: "3px solid var(--paramo-green)",
-            }}>
-              <SectionTitle action={
-                alertas?.n_alertas > 0 && (
-                  <span className="chip red mono" style={{ fontSize: 9 }}>{alertas.n_alertas} activas</span>
-                )
-              }>
-                🛡️ Prevención · clusters formándose
+            {/* CARD 2: alertas tempranas */}
+            <div className="card" style={{ padding: 18, borderTop: '3px solid var(--success)' }}>
+              <SectionTitle
+                action={
+                  alertas?.n_alertas > 0 && (
+                    <Chip tone="red" size="sm">{alertas.n_alertas} activas</Chip>
+                  )
+                }
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <FaShieldAlt size={14} style={{ color: 'var(--success)' }} />
+                  Prevención · clusters formándose
+                </span>
               </SectionTitle>
               {!alertas || alertas.n_alertas === 0 ? (
-                <div style={{ fontSize: 12, color: "var(--ink-mute)", lineHeight: 1.5 }}>
-                  ✓ La cartera luce estable en la última ventana de {alertas?.ventana_efectiva_dias || 30}d.
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <FaCheckCircle size={12} style={{ color: 'var(--success)' }} />
+                  La cartera luce estable en la última ventana de{' '}
+                  {alertas?.ventana_efectiva_dias || 30}d.
                 </div>
               ) : (
                 <>
-                  <div style={{ fontSize: 12, color: "var(--condor-wing)", lineHeight: 1.5, marginBottom: 10 }}>
-                    Detecté <strong>{alertas.n_alertas} patrones</strong> formándose · USD <strong>{Math.round((alertas.monto_total_en_riesgo_usd||0)/1000)}K</strong> prevenibles si actuás ahora.
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--text-primary)',
+                      lineHeight: 1.5,
+                      marginBottom: 10,
+                    }}
+                  >
+                    Detecté <strong>{alertas.n_alertas} patrones</strong> formándose · USD{' '}
+                    <strong>{Math.round((alertas.monto_total_en_riesgo_usd || 0) / 1000)}K</strong>{' '}
+                    prevenibles si actuás ahora.
                   </div>
-                  <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ display: 'grid', gap: 6 }}>
                     {alertas.alertas?.slice(0, 3).map((a: any, i: number) => (
-                      <div key={i} style={{
-                        padding: "6px 10px", background: "var(--marfil-paper)", borderRadius: 6,
-                        fontSize: 11, borderLeft: `3px solid ${a.severidad === 'alta' ? 'var(--guayaba-red)' : 'var(--andes-orange)'}`,
-                      }}>
-                        <span className="mono" style={{ fontWeight: 600, color: "var(--mountain-blue)" }}>{a.entidad}</span>
-                        <span style={{ marginLeft: 6, color: "var(--ink-mute)" }}>· {a.n_casos_recientes} casos · ${(a.monto_en_riesgo_usd/1000).toFixed(0)}K</span>
+                      <div
+                        key={i}
+                        style={{
+                          padding: '8px 10px',
+                          background: 'var(--bg-card-soft)',
+                          border: '1px solid var(--border-soft)',
+                          borderRadius: 6,
+                          fontSize: 11,
+                          borderLeft: `3px solid ${
+                            a.severidad === 'alta' ? 'var(--danger)' : 'var(--warning)'
+                          }`,
+                        }}
+                      >
+                        <span className="mono" style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                          {a.entidad}
+                        </span>
+                        <span style={{ marginLeft: 6, color: 'var(--text-secondary)' }}>
+                          · {a.n_casos_recientes} casos · $
+                          {(a.monto_en_riesgo_usd / 1000).toFixed(0)}K
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -489,43 +729,68 @@ function AntifraudeHome({ onInvestigate }) {
               )}
             </div>
 
-            {/* CARD 3: Patrones nuevos (anomalías) */}
-            <div className="card" style={{
-              padding: 18,
-              background: "linear-gradient(180deg, white, rgba(44,95,141,0.05))",
-              borderTop: "3px solid var(--mountain-blue)",
-            }}>
-              <SectionTitle action={
-                anomalias?.novedosos > 0 && (
-                  <span className="chip blue mono" style={{ fontSize: 9 }}>{anomalias.novedosos} nuevos</span>
-                )
-              }>
-                ✨ Patrones inusuales hoy
+            {/* CARD 3: patrones inusuales */}
+            <div className="card" style={{ padding: 18, borderTop: '3px solid var(--primary)' }}>
+              <SectionTitle
+                action={
+                  anomalias?.novedosos > 0 && (
+                    <Chip tone="blue" size="sm">{anomalias.novedosos} nuevos</Chip>
+                  )
+                }
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <FaMagic size={14} style={{ color: 'var(--primary)' }} />
+                  Patrones inusuales hoy
+                </span>
               </SectionTitle>
               {!anomalias || !anomalias.items?.length ? (
-                <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>
-                  IsolationForest todavía no produjo resultados. Probá la pantalla <span className="mono">✨ Patrones inusuales</span>.
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  IsolationForest todavía no produjo resultados.
                 </div>
               ) : (
                 <>
-                  <div style={{ fontSize: 12, color: "var(--condor-wing)", lineHeight: 1.5, marginBottom: 10 }}>
-                    Detecté <strong>{anomalias.total}</strong> casos estadísticamente raros, <strong>{anomalias.novedosos}</strong> sin alerta histórica previa.
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--text-primary)',
+                      lineHeight: 1.5,
+                      marginBottom: 10,
+                    }}
+                  >
+                    Detecté <strong>{anomalias.total}</strong> casos estadísticamente raros,{' '}
+                    <strong>{anomalias.novedosos}</strong> sin alerta histórica previa.
                   </div>
-                  <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ display: 'grid', gap: 6 }}>
                     {anomalias.items.slice(0, 3).map((it: any) => (
                       <div
                         key={it.id_siniestro}
                         onClick={() => onInvestigate && onInvestigate(it.id_siniestro)}
                         style={{
-                          padding: "6px 10px", background: "var(--marfil-paper)", borderRadius: 6,
-                          fontSize: 11, cursor: "pointer",
-                          borderLeft: `3px solid ${it.novedoso ? 'var(--guayaba-red)' : 'var(--paramo-green)'}`,
-                          display: "flex", alignItems: "center", gap: 6,
+                          padding: '8px 10px',
+                          background: 'var(--bg-card-soft)',
+                          border: '1px solid var(--border-soft)',
+                          borderRadius: 6,
+                          fontSize: 11,
+                          cursor: 'pointer',
+                          borderLeft: `3px solid ${
+                            it.novedoso ? 'var(--danger)' : 'var(--success)'
+                          }`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
                         }}
                       >
-                        <span className="mono" style={{ fontWeight: 600, color: "var(--mountain-blue)" }}>{it.id_siniestro}</span>
-                        <span style={{ color: "var(--ink-mute)" }}>· score {it.anomaly_score}</span>
-                        {it.novedoso && <span className="chip red" style={{ fontSize: 8, marginLeft: "auto" }}>✨ nuevo</span>}
+                        <span className="mono" style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                          {it.id_siniestro}
+                        </span>
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                          · score {it.anomaly_score}
+                        </span>
+                        {it.novedoso && (
+                          <Chip tone="red" size="sm" style={{ marginLeft: 'auto', fontSize: 9 }}>
+                            nuevo
+                          </Chip>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -591,7 +856,7 @@ function SiniestrosHome({ onInvestigate }) {
 
   return (
     <RoleFrame
-      icon="📋"
+      icon={FaUserTie}
       title="Mi día, priorizado por el cóndor"
       super="Mi día priorizado en orden"
       accent="#E87A4F"
@@ -624,8 +889,8 @@ function SiniestrosHome({ onInvestigate }) {
                 </div>
                 <VueloDelCondor score={c.score} variant="sm"/>
                 <span className="tabular mono" style={{ fontSize: 12 }}>${(c.monto_reclamado_usd||0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
-                <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => fbQuick(c.id_siniestro, 'aprobar', c.score, c.nivel)}>✓ resolver</button>
-                <button className="chip outline" style={{ fontSize: 10, cursor: "pointer" }} onClick={() => onInvestigate(c.id_siniestro)}>investigar</button>
+                <button className="btn ghost sm" onClick={() => fbQuick(c.id_siniestro, 'aprobar', c.score, c.nivel)}><FaCheckCircle size={10} /> Resolver</button>
+                <button className="btn ghost sm" onClick={() => onInvestigate(c.id_siniestro)}><FaSearch size={10} /> Investigar</button>
               </div>
             ))}
           </div>
@@ -703,7 +968,7 @@ function JefaturaHome() {
 
   return (
     <RoleFrame
-      icon="📊"
+      icon={FaBriefcase}
       title="Centro de operaciones"
       super="Centro de operaciones"
       accent="#2C5F8D"
@@ -905,7 +1170,7 @@ function RiesgosHome() {
   const provRestr = kpis?.totales?.proveedores_lista_restrictiva || 0;
   return (
     <RoleFrame
-      icon="⚠️"
+      icon={FaBalanceScale}
       title="Mapa de exposición consolidada"
       super="Mapa de exposición consolidada"
       accent="#D4A574"
@@ -921,7 +1186,7 @@ function RiesgosHome() {
         <SectionTitle action={
           <div style={{ display: "flex", gap: 8 }}>
             <button className="chip outline" style={{ fontSize: 11 }}>por proveedor</button>
-            <button className="chip" style={{ fontSize: 11, background: "var(--condor-wing)", color: "white" }}>por proveedor ✓</button>
+            <button className="chip" style={{ fontSize: 11, background: "var(--primary)", color: "white" }}><FaCheckCircle size={10} /> por proveedor</button>
             <button className="chip outline" style={{ fontSize: 11 }}>por cobertura</button>
             <button className="chip outline" style={{ fontSize: 11 }}>por segmento</button>
           </div>
@@ -991,11 +1256,11 @@ function WhatIfSimulator() {
 function AuditoriaHome() {
   return (
     <RoleFrame
-      icon="🔍"
+      icon={FaUserNurse}
       title="Cadena de evidencia forense"
       super="Cadena de evidencia legal"
       accent="#4A7C59"
-      extra={<button className="btn">⬇ Exportar PDF compliance</button>}
+      extra={<button className="btn"><FaDownload size={12} /> Exportar PDF compliance</button>}
     >
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 18 }}>
         <KpiCard label="Casos auditables" value="247" sub="firmados digitalmente" tone="wing"/>
@@ -1053,7 +1318,7 @@ function ForensicTimeline() {
           <div style={{ position: "absolute", left: -2, top: 4, width: 12, height: 12, borderRadius: "50%", background: "white", border: "2px solid var(--paramo-green)" }}/>
           <div className="mono" style={{ fontSize: 10, color: "var(--ink-mute)" }}>{e.t} · {e.who}</div>
           <div style={{ fontSize: 12, marginTop: 2 }}>{e.what}</div>
-          <div className="mono" style={{ fontSize: 9.5, color: "var(--paramo-green)" }}>✓ {e.hash}</div>
+          <div className="mono" style={{ fontSize: 9.5, color: "var(--success)", display: 'inline-flex', alignItems: 'center', gap: 4 }}><FaCheckCircle size={9} /> {e.hash}</div>
         </div>
       ))}
     </div>
@@ -1066,7 +1331,7 @@ function ForensicTimeline() {
 function TecnologiaHome() {
   return (
     <RoleFrame
-      icon="🛠️"
+      icon={FaCog}
       title="Salud del sistema en tiempo real"
       super="Salud del sistema en tiempo real"
       accent="#1F4A73"
@@ -1210,11 +1475,11 @@ function GerenciaHome() {
 
   return (
     <RoleFrame
-      icon="💼"
+      icon={FaUsers}
       title="Pulso ejecutivo de cartera"
       super="Pulso ejecutivo cartera"
       accent="#1A3A52"
-      extra={<button className="btn">📤 Compartir con el board</button>}
+      extra={<button className="btn"><FaShareAlt size={12} /> Compartir con el board</button>}
     >
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
         <KpiCard
@@ -1263,7 +1528,7 @@ function GerenciaHome() {
               </div>
             </div>
           ))}
-          <button className="btn warm" style={{ marginTop: 14, width: "100%" }}>📄 Generar resumen ejecutivo</button>
+          <button className="btn block" style={{ marginTop: 14 }}><FaFileAlt size={12} /> Generar resumen ejecutivo</button>
         </div>
       </div>
 

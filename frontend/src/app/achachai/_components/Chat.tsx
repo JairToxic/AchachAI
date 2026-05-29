@@ -5,7 +5,40 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Condor, VueloDelCondor } from './Condor';
 import { CondorSilhouette } from './CondorSilhouette';
+import { CondorLogo } from './CondorLogo';
 import { EcuadorHeatMap } from './EcuadorHeatMap';
+import {
+  FaBroadcastTower,
+  FaSearch,
+  FaNetworkWired,
+  FaMapMarkedAlt,
+  FaUsers,
+  FaFileAlt,
+  FaDollarSign,
+  FaChartBar,
+  FaChartLine,
+  FaClipboardCheck,
+  FaBolt,
+  FaCheckCircle,
+  FaFileInvoice,
+  FaUserShield,
+  FaBriefcase,
+  FaDownload,
+  FaBrain,
+  FaPaperPlane,
+  FaMicrophone,
+  FaExclamationTriangle,
+  FaCoins,
+  FaCog,
+  FaLightbulb,
+  FaEye,
+  FaThumbsUp,
+  FaThumbsDown,
+  FaBuilding,
+  FaUserCircle,
+  FaPlane,
+  FaPlay,
+} from 'react-icons/fa';
 
 /* Estilos para markdown del condor: tablas + listas con look del design system */
 const MD_STYLES: React.CSSProperties = {
@@ -52,17 +85,17 @@ export function MD({ children }: { children: string }) {
 /* ============================================================
    Catálogo humano de tools — qué dice cada una mientras corre
    ============================================================ */
-export const TOOL_NARRATIVE: Record<string, { phrase: string; icon: string; tone: string; detail: string }> = {
-  top_riesgo:                { phrase: "Escaneando casos críticos",       icon: "📡", tone: "#C5333A", detail: "Aplicando scoring híbrido (reglas + XGBoost) a 25.460 siniestros…" },
-  detalle_siniestro:         { phrase: "Recuperando detalle del caso",    icon: "🔍", tone: "#E87A4F", detail: "Cruzando póliza + asegurado + vehículo + proveedor + documentos…" },
-  ranking_proveedores:       { phrase: "Calculando concentración por proveedor", icon: "🕸️", tone: "#2C5F8D", detail: "Agregando casos por proveedor en últimos 90 días…" },
-  ranking_ciudades:          { phrase: "Mapeando geografía del fraude",   icon: "🗺️", tone: "#2C5F8D", detail: "Agrupando casos por ciudad y calculando densidad…" },
-  asegurados_recurrentes:    { phrase: "Detectando clientes frecuentes",  icon: "👥", tone: "#D4A574", detail: "Buscando asegurados con múltiples reclamos en 18 meses…" },
-  docs_faltantes:            { phrase: "Auditando completitud documental", icon: "📄", tone: "#D4A574", detail: "Listando casos con documentos faltantes o ilegibles…" },
-  montos_atipicos:           { phrase: "Identificando montos anómalos",   icon: "💰", tone: "#C5333A", detail: "Filtrando reclamos cercanos al 95% de suma asegurada…" },
-  estadisticas_por_cobertura:{ phrase: "Analizando por tipo de cobertura", icon: "📊", tone: "#2C5F8D", detail: "Calculando % fraude por ramo y monto promedio…" },
-  simulacion_ahorro:         { phrase: "Calculando ROI y proyección $$$", icon: "💵", tone: "#4A7C59", detail: "Estimando ahorro anual con tasa de detección AchachAI…" },
-  exportar_reporte:          { phrase: "Preparando reporte de auditoría", icon: "📋", tone: "#1A3A52", detail: "Generando CSV con casos del nivel solicitado…" },
+export const TOOL_NARRATIVE: Record<string, { phrase: string; icon: any; tone: string; detail: string }> = {
+  top_riesgo:                { phrase: "Escaneando casos críticos",       icon: FaBroadcastTower, tone: "var(--danger)",  detail: "Aplicando scoring híbrido (reglas + XGBoost) a 39.960 siniestros multi-ramo…" },
+  detalle_siniestro:         { phrase: "Recuperando detalle del caso",    icon: FaSearch,         tone: "var(--primary)", detail: "Cruzando póliza + asegurado + vehículo + proveedor + documentos…" },
+  ranking_proveedores:       { phrase: "Calculando concentración por proveedor", icon: FaNetworkWired, tone: "var(--accent)", detail: "Agregando casos por proveedor en últimos 90 días…" },
+  ranking_ciudades:          { phrase: "Mapeando geografía del fraude",   icon: FaMapMarkedAlt,   tone: "var(--accent)",  detail: "Agrupando casos por ciudad y calculando densidad…" },
+  asegurados_recurrentes:    { phrase: "Detectando clientes frecuentes",  icon: FaUsers,          tone: "var(--warning)", detail: "Buscando asegurados con múltiples reclamos en 18 meses…" },
+  docs_faltantes:            { phrase: "Auditando completitud documental", icon: FaFileAlt,       tone: "var(--warning)", detail: "Listando casos con documentos faltantes o ilegibles…" },
+  montos_atipicos:           { phrase: "Identificando montos anómalos",   icon: FaDollarSign,     tone: "var(--danger)",  detail: "Filtrando reclamos cercanos al 95% de suma asegurada…" },
+  estadisticas_por_cobertura:{ phrase: "Analizando por tipo de cobertura", icon: FaChartBar,      tone: "var(--primary)", detail: "Calculando % fraude por ramo y monto promedio…" },
+  simulacion_ahorro:         { phrase: "Calculando ROI y proyección",     icon: FaChartLine,      tone: "var(--success)", detail: "Estimando ahorro anual con tasa de detección AchachAI…" },
+  exportar_reporte:          { phrase: "Preparando reporte de auditoría", icon: FaClipboardCheck, tone: "var(--text-primary)", detail: "Generando CSV con casos del nivel solicitado…" },
 };
 
 const PHRASES_PHASE = [
@@ -204,7 +237,7 @@ export function JarvisStream({ phase, tools, currentTool }: { phase: string; too
           {tools.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {tools.map((t, i) => {
-                const nar = TOOL_NARRATIVE[t] || { phrase: t, icon: "⚡", tone: "#E87A4F", detail: "Procesando…" };
+                const nar = TOOL_NARRATIVE[t] || { phrase: t, icon: FaBolt, tone: "var(--warning)", detail: "Procesando…" };
                 const isCurrent = i === tools.length - 1 && t === currentTool;
                 const isDone = !isCurrent;
                 return (
@@ -215,15 +248,17 @@ export function JarvisStream({ phase, tools, currentTool }: { phase: string; too
                     border: `1px solid ${isCurrent ? "rgba(232,122,79,0.5)" : "rgba(244,237,228,0.08)"}`,
                     animation: isCurrent ? "fade-up .25s ease both" : "none",
                   }}>
-                    <span style={{ fontSize: 16, marginTop: 1 }}>{nar.icon}</span>
+                    <span style={{ color: nar.tone, marginTop: 1, display: 'grid', placeItems: 'center' }}>
+                      {typeof nar.icon === 'function' ? <nar.icon size={14} /> : null}
+                    </span>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--marfil)" }}>{nar.phrase}</span>
                         <span className="mono" style={{ fontSize: 9.5, color: "rgba(244,237,228,0.55)", letterSpacing: ".06em" }}>[{t}]</span>
                         <span style={{ flex: 1 }}/>
                         {isDone && (
-                          <span className="mono" style={{ fontSize: 10, color: "var(--paramo-soft)", fontWeight: 600 }}>
-                            ✓ {(180 + i * 50 + Math.floor(Math.random() * 80)).toString()}ms
+                          <span className="mono" style={{ fontSize: 10, color: "var(--success)", fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <FaCheckCircle size={9} /> {(180 + i * 50 + Math.floor(Math.random() * 80)).toString()}ms
                           </span>
                         )}
                         {isCurrent && (
@@ -275,7 +310,7 @@ export function JarvisStream({ phase, tools, currentTool }: { phase: string; too
             marginTop: 12, paddingTop: 10, borderTop: "1px dashed rgba(244,237,228,0.12)",
             fontSize: 9.5, color: "rgba(244,237,228,0.5)", letterSpacing: ".06em",
           }}>
-            <span className="mono">CARTERA · 25.460 SINIESTROS · 198 PROVEEDORES</span>
+            <span className="mono">CARTERA · 39.960 SINIESTROS · 271 PROVEEDORES · 3 RAMOS</span>
             <span className="mono">LATENCIA: {(Math.random() * 600 + 200).toFixed(0)}ms</span>
           </div>
         </div>
@@ -381,7 +416,7 @@ export function CityHeatmapAuto() {
   );
   if (!data) return (
     <div style={{ padding: "10px 18px", fontSize: 11, color: "var(--ink-mute)" }}>
-      🗺️ Dibujando mapa de calor de Ecuador…
+      <FaMapMarkedAlt size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} /> Dibujando mapa de calor de Ecuador…
     </div>
   );
   if (data.length === 0) return null;
@@ -409,8 +444,8 @@ export function ReportePdfCard({ r }: { r: any }) {
     auditoria: "var(--paramo-green)",
     directorio: "var(--mountain-blue)",
   };
-  const iconByTipo: Record<string, string> = {
-    ejecutivo: "📋", antifraude: "🕵️", auditoria: "📑", directorio: "💼",
+  const iconByTipo: Record<string, any> = {
+    ejecutivo: FaClipboardCheck, antifraude: FaUserShield, auditoria: FaFileInvoice, directorio: FaBriefcase,
   };
   const tone = toneByTipo[r.tipo] || "var(--andes-orange)";
 
@@ -427,12 +462,14 @@ export function ReportePdfCard({ r }: { r: any }) {
         display: "flex", alignItems: "center", gap: 14,
       }}>
         <div style={{
-          fontSize: 32, width: 52, height: 52, borderRadius: 10,
-          background: `${tone}15`, display: "grid", placeItems: "center",
-        }}>{iconByTipo[r.tipo] || "📄"}</div>
+          width: 52, height: 52, borderRadius: 10,
+          background: `${tone}1A`, color: tone, display: "grid", placeItems: "center",
+        }}>
+          {(() => { const I = iconByTipo[r.tipo] || FaFileAlt; return <I size={24} />; })()}
+        </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 10.5, color: tone, letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 700 }}>
-            📄 Reporte PDF generado
+          <div style={{ fontSize: 10.5, color: tone, letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <FaFileAlt size={11} /> Reporte PDF generado
           </div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--condor-wing)", marginTop: 2 }}>
             {r.titulo}
@@ -457,7 +494,7 @@ export function ReportePdfCard({ r }: { r: any }) {
             display: "flex", alignItems: "center", gap: 6,
           }}
         >
-          ⬇ Descargar PDF
+          <FaDownload size={12} /> Descargar PDF
         </a>
       </div>
     </div>
@@ -505,8 +542,8 @@ export function EvaluacionCard({ e, onInvestigate }: { e: any; onInvestigate?: (
           </svg>
 
           <div>
-            <div style={{ fontSize: 10.5, letterSpacing: ".12em", textTransform: "uppercase", fontWeight: 700, color: tone }}>
-              ⚡ Evaluación en vivo
+            <div style={{ fontSize: 10.5, letterSpacing: ".12em", textTransform: "uppercase", fontWeight: 700, color: tone, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <FaBolt size={11} /> Evaluación en vivo
             </div>
             <div style={{ fontSize: 18, fontFamily: "var(--serif)", fontWeight: 600, color: tone, marginTop: 2 }}>
               {nivel}
@@ -535,7 +572,7 @@ export function EvaluacionCard({ e, onInvestigate }: { e: any; onInvestigate?: (
             background: `${tone}12`, borderLeft: `3px solid ${tone}`, borderRadius: 6,
             fontSize: 12, color: "var(--ink-soft)",
           }}>
-            <strong style={{ color: tone }}>🦅 Acción sugerida:</strong> {e.accion_sugerida}
+            <strong style={{ color: tone }}>Acción sugerida:</strong> {e.accion_sugerida}
           </div>
         )}
       </div>
@@ -561,11 +598,7 @@ export function EvidencePreview({ summary, onInvestigate }: { summary: string; o
       borderTop: "1px solid var(--line)",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <span style={{
-          display: "inline-block", width: 22, height: 22, borderRadius: "50%",
-          background: "linear-gradient(135deg, var(--andes-orange), var(--guayaba-red))",
-          display: "grid", placeItems: "center", color: "white", fontSize: 12,
-        }}>🦅</span>
+        <CondorLogo size={22} />
         <div>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--condor-wing)" }}>
             Evidencia visual auto-detectada
@@ -608,8 +641,8 @@ export function EvidencePreview({ summary, onInvestigate }: { summary: string; o
                     {c.nivel}{!c.scoreReal && ' · score~'}
                   </span>
                 )}
-                <span style={{ fontSize: 10, color: "var(--ink-mute)", display: "flex", alignItems: "center", gap: 3 }}>
-                  🦅 investigar profundo
+                <span style={{ fontSize: 10, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 4 }}>
+                  <FaSearch size={9} /> Investigar
                 </span>
               </button>
             );
@@ -628,14 +661,15 @@ export function EvidencePreview({ summary, onInvestigate }: { summary: string; o
               color: "var(--mountain-blue)",
               border: "1px solid rgba(44,95,141,0.2)",
               fontWeight: 500,
-            }}>🏢 {p}</span>
+            }}><FaBuilding size={10} /> {p}</span>
           ))}
           {ev.niveles.map(n => {
             const cls = n === "ROJO" ? "red" : n === "AMARILLO" ? "amber" : "green";
-            const icon = n === "ROJO" ? "🔴" : n === "AMARILLO" ? "🟡" : "🟢";
+            const label = n === "ROJO" ? "Riesgo alto" : n === "AMARILLO" ? "Riesgo medio" : "Riesgo bajo";
+            const dotColor = n === "ROJO" ? "var(--danger)" : n === "AMARILLO" ? "var(--warning)" : "var(--success)";
             return (
               <span key={n} className={`chip ${cls}`} style={{ fontSize: 10.5, padding: "3px 9px", fontWeight: 600 }}>
-                {icon} {n}
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, display: 'inline-block', marginRight: 6 }} /> {label}
               </span>
             );
           })}
@@ -725,7 +759,7 @@ export const CANNED_ANSWERS = {
     summary: "Revisé tu cartera. Hoy hay 12 casos en rojo, 47 en observación. El proveedor PRV-NEW0019 explica el 38% de la exposición crítica.",
     tools: ["top_riesgo", "ranking_proveedores"],
     sources: [
-      "Consulté tabla 'siniestros' (25.460 registros)",
+      "Consulté tabla 'siniestros' (39.960 registros multi-ramo)",
       "Apliqué scoring XGBoost v4 (Azure ML)",
       "Filtré por score ≥ 70",
     ],
@@ -775,90 +809,142 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
     setActiveTools([]);
     setCurrentTool(null);
 
-    // Fase 1: pre-fetch — el cóndor "piensa" antes de mandar al backend
-    setCurrentPhase("🛫 Despegando · conectando con Azure AI Foundry…");
-    await sleep(380);
-    setCurrentPhase("🧠 Resolviendo intención · decidiendo qué herramientas usar");
-    await sleep(420);
+    setCurrentPhase("Despegando · conectando con Azure AI Foundry…");
 
-    // Lanzar el request al backend en paralelo con animación
-    const fetchPromise = fetch(`${API}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: q,
-        history: messages.filter(m => m.text).slice(-6).map(m => ({
-          role: m.role === "condor" ? "assistant" : "user",
-          content: m.text || (m.payload && m.payload.summary) || "",
-        })),
-      }),
-    });
-
-    setCurrentPhase("📡 Conectando con la base de 25.460 siniestros…");
+    // ID temporal para el mensaje que vamos a ir actualizando con los deltas
+    const streamingId = `stream-${Date.now()}`;
+    const toolsCalled: string[] = [];
+    const toolsFull: any[] = [];
+    let accumulatedText = "";
+    let totalTokens = 0;
+    let iterations = 1;
+    let firstDelta = true;
 
     try {
-      const resp = await fetchPromise;
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      const tools = (data.tools_used || []).map(t => t.tool);
+      const resp = await fetch(`${API}/chat/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: q,
+          history: messages.filter(m => m.text).slice(-6).map(m => ({
+            role: m.role === "condor" ? "assistant" : "user",
+            content: m.text || (m.payload && m.payload.summary) || "",
+          })),
+        }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
 
-      // Fase 2: stream visual de cada tool
-      for (let i = 0; i < tools.length; i++) {
-        const nar = TOOL_NARRATIVE[tools[i]] || { phrase: tools[i] };
-        setCurrentPhase(`${nar.phrase}…`);
-        setCurrentTool(tools[i]);
-        setActiveTools(t => [...t, tools[i]]);
-        await sleep(450 + Math.random() * 200);
+      setCurrentPhase("Resolviendo intención · el cóndor decide qué herramientas usar");
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parsear NDJSON: cada evento termina en \n
+        let nl: number;
+        while ((nl = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+
+          let ev: any;
+          try { ev = JSON.parse(line); } catch { continue; }
+
+          if (ev.type === "tool_call") {
+            toolsCalled.push(ev.tool);
+            const nar = TOOL_NARRATIVE[ev.tool] || { phrase: ev.tool };
+            setCurrentPhase(`${nar.phrase}…`);
+            setCurrentTool(ev.tool);
+            setActiveTools(t => [...t, ev.tool]);
+          } else if (ev.type === "tool_result") {
+            toolsFull.push({ tool: ev.tool, result_summary: ev.summary });
+          } else if (ev.type === "delta") {
+            // Primer delta: cerrar fase de pensamiento + crear burbuja de respuesta
+            if (firstDelta) {
+              firstDelta = false;
+              setCurrentTool(null);
+              setCurrentPhase("Escribiendo respuesta…");
+              setThinking(false);
+              setActiveTools([]);
+              setMessages(m => [...m, {
+                id: streamingId,
+                role: "condor",
+                kind: "answer",
+                streaming: true,
+                payload: {
+                  summary: "",
+                  tools: toolsCalled,
+                  sources: [],
+                  cost: { tokens: 0, time: "streaming…", price: "—" },
+                },
+                time: now(),
+              }]);
+            }
+            accumulatedText += ev.text || "";
+            // Actualizar el mensaje en streaming
+            setMessages(m => m.map((msg: any) =>
+              msg.id === streamingId
+                ? { ...msg, payload: { ...msg.payload, summary: accumulatedText } }
+                : msg
+            ));
+          } else if (ev.type === "done") {
+            totalTokens = ev.tokens || 0;
+            iterations = ev.iterations || 1;
+            // Resultado final - cerrar streaming y enriquecer
+            setMessages(m => m.map((msg: any) =>
+              msg.id === streamingId
+                ? {
+                    ...msg,
+                    streaming: false,
+                    payload: {
+                      ...msg.payload,
+                      summary: accumulatedText || "Sin respuesta.",
+                      tools: toolsCalled,
+                      sources: toolsCalled.map(t => {
+                        const nar = TOOL_NARRATIVE[t];
+                        return nar ? `${nar.phrase} (${t})` : `Llamé tool '${t}'`;
+                      }),
+                      cost: {
+                        tokens: totalTokens,
+                        time: `${iterations} it`,
+                        price: `~$${(totalTokens * 0.000002).toFixed(4)}`,
+                      },
+                    },
+                  }
+                : msg
+            ));
+          } else if (ev.type === "error") {
+            throw new Error(ev.message || "error desconocido");
+          }
+        }
       }
 
-      // Fase 3: síntesis
+      setCurrentPhase("");
+      setThinking(false);
+      setActiveTools([]);
       setCurrentTool(null);
-      setCurrentPhase("✨ Sintetizando insights · construyendo respuesta…");
-      await sleep(600);
-
+    } catch (err: any) {
       setThinking(false);
       setActiveTools([]);
       setCurrentPhase("");
-
-      // Extraer resultados completos de tools especiales (reportes, evaluaciones)
-      const toolsFull = data.tools_used || [];
-      const reporteResult = toolsFull.find((t: any) =>
-        t.tool === "generar_reporte_pdf" && t.result_full
-      )?.result_full;
-      const evaluacionResult = toolsFull.find((t: any) =>
-        t.tool === "evaluar_caso_hipotetico" && t.result_full
-      )?.result_full;
-
-      const payload = {
-        summary: data.response || "Sin respuesta.",
-        tools: tools,
-        sources: tools.map(t => {
-          const nar = TOOL_NARRATIVE[t];
-          return nar ? `${nar.icon} ${nar.phrase} (${t})` : `Llamé tool '${t}'`;
-        }),
-        cost: {
-          tokens: data.tokens || 0,
-          time: `${data.iterations || 1} it`,
-          price: `~$${((data.tokens || 0) * 0.000002).toFixed(4)}`,
-        },
-        reporteResult,
-        evaluacionResult,
+      setCurrentTool(null);
+      // Si nunca creamos la burbuja de streaming, agregamos una de error
+      const errorPayload = {
+        summary: `Error consultando al backend: \`${err.message}\`. Verificá que FastAPI esté corriendo.`,
+        tools: [], sources: [], cost: { tokens: 0, time: "0s", price: "$0" },
       };
-      setMessages(m => [...m, { role: "condor", kind: "answer", payload, time: now() }]);
-    } catch (err) {
-      setThinking(false);
-      setActiveTools([]);
-      setCurrentPhase("");
-      setCurrentTool(null);
-      setMessages(m => [...m, {
-        role: "condor",
-        kind: "answer",
-        payload: {
-          summary: `⚠️ Error consultando al backend: \`${err.message}\`. Verificá que FastAPI esté corriendo en \`localhost:8000\`.`,
-          tools: [], sources: [], cost: { tokens: 0, time: "0s", price: "$0" },
-        },
-        time: now(),
-      }]);
+      if (firstDelta) {
+        setMessages(m => [...m, { role: "condor", kind: "answer", payload: errorPayload, time: now() }]);
+      } else {
+        setMessages(m => m.map((msg: any) =>
+          msg.id === streamingId ? { ...msg, streaming: false, payload: errorPayload } : msg
+        ));
+      }
     }
   }
 
@@ -889,13 +975,13 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
           </div>
 
           <div style={{ position: "relative", zIndex: 1 }}>
-            <Condor size={56} mood={thinking ? "think" : "idle"} tone="wing" />
-            <span style={{ position: "absolute", bottom: 0, right: -2, width: 10, height: 10, borderRadius: "50%", background: "var(--paramo-green)", border: "2px solid var(--marfil)" }}/>
+            <CondorLogo size={52} />
+            <span style={{ position: "absolute", bottom: 2, right: 0, width: 10, height: 10, borderRadius: "50%", background: "var(--success)", border: "2px solid var(--bg-card)" }}/>
           </div>
           <div style={{ flex: 1, position: "relative", zIndex: 1 }}>
-            <h2 style={{ fontSize: 22, marginBottom: 2 }}>Conversación con el Cóndor</h2>
+            <h2 className="display" style={{ fontSize: 22, marginBottom: 2, color: 'var(--text-primary)' }}>Conversación con el Cóndor</h2>
             <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>
-              Modelo: <span className="mono">gpt-5-mini</span> · 10 tools activas · contexto: cartera vehicular 25.460 siniestros
+              Modelo: <span className="mono">gpt-5-mini</span> · 10 tools activas · contexto: cartera multi-ramo 39.960 siniestros (Vehículos · Hogar · Salud)
             </div>
           </div>
           <div className="chip blue" style={{ position: "relative", zIndex: 1 }}>
@@ -917,19 +1003,19 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
             {suggestions.map((p, i) => (
               <button key={i}
                 onClick={() => send(p)}
-                className="chip outline"
-                style={{ cursor: "pointer", fontSize: 11.5, padding: "6px 12px", background: "white" }}>
-                <Condor size={12} tone="wing" mood="still" /> {p}
+                className="btn ghost sm"
+                style={{ fontSize: 11.5, padding: "6px 12px" }}>
+                <FaPlay size={9} /> {p}
               </button>
             ))}
           </div>
           <div style={{
             display: "flex", alignItems: "center", gap: 10,
-            background: "white", border: "1px solid var(--line-strong)",
+            background: "var(--bg-card)", border: "1px solid var(--border-color)",
             borderRadius: 16, padding: "8px 8px 8px 16px",
             boxShadow: "var(--shadow-sm)",
           }}>
-            <Condor size={20} tone="orange" mood="idle" />
+            <CondorLogo size={26} />
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -940,7 +1026,7 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
                 background: "transparent", color: "var(--condor-wing)",
               }}
             />
-            <button className="btn ghost" style={{ padding: "8px 10px" }} title="Voz">🎙</button>
+            <button className="btn ghost" style={{ padding: "8px 10px" }} title="Voz"><FaMicrophone size={13} /></button>
             <button className="btn" onClick={() => send()} disabled={thinking}>
               Enviar →
             </button>
@@ -1013,10 +1099,10 @@ function HistoryItem({ time, title, tools, highlight, red }) {
 function ThinkingBlock({ tools }) {
   return (
     <div className="fade-up" style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-      <Condor size={28} mood="think" tone="orange" />
+      <CondorLogo size={32} />
       <div style={{ flex: 1, maxWidth: 720 }}>
-        <div className="mono" style={{ fontSize: 11, color: "var(--andes-orange)", marginBottom: 8 }}>
-          <Condor size={11} tone="orange" mood="still"/> consultando {tools.length || "…"} fuentes…
+        <div className="mono" style={{ fontSize: 11, color: "var(--accent)", marginBottom: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', animation: 'pulse-amber 1.2s infinite' }} /> consultando {tools.length || "…"} fuentes…
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {tools.map((t, i) => (
@@ -1029,7 +1115,7 @@ function ThinkingBlock({ tools }) {
               backgroundSize: "200% 100%",
             }}>
               <span className="mono">{t}</span>
-              {i < tools.length - 1 && <span style={{ marginLeft: 4 }}>✓</span>}
+              {i < tools.length - 1 && <FaCheckCircle size={9} style={{ marginLeft: 4, color: 'var(--success)' }} />}
             </span>
           ))}
           {tools.length === 0 && (
@@ -1062,7 +1148,7 @@ function Message({ msg, onInvestigate }) {
     const a = msg.payload;
     return (
       <div className="fade-up" style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-        <Condor size={28} mood="speak" tone="wing" />
+        <CondorLogo size={32} />
         <div style={{ flex: 1, maxWidth: 760 }}>
           <div style={{
             background: "white", border: "1px solid var(--line)",
@@ -1122,24 +1208,24 @@ function Message({ msg, onInvestigate }) {
                 ▾ ¿Cómo llegué a esto?
               </summary>
               <ul style={{ margin: "8px 0 4px 16px", padding: 0, fontSize: 11.5, color: "var(--ink-soft)", lineHeight: 1.7 }}>
-                {a.sources.map((s, i) => <li key={i}>⚡ {s}</li>)}
+                {a.sources.map((s, i) => <li key={i}><FaBolt size={9} style={{ marginRight: 4 }} /> {s}</li>)}
               </ul>
-              <div style={{ display: "flex", gap: 14, fontSize: 10.5, color: "var(--ink-mute)", marginTop: 10, paddingTop: 8, borderTop: "1px dashed var(--line)" }}>
-                <span>⏱ {a.cost.time}</span>
-                <span>🪙 {a.cost.tokens} tokens</span>
-                <span>💵 {a.cost.price}</span>
+              <div style={{ display: "flex", gap: 14, fontSize: 10.5, color: "var(--text-secondary)", marginTop: 10, paddingTop: 8, borderTop: "1px dashed var(--border-color)" }}>
+                <span>{a.cost.time}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><FaCoins size={10} /> {a.cost.tokens} tokens</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><FaDollarSign size={10} /> {a.cost.price}</span>
                 <span style={{ flex: 1 }}/>
-                <span>🔧 {a.tools.map(t => <span key={t} className="mono" style={{ marginLeft: 4 }}>[{t}]</span>)}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><FaCog size={10} /> {a.tools.map(t => <span key={t} className="mono" style={{ marginLeft: 4 }}>[{t}]</span>)}</span>
               </div>
             </details>
 
             {a.tableRows && (
               <div style={{ padding: "10px 18px", display: "flex", gap: 8, borderTop: "1px solid var(--line)", background: "var(--marfil-paper)" }}>
-                <button className="chip green" style={{ cursor: "pointer" }}>💡 Sugerencia: revisar PRV-NEW0019</button>
-                <button className="chip outline" style={{ cursor: "pointer" }} onClick={() => onInvestigate && onInvestigate("SIN-100029")}>🦅 Investigar profundo</button>
+                <button className="chip green" style={{ cursor: "pointer" }}><FaLightbulb size={10} /> Sugerencia: revisar PRV-NEW0019</button>
+                <button className="btn ghost sm" onClick={() => onInvestigate && onInvestigate("SIN-100029")}><FaSearch size={10} /> Investigar profundo</button>
                 <div style={{ flex: 1 }}/>
-                <button className="chip outline" style={{ cursor: "pointer" }}>👍</button>
-                <button className="chip outline" style={{ cursor: "pointer" }}>👎</button>
+                <button className="btn ghost sm" aria-label="Útil"><FaThumbsUp size={11} /></button>
+                <button className="btn ghost sm" aria-label="No útil"><FaThumbsDown size={11} /></button>
               </div>
             )}
           </div>
@@ -1152,7 +1238,7 @@ function Message({ msg, onInvestigate }) {
   // greeting / proactive
   return (
     <div className="fade-up" style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-      <Condor size={28} mood={msg.kind === "proactive" ? "alert" : "idle"} tone={msg.kind === "proactive" ? "orange" : "wing"} />
+      <CondorLogo size={32} />
       <div style={{ flex: 1, maxWidth: 560 }}>
         <div style={{
           background: msg.kind === "proactive" ? "rgba(232,122,79,0.10)" : "white",
@@ -1164,7 +1250,7 @@ function Message({ msg, onInvestigate }) {
         }}>
           {msg.kind === "proactive" && (
             <div style={{ fontSize: 10, fontWeight: 700, color: "var(--andes-orange)", letterSpacing: ".1em", marginBottom: 4 }}>
-              💡 SUGERENCIA PROACTIVA
+              <FaLightbulb size={11} style={{ marginRight: 6, verticalAlign: 'middle' }} /> SUGERENCIA PROACTIVA
             </div>
           )}
           {msg.text}

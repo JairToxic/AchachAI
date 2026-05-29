@@ -8,6 +8,10 @@ Funciones:
 - analyze_factura(file_bytes): extrae campos + valida coherencia + score
 - analyze_imagen_dano(file_bytes, descripcion_siniestro): cruza con relato
 - analyze_documento_generico(file_bytes, tipo): para denuncias/partes
+- analyze_parte_policial(file_bytes, contexto_siniestro): extrae nº de parte,
+  placa, fecha, lugar, conductor, y cruza con datos del siniestro
+- analyze_declaracion_accidente(file_bytes, contexto_siniestro): valida coherencia
+  entre relato declarado, fecha, lugar, asegurado y datos del siniestro
 """
 from __future__ import annotations
 
@@ -23,6 +27,13 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from azure.core.credentials import AzureKeyCredential
 from openai import AzureOpenAI
+
+from src.document_analysis.inconsistencia_catalog import enrich_inconsistencias
+
+try:
+    import fitz  # PyMuPDF, para render PDF -> imagen
+except ImportError:
+    fitz = None
 
 
 @dataclass
@@ -81,7 +92,8 @@ def analyze_factura(file_bytes: bytes, fecha_ocurrencia: Optional[str] = None) -
         return DocumentAnalysisResult(
             tipo_documento="factura",
             extracted_fields={},
-            inconsistencias=[{"tipo": "vacio", "evidencia": "Document Intelligence no extrajo ningun campo"}],
+            inconsistencias=enrich_inconsistencias([{"tipo": "vacio", "severidad": "MEDIA",
+                              "evidencia": "Document Intelligence no extrajo ningun campo"}]),
             nivel_riesgo_doc="AMARILLO",
             score_doc=30,
             explicacion="Factura ilegible o formato no reconocido. Pedir version original.",
@@ -169,7 +181,7 @@ def analyze_factura(file_bytes: bytes, fecha_ocurrencia: Optional[str] = None) -
     return DocumentAnalysisResult(
         tipo_documento="factura",
         extracted_fields=extracted,
-        inconsistencias=inconsistencias,
+        inconsistencias=enrich_inconsistencias(inconsistencias),
         nivel_riesgo_doc=nivel,
         score_doc=score,
         explicacion=expl,
@@ -328,7 +340,7 @@ Usa lenguaje tecnico de peritaje. Si la imagen es ilegible, indica "imagen ilegi
             "ubicacion_del_dano": parsed.get("ubicacion_del_dano"),
             "severidad_dano_observado": parsed.get("severidad_dano_observado"),
         },
-        inconsistencias=parsed.get("inconsistencias", []),
+        inconsistencias=enrich_inconsistencias(parsed.get("inconsistencias", [])),
         nivel_riesgo_doc=nivel,
         score_doc=score,
         explicacion=parsed.get("explicacion", ""),
@@ -358,8 +370,8 @@ def analyze_documento_generico(file_bytes: bytes, tipo: str = "documento",
         return DocumentAnalysisResult(
             tipo_documento=tipo,
             extracted_fields={"texto": ""},
-            inconsistencias=[{"tipo": "ilegible", "severidad": "ALTA",
-                              "evidencia": "Document Intelligence no extrajo texto"}],
+            inconsistencias=enrich_inconsistencias([{"tipo": "ilegible", "severidad": "ALTA",
+                              "evidencia": "Document Intelligence no extrajo texto"}]),
             nivel_riesgo_doc="AMARILLO",
             score_doc=40,
             explicacion="Documento ilegible. Pedir version mejor calidad.",
@@ -415,7 +427,465 @@ Devuelve JSON:
             "parece_oficial": parsed.get("parece_oficial"),
             **parsed.get("datos_extraidos", {}),
         },
-        inconsistencias=parsed.get("inconsistencias", []),
+        inconsistencias=enrich_inconsistencias(parsed.get("inconsistencias", [])),
+        nivel_riesgo_doc=nivel,
+        score_doc=score,
+        explicacion=parsed.get("explicacion", ""),
+    )
+
+
+# ===================== PARTE POLICIAL =====================
+_PARTE_POLICIAL_PROMPT = """Eres un investigador de seguros revisando un parte policial.
+
+CONTEXTO del siniestro reportado por la aseguradora (datos a contrastar):
+{contexto}
+
+TEXTO extraido del parte policial via OCR:
+\"\"\"{texto}\"\"\"
+
+Tu tarea: extraer datos clave del parte y detectar inconsistencias respecto al
+contexto. NO ACUSES; senala discrepancias factuales.
+
+Devuelve UNICAMENTE JSON valido con esta estructura:
+{{
+  "parece_oficial": true/false,
+  "datos_extraidos": {{
+    "numero_parte": "...",
+    "fecha_evento": "YYYY-MM-DD",
+    "hora_evento": "HH:MM",
+    "lugar": "...",
+    "placa_vehiculo": "...",
+    "conductor": "...",
+    "tipo_evento": "...",
+    "autoridad_emisora": "..."
+  }},
+  "inconsistencias": [
+    {{"tipo": "fecha_no_coincide|placa_no_coincide|lugar_inconsistente|...",
+      "severidad": "ALTA|MEDIA|BAJA",
+      "evidencia": "diferencia concreta entre parte y contexto"}}
+  ],
+  "score_riesgo": 0-100,
+  "explicacion": "1-2 lineas neutras, sin acusar"
+}}"""
+
+
+def analyze_parte_policial(
+    file_bytes: bytes,
+    contexto_siniestro: Optional[dict] = None,
+) -> DocumentAnalysisResult:
+    """Analiza un parte policial: extrae nº de parte, placa, fecha, lugar, autoridad,
+    conductor; los compara contra el contexto del siniestro y detecta discrepancias.
+
+    contexto_siniestro espera al menos:
+      id_siniestro, fecha_ocurrencia, ciudad_evento, placa, numero_parte_policial,
+      descripcion (opcional para contextualizar al LLM).
+    """
+    client = _di_client()
+    poller = client.begin_analyze_document(
+        model_id="prebuilt-read",
+        body=AnalyzeDocumentRequest(bytes_source=file_bytes),
+    )
+    result = poller.result()
+
+    text = "".join(
+        (line.content + "\n")
+        for page in result.pages
+        for line in (page.lines or [])
+    )
+
+    if not text.strip():
+        return DocumentAnalysisResult(
+            tipo_documento="parte_policial",
+            extracted_fields={"texto": ""},
+            inconsistencias=enrich_inconsistencias([{"tipo": "ilegible", "severidad": "ALTA",
+                              "evidencia": "OCR no extrajo texto del parte policial"}]),
+            nivel_riesgo_doc="AMARILLO",
+            score_doc=40,
+            explicacion="Parte policial ilegible. Pedir copia certificada.",
+        )
+
+    contexto_str = "(sin contexto)"
+    if contexto_siniestro:
+        keys = ["id_siniestro", "fecha_ocurrencia", "ciudad_evento", "sucursal",
+                "placa", "numero_parte_policial", "descripcion"]
+        contexto_str = "\n".join(
+            f"  - {k}: {contexto_siniestro.get(k)}"
+            for k in keys if contexto_siniestro.get(k) is not None
+        ) or "(sin campos)"
+
+    llm = _vision_client()
+    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_CHAT", "gpt-5-mini")
+    prompt = _PARTE_POLICIAL_PROMPT.format(
+        contexto=contexto_str,
+        texto=text[:3500],
+    )
+
+    import json
+    try:
+        resp = llm.chat.completions.create(
+            model=deployment,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+        )
+        parsed = json.loads(resp.choices[0].message.content)
+    except (json.JSONDecodeError, Exception) as exc:
+        parsed = {
+            "parece_oficial": None,
+            "datos_extraidos": {},
+            "inconsistencias": [{"tipo": "error_modelo", "severidad": "BAJA",
+                                  "evidencia": f"{type(exc).__name__}: {exc}"[:300]}],
+            "score_riesgo": 0,
+            "explicacion": "No se pudo procesar el parte con el LLM.",
+        }
+
+    # Refuerzo determinista: si el LLM extrajo placa o numero_parte y no coincide
+    # con el contexto, agregamos la inconsistencia explicitamente (por si el modelo
+    # no la marco).
+    extra_inc = []
+    extracted = parsed.get("datos_extraidos") or {}
+    if contexto_siniestro:
+        placa_ctx = (contexto_siniestro.get("placa") or "").upper().replace(" ", "")
+        placa_doc = (extracted.get("placa_vehiculo") or "").upper().replace(" ", "")
+        if placa_ctx and placa_doc and placa_ctx != placa_doc:
+            extra_inc.append({
+                "tipo": "placa_no_coincide",
+                "severidad": "ALTA",
+                "evidencia": f"Parte policial reporta placa {placa_doc}; siniestro tiene placa {placa_ctx}",
+            })
+        np_ctx = (contexto_siniestro.get("numero_parte_policial") or "").strip()
+        np_doc = (extracted.get("numero_parte") or "").strip()
+        if np_ctx and np_doc and np_ctx not in np_doc and np_doc not in np_ctx:
+            extra_inc.append({
+                "tipo": "numero_parte_no_coincide",
+                "severidad": "MEDIA",
+                "evidencia": f"Parte indica nº {np_doc}; sistema registra {np_ctx}",
+            })
+
+    inconsistencias = (parsed.get("inconsistencias") or []) + extra_inc
+    score = int(parsed.get("score_riesgo", 0)) + 25 * len(extra_inc)
+    score = max(0, min(score, 100))
+    nivel = "ROJO" if score >= 60 else "AMARILLO" if score >= 30 else "VERDE"
+
+    return DocumentAnalysisResult(
+        tipo_documento="parte_policial",
+        extracted_fields={
+            "n_paginas": len(result.pages),
+            "parece_oficial": parsed.get("parece_oficial"),
+            **extracted,
+        },
+        inconsistencias=enrich_inconsistencias(inconsistencias),
+        nivel_riesgo_doc=nivel,
+        score_doc=score,
+        explicacion=parsed.get("explicacion", ""),
+    )
+
+
+# ===================== DECLARACION DE ACCIDENTE =====================
+_DECLARACION_PROMPT = """Eres un perito revisando una declaracion de accidente firmada por el asegurado.
+
+CONTEXTO del siniestro (datos a contrastar):
+{contexto}
+
+TEXTO extraido de la declaracion via OCR:
+\"\"\"{texto}\"\"\"
+
+Tu tarea: extraer los datos declarados y compararlos contra el contexto. Senala
+discrepancias factuales y elementos narrativos sospechosos (relato ensayado,
+copiado, contradicciones internas, lenguaje no espontaneo). NO ACUSES.
+
+Devuelve UNICAMENTE JSON valido con:
+{{
+  "datos_extraidos": {{
+    "nombre_asegurado": "...",
+    "cedula": "...",
+    "fecha_evento": "YYYY-MM-DD",
+    "lugar": "...",
+    "placa": "...",
+    "relato_breve": "1-2 lineas con el relato del asegurado"
+  }},
+  "inconsistencias": [
+    {{"tipo": "fecha_no_coincide|nombre_no_coincide|relato_contradice_descripcion|...",
+      "severidad": "ALTA|MEDIA|BAJA",
+      "evidencia": "..."}}
+  ],
+  "score_riesgo": 0-100,
+  "explicacion": "1-2 lineas neutras, sin acusar"
+}}"""
+
+
+def analyze_declaracion_accidente(
+    file_bytes: bytes,
+    contexto_siniestro: Optional[dict] = None,
+) -> DocumentAnalysisResult:
+    """Analiza una declaracion de accidente: extrae nombre, cedula, fecha, lugar,
+    placa y relato; los compara con el contexto del siniestro.
+
+    contexto_siniestro espera al menos:
+      id_siniestro, fecha_ocurrencia, ciudad_evento, placa, nombre_asegurado,
+      descripcion.
+    """
+    client = _di_client()
+    poller = client.begin_analyze_document(
+        model_id="prebuilt-read",
+        body=AnalyzeDocumentRequest(bytes_source=file_bytes),
+    )
+    result = poller.result()
+
+    text = "".join(
+        (line.content + "\n")
+        for page in result.pages
+        for line in (page.lines or [])
+    )
+
+    if not text.strip():
+        return DocumentAnalysisResult(
+            tipo_documento="declaracion_accidente",
+            extracted_fields={"texto": ""},
+            inconsistencias=enrich_inconsistencias([{"tipo": "ilegible", "severidad": "ALTA",
+                              "evidencia": "OCR no extrajo texto de la declaracion"}]),
+            nivel_riesgo_doc="AMARILLO",
+            score_doc=40,
+            explicacion="Declaracion ilegible. Pedir version original.",
+        )
+
+    contexto_str = "(sin contexto)"
+    if contexto_siniestro:
+        keys = ["id_siniestro", "fecha_ocurrencia", "ciudad_evento", "sucursal",
+                "placa", "nombre_asegurado", "descripcion"]
+        contexto_str = "\n".join(
+            f"  - {k}: {contexto_siniestro.get(k)}"
+            for k in keys if contexto_siniestro.get(k) is not None
+        ) or "(sin campos)"
+
+    llm = _vision_client()
+    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_CHAT", "gpt-5-mini")
+    prompt = _DECLARACION_PROMPT.format(
+        contexto=contexto_str,
+        texto=text[:3500],
+    )
+
+    import json
+    try:
+        resp = llm.chat.completions.create(
+            model=deployment,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+        )
+        parsed = json.loads(resp.choices[0].message.content)
+    except (json.JSONDecodeError, Exception) as exc:
+        parsed = {
+            "datos_extraidos": {},
+            "inconsistencias": [{"tipo": "error_modelo", "severidad": "BAJA",
+                                  "evidencia": f"{type(exc).__name__}: {exc}"[:300]}],
+            "score_riesgo": 0,
+            "explicacion": "No se pudo procesar la declaracion con el LLM.",
+        }
+
+    extra_inc = []
+    extracted = parsed.get("datos_extraidos") or {}
+    if contexto_siniestro:
+        placa_ctx = (contexto_siniestro.get("placa") or "").upper().replace(" ", "")
+        placa_doc = (extracted.get("placa") or "").upper().replace(" ", "")
+        if placa_ctx and placa_doc and placa_ctx != placa_doc:
+            extra_inc.append({
+                "tipo": "placa_no_coincide",
+                "severidad": "ALTA",
+                "evidencia": f"Declaracion reporta placa {placa_doc}; siniestro tiene placa {placa_ctx}",
+            })
+        nombre_ctx = (contexto_siniestro.get("nombre_asegurado") or "").strip().lower()
+        nombre_doc = (extracted.get("nombre_asegurado") or "").strip().lower()
+        if nombre_ctx and nombre_doc:
+            tokens_ctx = set(nombre_ctx.split())
+            tokens_doc = set(nombre_doc.split())
+            if tokens_ctx and not (tokens_ctx & tokens_doc):
+                extra_inc.append({
+                    "tipo": "nombre_no_coincide",
+                    "severidad": "ALTA",
+                    "evidencia": f"Declaracion firmada por '{nombre_doc}'; titular es '{nombre_ctx}'",
+                })
+
+    inconsistencias = (parsed.get("inconsistencias") or []) + extra_inc
+    score = int(parsed.get("score_riesgo", 0)) + 25 * len(extra_inc)
+    score = max(0, min(score, 100))
+    nivel = "ROJO" if score >= 60 else "AMARILLO" if score >= 30 else "VERDE"
+
+    return DocumentAnalysisResult(
+        tipo_documento="declaracion_accidente",
+        extracted_fields={
+            "n_paginas": len(result.pages),
+            **extracted,
+        },
+        inconsistencias=enrich_inconsistencias(inconsistencias),
+        nivel_riesgo_doc=nivel,
+        score_doc=score,
+        explicacion=parsed.get("explicacion", ""),
+    )
+
+
+# ===================== FORENSIA VISUAL (GPT-4o Vision sobre el PDF renderizado) =====================
+_FORENSIA_PROMPT = """Sos un perito documentologico especializado en deteccion de fraude documental.
+Analiza visualmente esta pagina y detecta marcas tipicas de falsificacion o edicion.
+
+Buscar especificamente:
+1. Multiples tipografias en la misma seccion (fuente cambia abruptamente)
+2. Texto sobrepuesto, pegado o con bordes irregulares
+3. Alineacion irregular en columnas, margenes o lineas
+4. Firmas/rubricas con signos de alteracion (pixelado, sobre-impresion, copia)
+5. Marcas de agua, sellos o logos con inconsistencias (borrosos, descentrados)
+6. Calidad de escaneo distinta entre secciones (zonas mas nitidas que otras)
+7. Color de fondo inconsistente entre secciones del papel
+8. Campos clave (monto, fecha, nombre) con apariencia visual distinta del cuerpo
+
+NO acuses al asegurado. Solo describe inconsistencias visuales objetivas.
+
+Tipos validos para "tipo": multiples_tipografias, texto_sobrepuesto_o_editado,
+alineacion_irregular, firma_alterada_o_sospechosa, marca_agua_sospechosa,
+calidad_escaneo_inconsistente, colores_fondo_inconsistentes,
+campos_clave_destacados_visualmente.
+
+Devuelve UNICAMENTE JSON valido:
+{
+  "documento_parece_autentico": true|false,
+  "observaciones_visuales": ["..."],
+  "inconsistencias": [
+    {"tipo": "...", "severidad": "ALTA|MEDIA|BAJA", "evidencia": "ubicacion+descripcion concreta"}
+  ],
+  "score_visual_riesgo": 0-100,
+  "explicacion": "1-2 lineas neutras y tecnicas"
+}"""
+
+
+def _render_pdf_to_png_bytes(file_bytes: bytes, page_num: int = 0, dpi: int = 180) -> Optional[bytes]:
+    """Renderiza una pagina del PDF a PNG bytes usando PyMuPDF.
+    Devuelve None si no se puede renderizar (PDF invalido o sin PyMuPDF).
+    """
+    if fitz is None:
+        return None
+    try:
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        if page_num >= len(doc):
+            page_num = 0
+        page = doc[page_num]
+        # Render a la resolucion dada
+        zoom = dpi / 72.0
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        png_bytes = pix.tobytes("png")
+        doc.close()
+        return png_bytes
+    except Exception:
+        return None
+
+
+def analyze_visual_forensics(
+    file_bytes: bytes,
+    tipo: str = "documento",
+) -> DocumentAnalysisResult:
+    """Forensia visual: renderiza el PDF y le pasa la imagen a GPT-4o Vision
+    con un prompt de perito documentologico.
+
+    Detecta marcas visuales de falsificacion que el OCR no ve:
+    - cambios de tipografia, texto sobrepuesto, firmas alteradas,
+      marcas de agua sospechosas, calidad inconsistente, etc.
+
+    Si PyMuPDF no esta disponible o el PDF no se puede renderizar,
+    devuelve resultado vacio sin error.
+    """
+    png_bytes = _render_pdf_to_png_bytes(file_bytes, page_num=0)
+    if png_bytes is None:
+        return DocumentAnalysisResult(
+            tipo_documento=f"{tipo}_forensia_visual",
+            extracted_fields={},
+            inconsistencias=[],
+            nivel_riesgo_doc="VERDE",
+            score_doc=0,
+            explicacion="Forensia visual no disponible (PDF no renderizable o PyMuPDF ausente).",
+        )
+
+    client = _vision_client()
+    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_VISION", "gpt-4o")
+    b64 = base64.b64encode(png_bytes).decode("utf-8")
+
+    import json
+    try:
+        resp = client.chat.completions.create(
+            model=deployment,
+            messages=[
+                {"role": "system", "content": "Perito documentologico. Describe inconsistencias visuales objetivas. No acuses."},
+                {"role": "user", "content": [
+                    {"type": "text", "text": _FORENSIA_PROMPT},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                ]},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=900,
+        )
+        raw = resp.choices[0].message.content
+        finish = getattr(resp.choices[0], "finish_reason", None)
+        if not raw:
+            parsed = {
+                "documento_parece_autentico": None,
+                "observaciones_visuales": [],
+                "inconsistencias": [{
+                    "tipo": "filtro_contenido" if finish == "content_filter" else "respuesta_vacia",
+                    "severidad": "BAJA",
+                    "evidencia": f"GPT-4o Vision sin respuesta (finish={finish}).",
+                }],
+                "score_visual_riesgo": 0,
+                "explicacion": "Vision no proceso el documento.",
+            }
+        else:
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                parsed = {
+                    "documento_parece_autentico": None,
+                    "observaciones_visuales": [],
+                    "inconsistencias": [{
+                        "tipo": "json_invalido",
+                        "severidad": "BAJA",
+                        "evidencia": str(raw)[:200],
+                    }],
+                    "score_visual_riesgo": 0,
+                    "explicacion": "JSON invalido del modelo de vision.",
+                }
+    except Exception as exc:
+        msg = str(exc)
+        if "content_filter" in msg or "ResponsibleAIPolicy" in msg:
+            parsed = {
+                "documento_parece_autentico": None,
+                "observaciones_visuales": [],
+                "inconsistencias": [{
+                    "tipo": "filtro_contenido",
+                    "severidad": "BAJA",
+                    "evidencia": "Azure OpenAI bloqueo el analisis visual.",
+                }],
+                "score_visual_riesgo": 0,
+                "explicacion": "Forensia visual bloqueada por filtro de contenido.",
+            }
+        else:
+            parsed = {
+                "documento_parece_autentico": None,
+                "observaciones_visuales": [],
+                "inconsistencias": [{
+                    "tipo": "error_modelo",
+                    "severidad": "BAJA",
+                    "evidencia": msg[:300],
+                }],
+                "score_visual_riesgo": 0,
+                "explicacion": f"Error al invocar GPT-4o Vision: {type(exc).__name__}",
+            }
+
+    score = int(parsed.get("score_visual_riesgo", 0))
+    nivel = "ROJO" if score >= 60 else "AMARILLO" if score >= 30 else "VERDE"
+
+    return DocumentAnalysisResult(
+        tipo_documento=f"{tipo}_forensia_visual",
+        extracted_fields={
+            "documento_parece_autentico": parsed.get("documento_parece_autentico"),
+            "observaciones_visuales": parsed.get("observaciones_visuales", []),
+        },
+        inconsistencias=enrich_inconsistencias(parsed.get("inconsistencias", [])),
         nivel_riesgo_doc=nivel,
         score_doc=score,
         explicacion=parsed.get("explicacion", ""),

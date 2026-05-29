@@ -244,7 +244,7 @@ export function EcuadorHeatMap({
           fontSize: 11, color: 'var(--ink-mute)', letterSpacing: '.1em',
           textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
         }}>
-          🗺️ {title}
+          {title}
         </div>
       )}
 

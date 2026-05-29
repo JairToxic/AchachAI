@@ -1,0 +1,25 @@
+{
+  "precision": 0.5888888888888889,
+  "recall": 0.7633744855967078,
+  "f1": 0.6648745519713262,
+  "auc_roc": 0.9504676312342641,
+  "pr_auc": 0.7721213499290722,
+  "top_15": {
+    "tiene_inconsistencia": 0.11276519298553467,
+    "n_inconsistentes": 0.0744486078619957,
+    "documentos_completos": 0.04656726121902466,
+    "lista_restrictiva": 0.03725287318229675,
+    "es_borde_vigencia": 0.03477577120065689,
+    "cobertura_Responsabilidad Civil": 0.029617728665471077,
+    "es_ptxrb_candidato": 0.024051563814282417,
+    "tasa_fraude_prov": 0.02363787591457367,
+    "monto_promedio_reclamado_usd": 0.02001027576625347,
+    "ratio_docs_no_entregados": 0.019259652122855186,
+    "cobertura_Robo": 0.018506912514567375,
+    "fault_responsable_Tercero": 0.018491074442863464,
+    "dias_vigencia_usados": 0.01677848957479,
+    "deducible_usd": 0.0146404467523098,
+    "es_robo": 0.014127250760793686
+  },
+  "prob_media_inyectados": 0.9304478764533997
+}

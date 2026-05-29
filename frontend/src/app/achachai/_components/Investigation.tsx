@@ -2,6 +2,30 @@
 // @ts-nocheck
 import { useEffect, useRef, useState } from 'react';
 import { Condor, VueloDelCondor } from './Condor';
+import { RiskScore } from './RiskScore';
+import {
+  FaArrowLeft,
+  FaUserCircle,
+  FaRedoAlt,
+  FaTheaterMasks,
+  FaShieldAlt,
+  FaSearch,
+  FaChartLine,
+  FaClipboardCheck,
+  FaTrafficLight,
+  FaFileAlt,
+  FaNetworkWired,
+  FaLightbulb,
+  FaCheckCircle,
+  FaExclamationTriangle,
+  FaTimesCircle,
+  FaBan,
+  FaShareSquare,
+  FaComments,
+  FaFileInvoice,
+  FaCamera,
+  FaCarCrash,
+} from 'react-icons/fa';
 
 /* ============================================================
    MODO INVESTIGACIÓN PROFUNDA — datos REALES del backend
@@ -89,6 +113,7 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
     const sid = d?.siniestro?.id_siniestro || caseId;
     const provNombre = d?.proveedor?.nombre || '—';
     const provId = d?.siniestro?.id_proveedor || '—';
+    const provRestrictivo = !!d?.proveedor?.lista_restrictiva;
     const ciudad = d?.siniestro?.ciudad_evento || '—';
     const cobertura = d?.siniestro?.cobertura || '—';
     const monto = d?.siniestro?.monto_reclamado_usd || 0;
@@ -98,82 +123,128 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
 
     const tone = (s: number) => (s >= 76 ? 'warn' : s >= 50 ? 'warn' : 'ok');
 
+    // Narrativa de cada regla en lenguaje de negocio
     const reglaTexts = reglas.length
-      ? reglas.map((r: any) => `${r.codigo} (${r.nombre})`)
-      : ['ninguna regla crítica disparada'];
+      ? reglas.map((r: any) => `${r.codigo} — ${r.nombre}: ${r.evidencia || 'evidencia en expediente'}`)
+      : ['No se activó ninguna regla crítica del manual antifraude — el caso pasa el primer filtro.'];
 
     const senalTexts = senales.length
-      ? senales.slice(0, 4).map((s: any) => `S${s.id} · ${s.nombre} (+${s.puntos} pts)`)
-      : ['ninguna señal activa'];
+      ? senales.slice(0, 4).map((s: any) => `${s.nombre} (+${s.puntos} pts) — ${s.evidencia || 'detectado en el expediente'}`)
+      : ['Ninguna de las 14 señales puntuables se activó — patrón normal de la cartera.'];
 
     const simTexts = sims.length
       ? [
-          `${sims.length} casos similares (sim ≥ ${sims[sims.length - 1].similitud.toFixed(2)})`,
+          `Encontramos ${sims.length} caso(s) con descripción muy parecida (similitud ≥ ${sims[sims.length - 1].similitud.toFixed(2)}). En fraudes seriales, los relatos se "clonan".`,
           ...(sims[0]?.proveedor
-            ? [`top match: ${sims[0].id_siniestro} · ${sims[0].proveedor}`]
+            ? [`El más parecido es ${sims[0].id_siniestro}, atendido por ${sims[0].proveedor}.`]
             : []),
         ]
-      : ['sin pares de alta similitud precomputados'];
+      : ['Ninguna narrativa de los 40.000 casos previos se parece sospechosamente a esta. No hay indicio de relato copiado.'];
+
+    // Informe ejecutivo cohesivo (paso 8)
+    const niveLabel = nivel === 'ROJO' ? '🔴 ROJO (alto riesgo)'
+                    : nivel === 'AMARILLO' ? '🟡 AMARILLO (medio)'
+                    : '🟢 VERDE (bajo)';
+    const recomendacion = nivel === 'ROJO'
+      ? 'ESCALAR a Unidad Antifraude para revisión especializada de campo.'
+      : nivel === 'AMARILLO'
+      ? 'ESCALAR a Unidad Antifraude para revisión documental adicional.'
+      : 'CONTINUAR flujo normal de liquidación. Sin alertas significativas.';
+
+    const razones: string[] = [];
+    if (reglas.length) {
+      reglas.slice(0, 3).forEach((r: any) => razones.push(`${r.codigo} — ${r.nombre}`));
+    }
+    if (senales.length && razones.length < 3) {
+      const top = [...senales].sort((a: any, b: any) => (b.puntos || 0) - (a.puntos || 0));
+      top.slice(0, 3 - razones.length).forEach((s: any) => razones.push(`${s.nombre} (+${s.puntos} pts)`));
+    }
+    if (provRestrictivo) razones.push(`Proveedor ${provNombre} figura en lista restrictiva interna.`);
+
+    const informeLines: string[] = [];
+    informeLines.push(`Score final: ${score}/100 · Nivel: ${niveLabel}`);
+    informeLines.push(`Recomendación: ${recomendacion}`);
+    if (razones.length) {
+      informeLines.push('Razones principales:');
+      razones.slice(0, 4).forEach((r, i) => informeLines.push(`  ${i + 1}. ${r}`));
+    }
+    informeLines.push('');
+    informeLines.push('Lo que NO sabemos: si la causa real fue mala fe del cliente o un error del proveedor. La revisión humana decide. AchachAI solo alerta — nunca acusa.');
 
     return [
       {
         t: '00:01',
-        icon: '🦅',
-        text: `Recuperando datos del siniestro ${sid} desde DuckDB…`,
+        icon: FaSearch,
+        text: `Abriendo el expediente del siniestro ${sid}.`,
         flag: 'ok',
-        detail: [`Cobertura ${cobertura} · ciudad ${ciudad}`, `Monto reclamado ${fmtUSD(monto)}`],
+        detail: [
+          `Cobertura: ${cobertura}. Ocurrió en ${ciudad}.`,
+          `El asegurado reclama ${fmtUSD(monto)}.`,
+          `Antes de juzgar, vamos a revisar 7 reglas críticas, 14 señales y comparar con 40.000 casos previos.`,
+        ],
       },
       {
         t: '00:03',
-        icon: '📊',
-        text: `Calculando score con XGBoost + reglas de negocio…`,
+        icon: FaChartLine,
+        text: `Comparando este caso contra patrones de 40.000 siniestros previos.`,
         flag: tone(score),
-        detail: [`Score ${score}/100 · nivel ${nivel}`],
+        detail: [
+          `Nuestro modelo XGBoost (AUC 0.97) calculó un score de ${score}/100.`,
+          `Nivel ${nivel}: ${nivel === 'ROJO' ? 'el patrón se parece mucho a fraudes confirmados del pasado.' : nivel === 'AMARILLO' ? 'hay indicios sospechosos, vale la pena revisar más a fondo.' : 'el patrón se parece a siniestros legítimos pagados normalmente.'}`,
+        ],
       },
       {
         t: '00:04',
-        icon: '📋',
-        text: `Aplicando 7 reglas críticas RF-01..07 y 14 señales ponderadas…`,
+        icon: FaClipboardCheck,
+        text: `Verificando si activa alguna de las 7 reglas críticas del manual antifraude.`,
         flag: reglas.length ? 'warn' : 'ok',
         detail: reglaTexts,
       },
       {
         t: '00:06',
-        icon: '🚦',
-        text: `Evaluando ${senales.length} señales activas sobre 14 totales…`,
+        icon: FaTrafficLight,
+        text: `Evaluando las 14 señales ponderadas (frecuencia, montos, documentos, fechas, narrativa).`,
         flag: senales.length >= 3 ? 'warn' : 'ok',
         detail: senalTexts,
       },
       {
         t: '00:08',
-        icon: '📄',
-        text: `Auditando ${ndocs} documentos adjuntos al expediente…`,
+        icon: FaFileAlt,
+        text: `Auditando el expediente documental del caso.`,
         flag: ndocs < 3 ? 'warn' : 'ok',
         detail:
           ndocs === 0
-            ? ['no se reportan documentos cargados']
-            : [`${ndocs} documento(s) en la carpeta del siniestro`],
+            ? ['⚠️ Este caso NO tiene documentos cargados. En un siniestro normal esperaríamos al menos factura + denuncia + fotos. La ausencia es una señal de cautela.']
+            : [
+                `El expediente contiene ${ndocs} documento(s).`,
+                ndocs >= 3 ? 'Cobertura documental razonable.' : 'Documentación escasa — vale la pena pedir más evidencia.',
+              ],
       },
       {
         t: '00:11',
-        icon: '🔍',
-        text: `Buscando narrativas similares (text-embedding-3-large)…`,
+        icon: FaSearch,
+        text: `Leyendo la descripción del siniestro y comparándola con 40.000 relatos previos.`,
         flag: sims.length ? 'warn' : 'ok',
         detail: simTexts,
       },
       {
         t: '00:14',
-        icon: '🕸',
-        text: `Analizando red de relaciones del proveedor ${provId}…`,
-        flag: 'ok',
-        detail: [`${provNombre || '—'}${d?.proveedor?.lista_restrictiva ? ' · ⚠ lista restrictiva' : ''}`],
+        icon: FaNetworkWired,
+        text: `Mapeando la red de relaciones alrededor del proveedor ${provId}.`,
+        flag: provRestrictivo ? 'warn' : 'ok',
+        detail: [
+          `Proveedor: ${provNombre || '—'}.`,
+          provRestrictivo
+            ? '🚨 Este proveedor figura en la LISTA RESTRICTIVA interna de Aseguradora del Sur (RF-03). Cada caso suyo merece revisión específica.'
+            : 'No figura en la lista restrictiva. Sin alertas en su historial reciente.',
+        ],
       },
       {
         t: '00:16',
-        icon: '✨',
-        text: `Sintetizando informe ejecutivo 360°…`,
-        flag: 'ok',
-        detail: [d?.explicacion || 'explicación generada por el motor de reglas'],
+        icon: FaLightbulb,
+        text: `Informe ejecutivo 360° — síntesis para el analista.`,
+        flag: nivel === 'ROJO' ? 'warn' : 'ok',
+        detail: informeLines,
       },
     ];
   }
@@ -228,53 +299,96 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
   const subLabel = `Confianza ${nivel} · ${reglas.length} regla(s) crítica(s) · ${senales.length} señal(es) activa(s)`;
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--marfil)' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
+      {/* banner ¿Para qué sirve esta pantalla? */}
+      <div
+        style={{
+          padding: '14px 28px',
+          background: 'var(--bg-card)',
+          borderBottom: '1px solid var(--border-color)',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            letterSpacing: '0.18em',
+            color: 'var(--andes-orange, #d97706)',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            marginBottom: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <FaLightbulb size={11} /> ¿Para qué sirve esta pantalla?
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: 18,
+            fontSize: 12.5,
+            color: 'var(--text-secondary)',
+            lineHeight: 1.45,
+          }}
+        >
+          <div>
+            <strong style={{ color: 'var(--text-primary)' }}>El problema:</strong>{' '}
+            Un caso con score alto necesita sustento antes de pagarlo, rechazarlo o escalarlo.
+            Mirar tablas no alcanza — hay que reconstruir el razonamiento.
+          </div>
+          <div>
+            <strong style={{ color: 'var(--text-primary)' }}>Qué hace el cóndor:</strong>{' '}
+            Reabre el expediente paso a paso: trae el caso, calcula score, revisa 7 reglas
+            críticas, 14 señales, documentos, narrativa y red de proveedores. Sin saltarse nada.
+          </div>
+          <div>
+            <strong style={{ color: 'var(--text-primary)' }}>Qué hacés vos:</strong>{' '}
+            Leés la bitácora paso a paso, validás la evidencia, podés cuestionar al cóndor en
+            el chat lateral, y finalmente decidís: <em>liquidar</em>, <em>escalar a antifraude</em> o <em>cerrar</em>.
+          </div>
+        </div>
+      </div>
+
       {/* header */}
       <div
         style={{
-          padding: '20px 32px',
-          borderBottom: '1px solid var(--line)',
+          padding: '20px 28px',
+          borderBottom: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
           gap: 18,
-          background:
-            tone === 'red'
-              ? 'linear-gradient(180deg, rgba(197,51,58,0.06), transparent)'
-              : tone === 'amber'
-              ? 'linear-gradient(180deg, rgba(212,165,116,0.10), transparent)'
-              : 'linear-gradient(180deg, rgba(74,124,89,0.06), transparent)',
+          background: 'var(--bg-card)',
+          flexWrap: 'wrap',
         }}
       >
-        <button className="btn ghost" onClick={onBack} style={{ padding: '6px 10px', fontSize: 12 }}>
-          ← Volver
+        <button className="btn ghost" onClick={onBack} style={{ padding: '6px 12px', fontSize: 12 }}>
+          <FaArrowLeft size={11} /> Volver
         </button>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 240 }}>
           <div
             style={{
               fontSize: 10.5,
-              letterSpacing: '.18em',
-              color: tone === 'red' ? 'var(--guayaba-red)' : 'var(--andes-orange)',
+              letterSpacing: '0.16em',
+              color: tone === 'red' ? 'var(--danger)' : tone === 'amber' ? 'var(--warning)' : 'var(--accent)',
               fontWeight: 700,
               textTransform: 'uppercase',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            🦅 Modo Investigación Profunda · datos reales
+            <FaShieldAlt size={11} /> Modo Investigación Profunda
           </div>
-          <h2 style={{ fontSize: 24, marginTop: 2 }}>
-            {sid} ·{' '}
-            <span
-              style={{
-                color: 'var(--ink-mute)',
-                fontFamily: 'var(--sans)',
-                fontWeight: 400,
-                fontSize: 16,
-              }}
-            >
-              {veh} · {cob.toLowerCase()} · {ciudad}
+          <h2 className="display" style={{ fontSize: 22, marginTop: 4, color: 'var(--text-primary)' }}>
+            <span className="mono">{sid}</span>{' '}
+            <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--sans)', fontWeight: 500, fontSize: 15 }}>
+              · {veh} · {cob.toLowerCase()} · {ciudad}
             </span>
           </h2>
         </div>
-        <VueloDelCondor score={score} variant="md" />
+        <RiskScore score={score} variant="md" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {detail?.siniestro?.id_asegurado && onVerAsegurado && (
             <button
@@ -282,7 +396,7 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
               onClick={() => onVerAsegurado(detail.siniestro.id_asegurado)}
               style={{ fontSize: 11 }}
             >
-              👤 Ver asegurado {detail.siniestro.id_asegurado}
+              <FaUserCircle size={12} /> Ver asegurado {detail.siniestro.id_asegurado}
             </button>
           )}
           <button
@@ -290,10 +404,10 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
             onClick={() => setCommittee((c) => !c)}
             style={{ fontSize: 11 }}
           >
-            {committee ? 'Salir Modo Comité' : '🎬 Modo Comité'}
+            <FaTheaterMasks size={12} /> {committee ? 'Salir Modo Comité' : 'Modo Comité'}
           </button>
           <button className="btn ghost" onClick={reset} style={{ fontSize: 11 }} disabled={running}>
-            ↻ Reproducir investigación
+            <FaRedoAlt size={11} /> Reproducir investigación
           </button>
         </div>
       </div>
@@ -327,7 +441,7 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
                     {step + 1} de {BITACORA.length}
                   </>
                 ) : (
-                  <>✓ {BITACORA.length} pasos completados</>
+                  <><FaCheckCircle size={11} style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--success)' }} /> {BITACORA.length} pasos completados</>
                 )}
               </div>
             </div>
@@ -396,7 +510,7 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
                   alignItems: 'center',
                 }}
               >
-                <VueloDelCondor score={score} variant="lg" sublabel={subLabel} />
+                <RiskScore score={score} variant="lg" sublabel={subLabel} />
                 <div>
                   <p style={{ fontSize: 15, lineHeight: 1.6, margin: 0 }}>
                     “{detail.explicacion || 'Sin explicación generada por el motor de reglas.'}”
@@ -410,21 +524,60 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
                     }}
                   >
                     {reglas.slice(0, 4).map((r: any) => (
-                      <span key={r.codigo} className="chip red">
-                        {r.codigo}
+                      <span
+                        key={r.codigo}
+                        className="chip red"
+                        title={`Regla crítica del PDF del reto. ${r.nombre || ''}\n${r.evidencia || ''}`}
+                      >
+                        {r.codigo} · {r.nombre ? r.nombre.split(' ').slice(0, 3).join(' ') : 'regla crítica'}
                       </span>
                     ))}
                     {senales.slice(0, 4).map((s: any) => (
-                      <span key={s.id} className="chip amber">
-                        S{s.id} +{s.puntos}
+                      <span
+                        key={s.id}
+                        className="chip amber"
+                        title={`Señal ponderada #${s.id} del catálogo. Suma ${s.puntos} pts al score.\n${s.evidencia || ''}`}
+                      >
+                        S{s.id} · {s.nombre ? s.nombre.split(' ').slice(0, 3).join(' ') : 'señal'} · +{s.puntos} pts
                       </span>
                     ))}
                     {detail.proveedor?.lista_restrictiva && (
-                      <span className="chip red">proveedor en lista restrictiva</span>
+                      <span className="chip red" title="Proveedor presente en la lista interna de Aseguradora del Sur por casos previos observados.">
+                        proveedor en lista restrictiva
+                      </span>
                     )}
                     {similares.length > 0 && (
-                      <span className="chip blue">{similares.length} casos similares</span>
+                      <span className="chip blue" title="Casos con descripción muy similar detectados por embeddings text-embedding-3-large. Posible plagio narrativo.">
+                        {similares.length} casos similares
+                      </span>
                     )}
+                  </div>
+
+                  {/* Leyenda explicativa */}
+                  <div
+                    style={{
+                      marginTop: 14,
+                      padding: '10px 12px',
+                      background: 'var(--marfil-paper, #fdf8f1)',
+                      border: '1px solid var(--line, #e6dfd1)',
+                      borderRadius: 6,
+                      fontSize: 11.5,
+                      lineHeight: 1.5,
+                      color: 'var(--ink-soft, #4a4a4a)',
+                    }}
+                  >
+                    <strong style={{ color: 'var(--text-primary)' }}>¿Cómo leer estos chips?</strong>
+                    <div style={{ marginTop: 4 }}>
+                      <span className="chip red" style={{ fontSize: 9.5, padding: '1px 6px' }}>RF-XX</span>
+                      {' = una de las 7 '}<em>reglas críticas</em>{' del manual antifraude (PDF del reto). Si se activa, el caso pasa automáticamente a ROJO o AMARILLO sin importar las señales.'}
+                    </div>
+                    <div style={{ marginTop: 3 }}>
+                      <span className="chip amber" style={{ fontSize: 9.5, padding: '1px 6px' }}>SN +pts</span>
+                      {' = una de las 14 '}<em>señales ponderadas</em>{' (frecuencia, monto, fechas, narrativa, documentos…). Cada una suma puntos al score 0–100.'}
+                    </div>
+                    <div style={{ marginTop: 3 }}>
+                      <strong>Fórmula:</strong>{' score = max(suma de señales, mínimo forzado por reglas críticas).'}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -433,7 +586,21 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
 
           {/* SECCIÓN VISUAL — desglose del score con barras animadas */}
           {showSummary && (
-            <ReportSection n={2} title="Anatomía del score" sub="cómo se construyó este 76/100">
+            <ReportSection n={2} title="Anatomía del score" sub={`cómo se construyó este ${score}/100 paso a paso`}>
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: '8px 12px',
+                  background: 'var(--bg-card, #fff)',
+                  border: '1px dashed var(--line, #e6dfd1)',
+                  borderRadius: 6,
+                  fontSize: 11.5,
+                  lineHeight: 1.5,
+                  color: 'var(--ink-soft, #4a4a4a)',
+                }}
+              >
+                Cada señal activa <em>suma</em> puntos a un score que arranca en 0. Si <em>cualquier</em> regla crítica RF-01..04 se activa, el score se fuerza a ≥76 (ROJO); si se activa RF-05..07, mínimo 41 (AMARILLO). Mostramos cada componente para que decidás si el cálculo te convence.
+              </div>
               <ScoreBreakdown
                 score={score}
                 nivel={nivel}
@@ -445,7 +612,21 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
 
           {/* SECCIÓN — comparativo vs cartera promedio */}
           {showSummary && detail?.siniestro && (
-            <ReportSection n={3} title="Cómo se compara con la cartera" sub="benchmarks de la cartera vehicular completa">
+            <ReportSection n={3} title="Cómo se compara con la cartera" sub="benchmarks contra los 39.960 siniestros multi-ramo del dataset">
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: '8px 12px',
+                  background: 'var(--bg-card, #fff)',
+                  border: '1px dashed var(--line, #e6dfd1)',
+                  borderRadius: 6,
+                  fontSize: 11.5,
+                  lineHeight: 1.5,
+                  color: 'var(--ink-soft, #4a4a4a)',
+                }}
+              >
+                Para entender si este caso es <em>raro</em>, lo comparamos contra el promedio y la mediana de la cartera completa. Una barra mucho más larga que el promedio es señal de anomalía (ej. monto muy alto, reporte muy tardío, demasiados reclamos previos).
+              </div>
               <ComparativoCartera
                 monto={detail.siniestro.monto_reclamado_usd}
                 dias_inicio={detail.siniestro.dias_desde_inicio_poliza}
@@ -559,25 +740,25 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
               <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: docsSubidos.length ? 16 : 0 }}>
                 <div
                   style={{
-                    width: 64,
-                    height: 64,
+                    width: 56,
+                    height: 56,
                     borderRadius: 12,
-                    background: detail.n_documentos < 3 ? 'rgba(212,165,116,0.18)' : 'rgba(74,124,89,0.12)',
+                    background: detail.n_documentos < 3 ? 'var(--warning-soft)' : 'var(--success-soft)',
+                    color: detail.n_documentos < 3 ? 'var(--warning)' : 'var(--success)',
                     display: 'grid',
                     placeItems: 'center',
-                    fontSize: 26,
                   }}
                 >
-                  📄
+                  <FaFileAlt size={26} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 26, fontFamily: 'var(--serif)', fontWeight: 600 }}>
+                  <div className="display" style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>
                     {detail.n_documentos} documento{detail.n_documentos === 1 ? '' : 's'} en el expediente original
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--ink-mute)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                     {detail.n_documentos < 3
-                      ? '⚠ Cobertura documental por debajo del mínimo esperado (3+).'
-                      : '✓ Cobertura documental aceptable.'}
+                      ? <><FaExclamationTriangle size={11} style={{ color: 'var(--warning)' }} /> Cobertura documental por debajo del mínimo esperado (3+).</>
+                      : <><FaCheckCircle size={11} style={{ color: 'var(--success)' }} /> Cobertura documental aceptable.</>}
                   </div>
                 </div>
                 <div style={{ marginLeft: 'auto' }}>
@@ -608,8 +789,8 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
                           background: 'var(--marfil-paper)', borderRadius: 8,
                           borderLeft: `3px solid ${tc}`,
                         }}>
-                          <span style={{ fontSize: 18 }}>
-                            {d.tipo === 'factura' ? '🧾' : d.tipo === 'imagen_dano' ? '📷' : d.tipo === 'parte_policial' ? '🚓' : '📄'}
+                          <span style={{ color: tc, display: 'grid', placeItems: 'center' }}>
+                            {d.tipo === 'factura' ? <FaFileInvoice size={16} /> : d.tipo === 'imagen_dano' ? <FaCamera size={16} /> : d.tipo === 'parte_policial' ? <FaCarCrash size={16} /> : <FaFileAlt size={16} />}
                           </span>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -794,12 +975,12 @@ function FeedbackActions({ sid, score, nivel, onBack }: any) {
       });
       const d = await r.json();
       if (d?.ok) {
-        setSent(`✓ Registrado como "${decision}". Total feedbacks acumulados: ${d.total_feedbacks}.`);
+        setSent(`Registrado como "${decision}". Total feedbacks acumulados: ${d.total_feedbacks}.`);
       } else {
-        setSent('⚠ El backend respondió sin OK. Revisa logs.');
+        setSent('El backend respondió sin OK. Revisa logs.');
       }
     } catch (e: any) {
-      setSent(`⚠ Error: ${e?.message || e}`);
+      setSent(`Error: ${e?.message || e}`);
     } finally {
       setBusy(false);
     }
@@ -811,18 +992,19 @@ function FeedbackActions({ sid, score, nivel, onBack }: any) {
         style={{
           marginTop: 14,
           fontSize: 11.5,
-          color: 'var(--ink-mute)',
+          color: 'var(--text-secondary)',
           padding: '10px 12px',
-          background: 'var(--marfil-paper)',
+          background: 'var(--warning-soft)',
           borderRadius: 8,
-          borderLeft: '3px solid var(--andes-orange)',
+          borderLeft: '3px solid var(--warning)',
+          display: 'flex', alignItems: 'center', gap: 8,
         }}
       >
-        ⚠️ Esto es una recomendación generada por el cóndor. La decisión final es del analista humano.
+        <FaExclamationTriangle size={13} style={{ color: 'var(--warning)' }} /> Esto es una recomendación generada por el cóndor. La decisión final es del analista humano.
       </div>
 
-      <div style={{ marginTop: 14, padding: 12, background: 'white', border: '1px solid var(--line)', borderRadius: 10 }}>
-        <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 6, color: 'var(--condor-wing)' }}>
+      <div style={{ marginTop: 14, padding: 14, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
           Tu decisión sobre {sid}
         </div>
         <textarea
@@ -831,40 +1013,43 @@ function FeedbackActions({ sid, score, nivel, onBack }: any) {
           placeholder="Justificación (opcional)…"
           rows={2}
           style={{
-            width: '100%', boxSizing: 'border-box', padding: '6px 10px',
-            border: '1px solid var(--line-strong)', borderRadius: 6,
-            fontSize: 12, fontFamily: 'inherit', resize: 'vertical', marginBottom: 8,
+            width: '100%', boxSizing: 'border-box', padding: '8px 10px',
+            border: '1px solid var(--border-color)', borderRadius: 6,
+            background: 'var(--bg-card-soft)', color: 'var(--text-primary)',
+            fontSize: 12, fontFamily: 'inherit', resize: 'vertical', marginBottom: 10,
           }}
         />
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn" disabled={busy} onClick={() => decidir('aprobar')}>
-            ✓ Aprobar pago
+          <button className="btn success" disabled={busy} onClick={() => decidir('aprobar')}>
+            <FaCheckCircle size={12} /> Aprobar pago
           </button>
           <button className="btn ghost" disabled={busy} onClick={() => decidir('retener')}>
-            ⏸ Retener
+            <FaExclamationTriangle size={12} /> Retener
           </button>
-          <button className="btn warm" disabled={busy} onClick={() => decidir('bloquear')}>
-            🚫 Bloquear pago
+          <button className="btn danger" disabled={busy} onClick={() => decidir('bloquear')}>
+            <FaBan size={12} /> Bloquear pago
           </button>
           <button className="btn ghost" disabled={busy} onClick={() => decidir('escalar')}>
-            📤 Escalar a comité
+            <FaShareSquare size={12} /> Escalar a comité
           </button>
           <span style={{ flex: 1 }} />
           <button className="btn ghost" onClick={onBack}>
-            💬 Volver al cóndor
+            <FaComments size={12} /> Volver al cóndor
           </button>
         </div>
         {sent && (
           <div
             style={{
               marginTop: 10,
-              padding: '6px 10px',
-              background: sent.startsWith('✓') ? 'rgba(74,124,89,0.10)' : 'rgba(197,51,58,0.08)',
+              padding: '8px 12px',
+              background: !sent.startsWith('Error') && !sent.startsWith('El backend') ? 'var(--success-soft)' : 'var(--danger-soft)',
               borderRadius: 6,
               fontSize: 11.5,
-              color: sent.startsWith('✓') ? 'var(--paramo-green)' : 'var(--guayaba-red)',
+              color: !sent.startsWith('Error') && !sent.startsWith('El backend') ? 'var(--success)' : 'var(--danger)',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
             }}
           >
+            {!sent.startsWith('Error') && !sent.startsWith('El backend') ? <FaCheckCircle size={12} /> : <FaExclamationTriangle size={12} />}
             {sent}
           </div>
         )}
@@ -1024,22 +1209,23 @@ function DynamicActions({ detail, similares }: any) {
 }
 
 function BitacoraStep({ b, latest }: any) {
-  const bg = b.flag === 'warn' ? 'rgba(212,165,116,0.08)' : 'white';
+  const bg = b.flag === 'warn' ? 'var(--warning-soft)' : 'var(--bg-card)';
+  const Icon = typeof b.icon === 'function' ? b.icon : null;
   return (
     <div
       className="fade-up"
       style={{
-        borderLeft: `2px solid var(--${b.flag === 'warn' ? 'andes-orange' : 'paramo-green'})`,
+        borderLeft: `2px solid var(--${b.flag === 'warn' ? 'warning' : 'success'})`,
         paddingLeft: 12,
         marginBottom: 12,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--ink-mute)' }}>
-          ⏱ {b.t}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+          {b.t}
         </span>
-        <span style={{ fontSize: 13 }}>{b.icon}</span>
-        {!latest && <span style={{ color: 'var(--paramo-green)', fontSize: 11 }}>✓</span>}
+        {Icon && <span style={{ color: b.flag === 'warn' ? 'var(--warning)' : 'var(--primary)', display: 'grid', placeItems: 'center' }}><Icon size={11} /></span>}
+        {!latest && <FaCheckCircle size={10} style={{ color: 'var(--success)' }} />}
       </div>
       <div
         style={{

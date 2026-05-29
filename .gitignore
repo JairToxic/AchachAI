@@ -61,6 +61,12 @@ tmp/
 
 # --- Embeddings binarios (236MB, regenerable con compute_embeddings.py) ---
 data/processed/embeddings_descripciones.npz
+backups/**/embeddings_descripciones.npz
+*.npz
+
+# --- Deploy artifacts (regenerables con _build_deploy_zip.py) ---
+backend_deploy.zip
+*_deploy.zip
 
 # --- Otros datos pesados regenerables (mantenemos similitudes.parquet que es chico) ---
 data/processed/features.parquet
