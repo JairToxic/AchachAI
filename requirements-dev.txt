@@ -17,6 +17,7 @@ scikit-learn==1.4.2           # IsolationForest, PCA AutoEncoder, StandardScaler
 xgboost==2.0.3                # modelo de clasificacion de fraude
 imbalanced-learn==0.12.2      # SMOTE para balancear clases
 joblib==1.4.2                 # persistencia de modelos
+optuna==3.6.1                 # hyperparameter tuning (src/models/optuna_tune.py)
 
 # --- NLP / embeddings ---
 sentence-transformers==2.7.0  # similitud de narrativas (deteccion de copy-paste)
