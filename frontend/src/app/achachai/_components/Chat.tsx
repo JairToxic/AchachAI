@@ -1,11 +1,13 @@
 'use client';
 // @ts-nocheck
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Condor, VueloDelCondor } from './Condor';
 import { CondorSilhouette } from './CondorSilhouette';
 import { CondorLogo } from './CondorLogo';
+import { VoiceButton } from './VoiceMode';
+import { JarvisHUD } from './JarvisHUD';
 import { EcuadorHeatMap } from './EcuadorHeatMap';
 import {
   FaBroadcastTower,
@@ -40,41 +42,221 @@ import {
   FaPlay,
 } from 'react-icons/fa';
 
-/* Estilos para markdown del condor: tablas + listas con look del design system */
+/* ============================================================
+   Markdown del cóndor — diseño premium con jerarquía visual fuerte
+   ============================================================ */
 const MD_STYLES: React.CSSProperties = {
-  fontSize: 13.5, lineHeight: 1.55, color: 'var(--condor-wing)',
+  fontSize: 14, lineHeight: 1.65, color: 'var(--condor-wing)',
 };
 
+// Resaltar IDs (SIN-XXX, PRV-XXX, RF-XX) como chips inline incluso dentro de texto
+function highlightIds(text: string): React.ReactNode {
+  if (typeof text !== 'string') return text;
+  const re = /\b(SIN-[SH]?-?\d{3,7}|PRV-(?:[A-Z]+-)?[A-Z0-9-]+|RF-0?[1-7]|ASE-[A-Z0-9-]+|DOC-[A-Z0-9-]+)\b/g;
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const id = m[1];
+    const color = id.startsWith('SIN') ? '#c5333a'
+                : id.startsWith('PRV') ? '#d97706'
+                : id.startsWith('RF')  ? '#e76f51'
+                : id.startsWith('ASE') ? '#1c5d99'
+                : '#888';
+    parts.push(
+      <span key={`${m.index}-${id}`} style={{
+        display: 'inline-block',
+        padding: '1px 7px',
+        fontSize: '0.85em',
+        fontFamily: 'JetBrains Mono, monospace',
+        fontWeight: 600,
+        background: `${color}14`,
+        border: `1px solid ${color}30`,
+        color: color,
+        borderRadius: 4,
+        margin: '0 1px',
+        lineHeight: 1.4,
+      }}>{id}</span>
+    );
+    last = re.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts.length === 1 ? parts[0] : <>{parts}</>;
+}
+
+// Wrapper que aplica highlightIds a children que son strings
+function withHighlights(children: any): any {
+  if (typeof children === 'string') return highlightIds(children);
+  if (Array.isArray(children)) {
+    return children.map((c, i) =>
+      typeof c === 'string' ? <React.Fragment key={i}>{highlightIds(c)}</React.Fragment> : c
+    );
+  }
+  return children;
+}
+
 const mdComponents = {
+  // Tabla mucho más prominente
   table: ({ children }: any) => (
-    <div style={{ overflow: 'auto', margin: '8px 0', borderRadius: 8, border: '1px solid var(--line)' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>{children}</table>
+    <div style={{
+      overflow: 'auto', margin: '14px 0',
+      borderRadius: 10, border: '1px solid #e6dfd1',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      background: '#fff',
+    }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>{children}</table>
     </div>
   ),
-  thead: ({ children }: any) => <thead style={{ background: 'var(--marfil-paper)' }}>{children}</thead>,
+  thead: ({ children }: any) => (
+    <thead style={{ background: 'linear-gradient(180deg, #faf6ee, #f5efe2)' }}>{children}</thead>
+  ),
   th: ({ children }: any) => (
-    <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--ink-mute)', fontWeight: 600, borderBottom: '1px solid var(--line)' }}>{children}</th>
+    <th style={{
+      textAlign: 'left', padding: '10px 12px',
+      fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase',
+      color: '#8a7d65', fontWeight: 700,
+      borderBottom: '2px solid #e6dfd1',
+    }}>{withHighlights(children)}</th>
   ),
   td: ({ children }: any) => (
-    <td style={{ padding: '8px 10px', verticalAlign: 'middle', borderBottom: '1px solid var(--line)' }}>{children}</td>
+    <td style={{
+      padding: '10px 12px', verticalAlign: 'middle',
+      borderBottom: '1px solid #f0eae0', fontSize: 13,
+    }}>{withHighlights(children)}</td>
   ),
-  tr: ({ children }: any) => <tr>{children}</tr>,
-  ul: ({ children }: any) => <ul style={{ margin: '6px 0 6px 18px', padding: 0 }}>{children}</ul>,
-  ol: ({ children }: any) => <ol style={{ margin: '6px 0 6px 18px', padding: 0 }}>{children}</ol>,
-  li: ({ children }: any) => <li style={{ margin: '3px 0' }}>{children}</li>,
-  p: ({ children }: any) => <p style={{ margin: '6px 0' }}>{children}</p>,
-  strong: ({ children }: any) => <strong style={{ color: 'var(--condor-wing)', fontWeight: 600 }}>{children}</strong>,
+  tr: ({ children }: any) => (
+    <tr style={{ transition: 'background 0.15s' }}>{children}</tr>
+  ),
+
+  // Listas con bullet naranja
+  ul: ({ children }: any) => (
+    <ul style={{ margin: '10px 0', paddingLeft: 0, listStyle: 'none' }}>{children}</ul>
+  ),
+  ol: ({ children }: any) => (
+    <ol style={{ margin: '10px 0', paddingLeft: 20, lineHeight: 1.7 }}>{children}</ol>
+  ),
+  li: ({ children, ordered }: any) => ordered ? (
+    <li style={{ margin: '4px 0' }}>{withHighlights(children)}</li>
+  ) : (
+    <li style={{
+      margin: '6px 0', paddingLeft: 20, position: 'relative',
+      lineHeight: 1.6,
+    }}>
+      <span style={{
+        position: 'absolute', left: 4, top: 2,
+        color: '#e76f51', fontSize: 16, fontWeight: 700, lineHeight: 1,
+      }}>•</span>
+      {withHighlights(children)}
+    </li>
+  ),
+
+  // Párrafos: el primero más prominente (lead) — detectamos por callouts
+  p: ({ children }: any) => {
+    const text = typeof children === 'string'
+      ? children
+      : Array.isArray(children) ? children.find((c: any) => typeof c === 'string') || '' : '';
+
+    // Detectar callouts especiales
+    if (typeof text === 'string') {
+      const low = text.toLowerCase().trim();
+      if (low.startsWith('acción sugerida') || low.startsWith('accion sugerida') || low.startsWith('recomendación') || low.startsWith('recomendacion')) {
+        return (
+          <div style={{
+            margin: '12px 0', padding: '12px 16px',
+            background: 'linear-gradient(135deg, rgba(231,111,81,0.10), rgba(197,51,58,0.04))',
+            borderLeft: '4px solid #e76f51', borderRadius: 8,
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+          }}>
+            <span style={{ fontSize: 18, lineHeight: 1.2 }}>💡</span>
+            <div style={{ flex: 1, fontSize: 13.5, lineHeight: 1.55 }}>
+              <span style={{ fontWeight: 700, color: '#c5333a', textTransform: 'uppercase', fontSize: 10.5, letterSpacing: '.1em', display: 'block', marginBottom: 4 }}>Acción sugerida</span>
+              {withHighlights(text.replace(/^(acci[oó]n sugerida|recomendaci[oó]n):?\s*/i, ''))}
+            </div>
+          </div>
+        );
+      }
+      if (low.startsWith('nota:') || low.startsWith('importante:') || low.startsWith('aviso:')) {
+        return (
+          <div style={{
+            margin: '10px 0', padding: '10px 14px',
+            background: 'rgba(28,93,153,0.06)',
+            borderLeft: '3px solid #1c5d99', borderRadius: 6,
+            fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.55,
+          }}>
+            {withHighlights(text)}
+          </div>
+        );
+      }
+    }
+    return <p style={{ margin: '10px 0', lineHeight: 1.65 }}>{withHighlights(children)}</p>;
+  },
+
+  strong: ({ children }: any) => (
+    <strong style={{ color: '#1A3A52', fontWeight: 700 }}>{withHighlights(children)}</strong>
+  ),
+  em: ({ children }: any) => (
+    <em style={{ color: 'var(--ink-soft)', fontStyle: 'italic' }}>{withHighlights(children)}</em>
+  ),
   code: ({ children }: any) => (
-    <code style={{ background: 'rgba(26,58,82,0.06)', padding: '1px 5px', borderRadius: 3, fontFamily: 'var(--mono)', fontSize: 11.5 }}>{children}</code>
+    <code style={{
+      background: 'rgba(231,111,81,0.10)',
+      padding: '2px 6px', borderRadius: 4,
+      fontFamily: 'JetBrains Mono, monospace', fontSize: 12,
+      color: '#c5333a', fontWeight: 600,
+    }}>{children}</code>
   ),
-  h1: ({ children }: any) => <h3 style={{ fontSize: 16, margin: '10px 0 6px', fontWeight: 600 }}>{children}</h3>,
-  h2: ({ children }: any) => <h3 style={{ fontSize: 15, margin: '10px 0 6px', fontWeight: 600 }}>{children}</h3>,
-  h3: ({ children }: any) => <h4 style={{ fontSize: 14, margin: '8px 0 4px', fontWeight: 600 }}>{children}</h4>,
+
+  // Headings con subrayado naranja para jerarquía
+  h1: ({ children }: any) => (
+    <h3 style={{
+      fontSize: 18, margin: '18px 0 10px', fontWeight: 700,
+      color: '#1A3A52', position: 'relative', paddingBottom: 6,
+      borderBottom: '2px solid #e76f51', display: 'inline-block',
+      letterSpacing: '-0.01em',
+    }}>{withHighlights(children)}</h3>
+  ),
+  h2: ({ children }: any) => (
+    <h3 style={{
+      fontSize: 16, margin: '16px 0 8px', fontWeight: 700,
+      color: '#1A3A52', position: 'relative', paddingBottom: 4,
+      borderBottom: '2px solid #e76f5180', display: 'inline-block',
+    }}>{withHighlights(children)}</h3>
+  ),
+  h3: ({ children }: any) => (
+    <h4 style={{
+      fontSize: 14, margin: '12px 0 6px', fontWeight: 700,
+      color: '#1A3A52',
+      display: 'flex', alignItems: 'center', gap: 8,
+    }}>
+      <span style={{
+        width: 4, height: 16, background: '#e76f51', borderRadius: 2,
+      }} />
+      {withHighlights(children)}
+    </h4>
+  ),
+
+  hr: () => (
+    <div style={{
+      height: 1, margin: '16px 0',
+      background: 'linear-gradient(90deg, transparent, #e6dfd1, transparent)',
+    }} />
+  ),
+
+  blockquote: ({ children }: any) => (
+    <blockquote style={{
+      margin: '12px 0', padding: '10px 16px',
+      borderLeft: '3px solid #e76f51',
+      background: 'rgba(231,111,81,0.04)',
+      borderRadius: '0 6px 6px 0',
+      fontSize: 13, fontStyle: 'italic', color: 'var(--ink-soft)',
+    }}>{children}</blockquote>
+  ),
 };
 
 export function MD({ children }: { children: string }) {
   return (
-    <div style={MD_STYLES}>
+    <div style={MD_STYLES} className="condor-md">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
         {children || ''}
       </ReactMarkdown>
@@ -398,7 +580,7 @@ function scoreVisualPorNivel(nivel: string | null): number {
  * el mapa de calor de Ecuador con tooltips y leyenda.
  */
 export function CityHeatmapAuto() {
-  const API = (typeof window !== "undefined" && (window as any).NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [data, setData] = useState<any[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -436,7 +618,7 @@ export function CityHeatmapAuto() {
  * Card flotante con botón de descarga cuando el agente generó un reporte PDF.
  */
 export function ReportePdfCard({ r }: { r: any }) {
-  const API = (typeof window !== "undefined" && (window as any).NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const fullUrl = r.url_descarga?.startsWith("http") ? r.url_descarga : `${API}${r.url_descarga}`;
   const toneByTipo: Record<string, string> = {
     ejecutivo: "var(--andes-orange)",
@@ -768,21 +950,91 @@ export const CANNED_ANSWERS = {
 };
 
 export function ChatScreen({ role = "antifraude", onInvestigate }) {
+  // Saludo placeholder mientras el backend carga (se reemplaza por datos reales)
   const [messages, setMessages] = useStateChat([
     {
       role: "condor",
       kind: "greeting",
-      text: "Hola María. Sobrevolé tu cartera mientras dormías. Hay 12 casos en rojo nuevos y un proveedor que me llama la atención.",
-      time: "08:14",
-    },
-    {
-      role: "condor",
-      kind: "proactive",
-      text: "Mientras revisabas el café, llegaron 3 casos críticos del proveedor PRV-NEW0019. ¿Querés que te los muestre?",
-      time: "08:42",
-      actions: ["Ver los 3 casos", "Más tarde"],
+      text: "Estoy sobrevolando tu cartera para traerte el resumen del día…",
+      time: now(),
+      loading: true,
     },
   ]);
+
+  // Cargar saludo REAL desde /kpis + /top-riesgo
+  useEffectChat(() => {
+    const API = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
+    (async () => {
+      try {
+        const [kpisRes, topRes] = await Promise.all([
+          fetch(`${API}/kpis`).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`${API}/top-riesgo?limit=3&nivel=ROJO`).then(r => r.ok ? r.json() : null).catch(() => null),
+        ]);
+        const nRojos = (topRes?.n_rojos_disponibles ?? topRes?.top?.length) || 0;
+        const totalSin = kpisRes?.totales?.siniestros || 0;
+        const top3 = (topRes?.top || []).slice(0, 3);
+        // Detectar proveedor recurrente si los 3 top comparten id_proveedor
+        let provDestacado: string | null = null;
+        if (top3.length >= 2) {
+          const provs = top3.map((c: any) => c.id_proveedor).filter(Boolean);
+          const counts: Record<string, number> = {};
+          provs.forEach(p => { counts[p] = (counts[p] || 0) + 1; });
+          const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+          if (sorted[0] && sorted[0][1] >= 2) provDestacado = sorted[0][0];
+        }
+
+        const newMessages: any[] = [];
+
+        // Saludo dinamico
+        if (nRojos > 0) {
+          let greeting = `Hola. Sobrevolé los ${totalSin.toLocaleString('en-US')} siniestros de la cartera y encontré ${nRojos} caso(s) en rojo`;
+          if (provDestacado) greeting += ` — ${provDestacado} aparece varias veces, vale la pena mirarlo.`;
+          else greeting += ` que requieren tu revisión.`;
+          newMessages.push({
+            role: "condor",
+            kind: "greeting",
+            text: greeting,
+            time: now(),
+          });
+        } else {
+          newMessages.push({
+            role: "condor",
+            kind: "greeting",
+            text: `Sobrevolé los ${totalSin.toLocaleString('en-US')} siniestros de la cartera. Hoy no encontré casos críticos nuevos. Si querés, puedo profundizar en algún ramo o proveedor.`,
+            time: now(),
+          });
+        }
+
+        // Sugerencia proactiva con casos REALES
+        if (top3.length >= 1) {
+          const ids = top3.map((c: any) => c.id_siniestro).join(", ");
+          newMessages.push({
+            role: "condor",
+            kind: "proactive",
+            text: provDestacado
+              ? `Detecté ${top3.length} caso(s) crítico(s) que mencionan al proveedor ${provDestacado}: ${ids}. ¿Querés que te los muestre con la evidencia?`
+              : `Tengo ${top3.length} caso(s) crítico(s) listos para revisar: ${ids}. ¿Querés que te los explique con la evidencia activada?`,
+            time: now(),
+            actions: [
+              { label: `Ver los ${top3.length} casos`, kind: "send_query", value: `Muéstrame el detalle de ${ids} con score, reglas activadas y evidencia` },
+              { label: "Más tarde", kind: "dismiss" },
+            ],
+            proactiveIds: top3.map((c: any) => c.id_siniestro),
+          });
+        }
+
+        setMessages(newMessages);
+      } catch (err) {
+        setMessages([{
+          role: "condor",
+          kind: "greeting",
+          text: "Buen día. Estoy listo para responder lo que necesites sobre la cartera. (No pude precargar el resumen del día, pero podés preguntar lo que quieras.)",
+          time: now(),
+        }]);
+      }
+    })();
+  }, []);
+
   const [input, setInput] = useStateChat("");
   const [thinking, setThinking] = useStateChat(false);
   const [activeTools, setActiveTools] = useStateChat([]);
@@ -804,7 +1056,7 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
   }
 
   async function runAgent(q) {
-    const API = (window.NEXT_PUBLIC_API_URL || "http://localhost:8000");
+    const API = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
     setThinking(true);
     setActiveTools([]);
     setCurrentTool(null);
@@ -864,60 +1116,44 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
           } else if (ev.type === "tool_result") {
             toolsFull.push({ tool: ev.tool, result_summary: ev.summary });
           } else if (ev.type === "delta") {
-            // Primer delta: cerrar fase de pensamiento + crear burbuja de respuesta
+            // Acumulamos el texto en silencio: NO lo mostramos token a token
+            // (eso se sentia como "escritura arrastrada"). La respuesta se
+            // vuelca completa de una sola vez al recibir "done". Mientras tanto
+            // mantenemos el HUD del condor en fase "Redactando informe…".
             if (firstDelta) {
               firstDelta = false;
               setCurrentTool(null);
-              setCurrentPhase("Escribiendo respuesta…");
-              setThinking(false);
-              setActiveTools([]);
-              setMessages(m => [...m, {
-                id: streamingId,
-                role: "condor",
-                kind: "answer",
-                streaming: true,
-                payload: {
-                  summary: "",
-                  tools: toolsCalled,
-                  sources: [],
-                  cost: { tokens: 0, time: "streaming…", price: "—" },
-                },
-                time: now(),
-              }]);
+              setCurrentPhase("Redactando informe…");
             }
             accumulatedText += ev.text || "";
-            // Actualizar el mensaje en streaming
-            setMessages(m => m.map((msg: any) =>
-              msg.id === streamingId
-                ? { ...msg, payload: { ...msg.payload, summary: accumulatedText } }
-                : msg
-            ));
           } else if (ev.type === "done") {
             totalTokens = ev.tokens || 0;
             iterations = ev.iterations || 1;
-            // Resultado final - cerrar streaming y enriquecer
-            setMessages(m => m.map((msg: any) =>
-              msg.id === streamingId
-                ? {
-                    ...msg,
-                    streaming: false,
-                    payload: {
-                      ...msg.payload,
-                      summary: accumulatedText || "Sin respuesta.",
-                      tools: toolsCalled,
-                      sources: toolsCalled.map(t => {
-                        const nar = TOOL_NARRATIVE[t];
-                        return nar ? `${nar.phrase} (${t})` : `Llamé tool '${t}'`;
-                      }),
-                      cost: {
-                        tokens: totalTokens,
-                        time: `${iterations} it`,
-                        price: `~$${(totalTokens * 0.000002).toFixed(4)}`,
-                      },
-                    },
-                  }
-                : msg
-            ));
+            // Cerrar el HUD y mostrar la respuesta COMPLETA de una sola vez
+            setThinking(false);
+            setActiveTools([]);
+            setCurrentTool(null);
+            setCurrentPhase("");
+            setMessages(m => [...m, {
+              id: streamingId,
+              role: "condor",
+              kind: "answer",
+              streaming: false,
+              payload: {
+                summary: accumulatedText || "Sin respuesta.",
+                tools: toolsCalled,
+                sources: toolsCalled.map(t => {
+                  const nar = TOOL_NARRATIVE[t];
+                  return nar ? `${nar.phrase} (${t})` : `Llamé tool '${t}'`;
+                }),
+                cost: {
+                  tokens: totalTokens,
+                  time: `${iterations} it`,
+                  price: `~$${(totalTokens * 0.000002).toFixed(4)}`,
+                },
+              },
+              time: now(),
+            }]);
           } else if (ev.type === "error") {
             throw new Error(ev.message || "error desconocido");
           }
@@ -933,18 +1169,15 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
       setActiveTools([]);
       setCurrentPhase("");
       setCurrentTool(null);
-      // Si nunca creamos la burbuja de streaming, agregamos una de error
+      // La respuesta se muestra recien en "done", asi que ante un error
+      // siempre agregamos una burbuja nueva. Si alcanzamos a acumular texto
+      // parcial, lo mostramos antes del aviso de error.
+      const parcial = accumulatedText ? `${accumulatedText}\n\n---\n` : "";
       const errorPayload = {
-        summary: `Error consultando al backend: \`${err.message}\`. Verificá que FastAPI esté corriendo.`,
-        tools: [], sources: [], cost: { tokens: 0, time: "0s", price: "$0" },
+        summary: `${parcial}⚠️ Error consultando al backend: \`${err.message}\`. Verificá que FastAPI esté corriendo.`,
+        tools: toolsCalled, sources: [], cost: { tokens: 0, time: "0s", price: "$0" },
       };
-      if (firstDelta) {
-        setMessages(m => [...m, { role: "condor", kind: "answer", payload: errorPayload, time: now() }]);
-      } else {
-        setMessages(m => m.map((msg: any) =>
-          msg.id === streamingId ? { ...msg, streaming: false, payload: errorPayload } : msg
-        ));
-      }
+      setMessages(m => [...m, { role: "condor", kind: "answer", payload: errorPayload, time: now() }]);
     }
   }
 
@@ -992,7 +1225,7 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
         {/* messages */}
         <div ref={scrollerRef} style={{ flex: 1, overflow: "auto", padding: "20px 48px 12px", position: "relative", zIndex: 1 }}>
           {messages.map((m, i) => (
-            <Message key={i} msg={m} onInvestigate={onInvestigate} />
+            <Message key={i} msg={m} onInvestigate={onInvestigate} onActionSend={(q: string) => send(q)} />
           ))}
           {thinking && <JarvisStream phase={currentPhase} tools={activeTools} currentTool={currentTool} />}
         </div>
@@ -1026,7 +1259,21 @@ export function ChatScreen({ role = "antifraude", onInvestigate }) {
                 background: "transparent", color: "var(--condor-wing)",
               }}
             />
-            <button className="btn ghost" style={{ padding: "8px 10px" }} title="Voz"><FaMicrophone size={13} /></button>
+            <VoiceButton
+              onTranscript={(t) => send(t)}
+              speakText={(() => {
+                // Encuentra el ultimo mensaje del condor con texto
+                for (let i = messages.length - 1; i >= 0; i--) {
+                  const m = messages[i];
+                  if (m.role === "condor" && !m.streaming) {
+                    const txt = m.text || (m.payload && m.payload.summary);
+                    if (txt) return txt;
+                  }
+                }
+                return null;
+              })()}
+              disabled={thinking}
+            />
             <button className="btn" onClick={() => send()} disabled={thinking}>
               Enviar →
             </button>
@@ -1129,7 +1376,7 @@ function ThinkingBlock({ tools }) {
   );
 }
 
-function Message({ msg, onInvestigate }) {
+function Message({ msg, onInvestigate, onActionSend }: any) {
   if (msg.role === "user") {
     return (
       <div className="fade-up" style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
@@ -1146,6 +1393,13 @@ function Message({ msg, onInvestigate }) {
 
   if (msg.kind === "answer") {
     const a = msg.payload;
+    // Helper: el HUD necesita callbacks para "investigar caso" y "preguntar más"
+    const handleInvestigateCase = (id: string) => {
+      if (typeof onInvestigate === "function") onInvestigate(id);
+    };
+    const handleAskMore = (query: string) => {
+      if (typeof onActionSend === "function") onActionSend(query);
+    };
     return (
       <div className="fade-up" style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <CondorLogo size={32} />
@@ -1156,6 +1410,14 @@ function Message({ msg, onInvestigate }) {
             boxShadow: "var(--shadow-sm)",
           }}>
             <div style={{ padding: "14px 18px 4px" }}>
+              {/* HUD Jarvis: extrae entidades automaticamente y muestra chips/KPIs/charts */}
+              {!msg.streaming && a.summary && (
+                <JarvisHUD
+                  text={a.summary}
+                  onInvestigateCase={handleInvestigateCase}
+                  onAskMore={handleAskMore}
+                />
+              )}
               <MD>{a.summary}</MD>
             </div>
 
@@ -1255,10 +1517,31 @@ function Message({ msg, onInvestigate }) {
           )}
           {msg.text}
           {msg.actions && (
-            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-              {msg.actions.map((a, i) => (
-                <button key={i} className={i === 0 ? "btn" : "btn ghost"} style={{ padding: "6px 12px", fontSize: 11.5 }}>{a}</button>
-              ))}
+            <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+              {msg.actions.map((a: any, i: number) => {
+                // Compat: si la action es string (formato viejo), tratarla como dismiss
+                const label = typeof a === "string" ? a : a.label;
+                const kind = typeof a === "string" ? "dismiss" : (a.kind || "dismiss");
+                const value = typeof a === "string" ? null : a.value;
+                const isPrimary = i === 0;
+                return (
+                  <button
+                    key={i}
+                    className={isPrimary ? "btn" : "btn ghost"}
+                    style={{ padding: "6px 12px", fontSize: 11.5 }}
+                    onClick={() => {
+                      if (kind === "send_query" && value && typeof onActionSend === "function") {
+                        onActionSend(value);
+                      } else if (kind === "navigate" && value && typeof onInvestigate === "function") {
+                        onInvestigate(value);
+                      }
+                      // dismiss: solo cierra (no hace nada extra)
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

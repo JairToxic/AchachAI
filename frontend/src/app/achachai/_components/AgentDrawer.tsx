@@ -255,7 +255,7 @@ export function AgentDrawer({ role = 'antifraude' }: { role?: string }) {
   }
 
   async function runAgent(q: string) {
-    const API = (typeof window !== 'undefined' && (window as any).NEXT_PUBLIC_API_URL) || 'http://localhost:8000';
+    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     setThinking(true);
     setActiveTools([]);
     setCurrentTool(null);

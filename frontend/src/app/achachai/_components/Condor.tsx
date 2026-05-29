@@ -271,7 +271,7 @@ export function CondorBubble({ onOpen, mood = 'idle' as Mood, message }: { onOpe
  * Refresca cada 30s para reflejar decisiones nuevas en otra pestaña.
  */
 export function LearningBar() {
-  const API = (typeof window !== "undefined" && (window as any).NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [stats, setStats] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
   const [expandido, setExpandido] = useState(false);

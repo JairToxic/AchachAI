@@ -1,6 +1,8 @@
 'use client';
-import { FaBars, FaBell, FaSearch, FaUserCircle, FaCog } from 'react-icons/fa';
+import { FaBars, FaSearch, FaUserCircle, FaCog } from 'react-icons/fa';
 import { ThemeToggle } from './ThemeToggle';
+import { TutorialButton } from './Tutorial';
+import { NotificationBell } from './NotificationBell';
 
 interface TopbarProps {
   title?: string;
@@ -66,39 +68,12 @@ export function Topbar({
       <div style={{ flex: 1 }} />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <TutorialButton compact />
         <ThemeToggle />
 
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label="Notificaciones"
-          title="Notificaciones"
-          style={{ position: 'relative' }}
-        >
-          <FaBell size={16} />
-          {notifications > 0 && (
-            <span
-              style={{
-                position: 'absolute',
-                top: 6,
-                right: 6,
-                minWidth: 16,
-                height: 16,
-                padding: '0 4px',
-                borderRadius: 8,
-                background: 'var(--danger)',
-                color: '#fff',
-                fontSize: 10,
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {notifications > 9 ? '9+' : notifications}
-            </span>
-          )}
-        </button>
+        <NotificationBell />
+        {/* notifications prop ya no se usa, NotificationBell hace fetch real */}
+        {false && notifications}
 
         <button type="button" className="icon-btn" aria-label="Ajustes" title="Ajustes">
           <FaCog size={16} />

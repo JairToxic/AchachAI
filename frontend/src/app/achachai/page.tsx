@@ -21,6 +21,7 @@ import { RoleHome } from './_components/RoleHomes';
 import { AgentProvider, AgentDrawer, AgentFAB, useAgent } from './_components/AgentDrawer';
 import { Sidebar, SIDEBAR_NAV, SIDEBAR_ROLES } from './_components/Sidebar';
 import { Topbar } from './_components/Topbar';
+import { useAutoStartTutorial } from './_components/Tutorial';
 import { useTheme } from './_components/ThemeToggle';
 
 /** Mapa pantalla -> label legible + hint para inyectar al agente. */
@@ -59,6 +60,10 @@ export default function AchachaiApp() {
   const [caseId, setCaseId] = useState<string>('SIN-100029');
   const [aseId, setAseId] = useState<string>('');
   const [role, setRole] = useState<string>('antifraude');
+
+  // Tutorial guiado: se lanza solo la primera vez (flag localStorage).
+  // Devuelve el overlay (o null) que renderizamos al final del componente.
+  const tutorialOverlay = useAutoStartTutorial(true);
 
   // Sidebar state
   const [collapsed, setCollapsed] = useState(false);
@@ -237,6 +242,9 @@ export default function AchachaiApp() {
           mood={screen === 'investigation' || screen === 'kanban' ? 'alert' : 'idle'}
           message={screen === 'home' ? 'Hola María. Sobrevolé tu cartera. Hay 12 casos en rojo nuevos.' : null}
         />
+
+        {/* Tour guiado (auto-arranca primera vez; el boton ? lo reabre) */}
+        {tutorialOverlay}
       </div>
     </AgentProvider>
   );

@@ -1,11 +1,45 @@
-# AchachAI — Detector de Posibles Fraudes en Siniestros Vehiculares
+# AchachAI · Ojos de Cóndor — Detector Multi-Ramo de Posibles Fraudes en Siniestros
 
 > **hackIAthon 2026 · Reto Aseguradora del Sur**
 > Equipo: **AchachAI** · Organizado por Viamática · Innovation Leader: Aseguradora del Sur
 
-**AchachAI** ("achachay" en kichwa significa _"¡qué sorpresa!"_ — y nuestra IA detecta esas sorpresas en la cartera) es un prototipo end-to-end que combina **reglas de negocio + Machine Learning supervisado + detección de anomalías no supervisada + análisis multimodal de documentos + agente conversacional** para asignar a cada siniestro un **score 0–100** y un **semáforo Verde / Amarillo / Rojo**, con explicación auditable de cada decisión.
+## 🦅 Demo en vivo (Azure App Service · East US 2)
+
+| Servicio | URL pública |
+|---|---|
+| **🌐 Aplicación web (frontend)** | <https://achachai-app.azurewebsites.net/achachai> |
+| **🔌 API (backend FastAPI)** | <https://achachai-api.azurewebsites.net> |
+| **💚 Health check** | <https://achachai-api.azurewebsites.net/health> |
+| **📁 Repositorio** | <https://github.com/JairToxic/AchachAI> |
+
+## 👥 Equipo AchachAI
+
+| Integrante | Rol |
+|---|---|
+| **Jair Sánchez** | Backend ML/IA, arquitectura Azure, integración Document Intelligence + GPT-4o Vision |
+| **Pablo Arcos** | Frontend Next.js, UX del Modo Investigación, Cóndor Profesor, Voz Jarvis |
+| **Cristina Molina** | Datos sintéticos multi-ramo, motor de reglas RF-01..07, calibración del modelo XGBoost |
+
+---
+
+**AchachAI** ("achachay" en kichwa significa _"¡qué frío!"_ — ese escalofrío que recorre el cuerpo cuando algo no encaja) es un prototipo end-to-end que combina **reglas de negocio + Machine Learning supervisado + detección de anomalías no supervisada + análisis multimodal de documentos (con forensia visual) + agente conversacional con orquestador de intenciones** para asignar a cada siniestro un **score 0–100** y un **semáforo Verde / Amarillo / Rojo**, con explicación auditable de cada decisión.
 
 > ⚠️ **Principio fundacional**: el sistema produce **alertas para revisión humana, NUNCA acusaciones**. La decisión final siempre es del analista. Sección 17 del PDF del reto.
+
+## 🆕 Lo nuevo desde la versión inicial (29 mayo 2026)
+
+| Capa | Mejora |
+|---|---|
+| 📊 **Dataset** | 15K → **39.960 siniestros multi-ramo** (Vehículos 65% / Hogar 20% / Salud 15%) · 271 proveedores |
+| 🤖 **Modelo** | XGBoost reentrenado: **AUC 0.974**, F1 **0.80**, Precision 0.75, Recall 0.86 |
+| 🔬 **Forensia visual** | GPT-4o Vision detecta cambios de tipografía, texto sobrepuesto, firmas alteradas, documentos sintéticos |
+| 📋 **Catálogo de inconsistencias** | 20+ tipos con descripción humana + mapeo a reglas RF + por qué importa cada una |
+| 💬 **Agente con orquestador** | Clasifica intent (canned / explanation / data) → respuestas instantáneas para saludos, sin tools cuando no aplican |
+| 🎤 **Voz Jarvis** | Web Speech API: STT con overlay grande, TTS con voz neuronal latina (off por default) |
+| 🎓 **Cóndor Profesor** | Tour guiado nativo + asistente flotante en 9 pantallas con prompts contextuales |
+| 🎨 **UI premium** | Markdown del cóndor con IDs como chips inline, callouts naranjas, headings con subrayado, JarvisHUD con KPIs auto-detectados |
+| 🔔 **Notificaciones reales** | Campana del topbar conectada al backend (top_riesgo + alertas tempranas) |
+| ☁️ **Deploy producción** | Azure App Service (Linux B2, East US 2) · Blob Storage para embeddings |
 
 ---
 

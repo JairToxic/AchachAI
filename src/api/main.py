@@ -14,6 +14,7 @@ Uso:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -32,6 +33,12 @@ load_dotenv(ROOT / ".env")
 
 import sys
 sys.path.insert(0, str(ROOT))
+
+# NOTE: el archivo embeddings_descripciones.npz NO se lee en runtime.
+# El sistema usa data/processed/similitudes.parquet (precomputado offline).
+# Si necesitas regenerar similitudes con casos nuevos, descarga el .npz desde
+# el blob (ver src/bootstrap.py) y corre scripts/compute_embeddings.py local.
+
 from src.ai_agent import ClaimsAgent  # noqa: E402
 from src.ai_agent.tools import (  # noqa: E402
     asegurados_recurrentes,
@@ -83,6 +90,104 @@ def get_agent() -> ClaimsAgent:
     if _agent is None:
         _agent = ClaimsAgent()
     return _agent
+
+
+# ===================== Warmup en startup =====================
+# Precalienta los caches mas costosos en background (no bloquea el boot).
+# Sin esto, la PRIMERA llamada a /top-riesgo desde el frontend tarda ~15-20s
+# porque evalua 2000+ siniestros con reglas/scoring por primera vez.
+_WARMUP_STATE: dict = {"started": False, "top_riesgo_ready": False, "agent_ready": False, "error": None}
+
+
+def _warmup_background() -> None:
+    """Corre en thread separado al arrancar el server. Idempotente."""
+    import threading, time as _t
+
+    def _work():
+        t0 = _t.time()
+        try:
+            log.info("[warmup] precalentando top_riesgo cache...")
+            from src.ai_agent.tools import _compute_top_riesgo_all
+            _compute_top_riesgo_all()
+            _WARMUP_STATE["top_riesgo_ready"] = True
+            log.info(f"[warmup] top_riesgo listo en {_t.time()-t0:.1f}s")
+        except Exception as e:
+            log.exception(f"[warmup] top_riesgo fallo: {e}")
+            _WARMUP_STATE["error"] = f"top_riesgo: {e}"
+        try:
+            log.info("[warmup] instanciando ClaimsAgent...")
+            get_agent()
+            _WARMUP_STATE["agent_ready"] = True
+            log.info(f"[warmup] agente listo, total {_t.time()-t0:.1f}s")
+        except Exception as e:
+            log.exception(f"[warmup] agent fallo: {e}")
+            _WARMUP_STATE["error"] = (_WARMUP_STATE["error"] or "") + f" | agent: {e}"
+
+    if _WARMUP_STATE["started"]:
+        return
+    _WARMUP_STATE["started"] = True
+    threading.Thread(target=_work, daemon=True, name="achachai-warmup").start()
+
+
+@app.on_event("startup")
+def _on_startup():
+    _warmup_background()
+
+
+@app.get("/warmup")
+def warmup_status():
+    """Estado del precalentado (sirve para verificar cuando esta listo)."""
+    return _WARMUP_STATE
+
+
+# ===================== Demo: servir PDFs oficiales =====================
+# Permite al frontend pre-cargar facturas / partes policiales / declaraciones
+# del Excel oficial sin que el usuario los suba manualmente.
+_DEMO_DOCS_DIR = ROOT / "data" / "Data set documentos evento"
+_DEMO_DOCS_SUBDIRS = {
+    "factura": "FACTURAS",
+    "parte_policial": "PARTE POLICIAL",
+    "declaracion": "DECLARACIÓN DE ACCIDENTE",
+}
+
+
+@app.get("/demo-docs/manifest")
+def demo_docs_manifest():
+    """Lista los PDFs disponibles agrupados por tipo + por id de siniestro.
+
+    Permite al frontend mostrar opciones tipo "Caso SIN-0022 (factura + parte)".
+    """
+    import re
+    out: dict[str, dict[str, list[str]]] = {}
+    for tipo, subdir in _DEMO_DOCS_SUBDIRS.items():
+        d = _DEMO_DOCS_DIR / subdir
+        if not d.exists():
+            continue
+        for p in d.glob("*.pdf"):
+            # buscar SIN-XXXX en el nombre del archivo
+            m = re.search(r"SIN[-_]?(\d{3,5})", p.name)
+            if not m:
+                continue
+            sin_id = f"SIN-{int(m.group(1)):04d}"
+            out.setdefault(sin_id, {})
+            out[sin_id].setdefault(tipo, []).append(p.name)
+    return {"casos": out}
+
+
+@app.get("/demo-docs/{tipo}/{filename}")
+def demo_docs_serve(tipo: str, filename: str):
+    """Sirve un PDF concreto del repo oficial. Solo PDFs y rutas validadas."""
+    from fastapi.responses import FileResponse
+    if tipo not in _DEMO_DOCS_SUBDIRS:
+        raise HTTPException(404, f"Tipo desconocido: {tipo}")
+    # Sanitizar filename: solo basename, sin paths
+    safe = Path(filename).name
+    if not safe.lower().endswith(".pdf"):
+        raise HTTPException(400, "Solo se sirven PDFs")
+    target = _DEMO_DOCS_DIR / _DEMO_DOCS_SUBDIRS[tipo] / safe
+    if not target.exists() or not target.is_file():
+        raise HTTPException(404, f"No existe {tipo}/{safe}")
+    return FileResponse(target, media_type="application/pdf", filename=safe)
 
 
 # ===================== Schemas =====================
@@ -552,57 +657,55 @@ _TOP_RIESGO_TTL_SEC = 300  # 5 minutos
 
 
 @app.get("/top-riesgo")
-def get_top_riesgo(limit: int = 10, nivel: str | None = None, force: bool = False):
+def get_top_riesgo(
+    limit: int = 10,
+    nivel: str | None = None,
+    ciudad: str | None = None,
+    force: bool = False,
+):
     """Top N siniestros con mayor score (evalua reglas+modelo en vivo).
 
-    Cacheado en memoria por 5 minutos para no rebanar el dataset en cada visita
-    a la bandeja/home. Usar ?force=true para invalidar manualmente.
+    El computo pesado (evaluar reglas+modelo sobre el sample) lo cachea
+    top_riesgo() internamente por 5 min; aqui solo filtramos/ordenamos en
+    memoria. El filtro por `ciudad` se aplica sobre TODO el universo evaluado
+    (no sobre un top-N global ya recortado), asi al filtrar por una sucursal/
+    ciudad concreta ves TODOS sus casos de riesgo, no solo los que entraban en
+    el top global.
 
-    Cuando NO se pasa nivel, devuelve un mix BALANCEADO entre ROJO y AMARILLO
-    (no satura con solo rojos): 60% ROJO + 40% AMARILLO aprox. Para la bandeja
-    priorizada esto garantiza que el analista vea casos de los dos niveles.
+    Cuando NO se pasa nivel, `top` trae un mix BALANCEADO ROJO+AMARILLO
+    (60/40). Ademas siempre devuelve `verdes` (muestra de bajo riesgo) y los
+    contadores por nivel para alimentar los 3 carriles de la bandeja.
     """
-    import time
-    now = time.time()
-    cached = _top_riesgo_cache.get("data")
-    if not force and cached is not None and (now - _top_riesgo_cache["ts"]) < _TOP_RIESGO_TTL_SEC:
-        items = cached.get("top", [])
-    else:
-        # Pedimos un buffer grande UNA vez y filtramos/cortamos en cliente.
-        # top_riesgo() ya devuelve ROJO + AMARILLO por default (nuevo).
-        result = top_riesgo(limit=400)  # buffer amplio para asegurar mix de niveles
-        _top_riesgo_cache["data"] = result
-        _top_riesgo_cache["ts"] = now
-        items = result.get("top", [])
+    universo = top_riesgo(limit=1_000_000, nivel="ROJO,AMARILLO,VERDE", ciudad=ciudad)
+    items = universo.get("top", [])
+
+    rojos = [c for c in items if c.get("nivel") == "ROJO"]
+    amarillos = [c for c in items if c.get("nivel") == "AMARILLO"]
+    verdes = [c for c in items if c.get("nivel") == "VERDE"]
 
     if nivel:
         wanted = {n.strip().upper() for n in nivel.split(",") if n.strip()}
-        items = [c for c in items if c.get("nivel") in wanted]
-        out = items[:limit]
+        out = [c for c in items if c.get("nivel") in wanted][:limit]
     else:
         # Mix balanceado: 60% ROJO + 40% AMARILLO (ambos ordenados por score desc)
-        rojos = [c for c in items if c.get("nivel") == "ROJO"]
-        amarillos = [c for c in items if c.get("nivel") == "AMARILLO"]
         n_rojo = max(1, int(limit * 0.60))
         n_amar = max(1, limit - n_rojo)
-        # Si falta de un lado, completar con el otro
-        out_rojo = rojos[:n_rojo]
-        out_amar = amarillos[:n_amar]
-        out = out_rojo + out_amar
-        # Si no llegamos al limit, rellenar con el sobrante
+        out = rojos[:n_rojo] + amarillos[:n_amar]
+        # Si falta de un lado, completar con el sobrante del otro
         if len(out) < limit:
-            extra = (rojos[n_rojo:] + amarillos[n_amar:])
+            extra = rojos[n_rojo:] + amarillos[n_amar:]
             out = out + extra[: (limit - len(out))]
-        # Ordenar final por score desc para que el ROJO mas alto siga arriba en cada bucket
         out.sort(key=lambda x: -x.get("score", 0))
 
     return {
-        "total_evaluados": (_top_riesgo_cache["data"] or {}).get("total_evaluados", 0),
-        "n_rojos_disponibles": sum(1 for c in items if c.get("nivel") == "ROJO"),
-        "n_amarillos_disponibles": sum(1 for c in items if c.get("nivel") == "AMARILLO"),
+        "total_evaluados": universo.get("total_evaluados", 0),
+        "ciudad": ciudad,
+        "n_rojos_disponibles": len(rojos),
+        "n_amarillos_disponibles": len(amarillos),
+        "n_verdes_disponibles": len(verdes),
         "top": out,
-        "cached": (now - _top_riesgo_cache["ts"]) < 1.0 is False,
-        "age_sec": round(now - _top_riesgo_cache["ts"], 1),
+        # Muestra de bajo riesgo (mayor score primero) para el carril "Riesgo bajo".
+        "verdes": verdes[:limit],
     }
 
 
@@ -764,6 +867,32 @@ def chat_stream(req: ChatRequest):
     )
 
 
+_REPORTE_EJECUTIVO_PROMPT = (
+    "Sos el copiloto antifraude de Aseguradora del Sur. Escribi un resumen ejecutivo "
+    "DE LA CARTERA para el comite antifraude, estilo briefing de 1 minuto.\n\n"
+    "USA ESTAS HERRAMIENTAS para construir el resumen: top_riesgo, ranking_proveedores, "
+    "ranking_ciudades, simulacion_ahorro.\n\n"
+    "FORMATO OBLIGATORIO — usa exactamente estos titulos en negrita (NO tablas, NO codigo, NO pipes):\n\n"
+    "## El pulso de la cartera\n"
+    "Una oracion narrando el estado general (n total, tasa de fraude estimada, monto en juego).\n\n"
+    "## Los 3 casos que recomendamos revisar primero\n"
+    "Una lista con bullets, cada uno: **SIN-XXXXX** — explicacion en 1 linea de por que merece revision.\n\n"
+    "## Los proveedores que estan acelerando\n"
+    "Una lista con bullets, cada uno: **PRV-XXXX** *(nombre)* — explicacion del patron.\n\n"
+    "## Donde mirar geograficamente\n"
+    "Una lista corta de ciudades con mas concentracion (con su numero).\n\n"
+    "## 3 acciones concretas para esta semana\n"
+    "Bullets numerados con acciones operativas, no recomendaciones genericas.\n\n"
+    "## Impacto economico estimado\n"
+    "Una oracion con el monto USD que se puede recuperar/prevenir.\n\n"
+    "REGLAS:\n"
+    "- Lenguaje claro, conversacional, en espanol neutro.\n"
+    "- NO uses tablas markdown con pipes (|). Usa listas con bullets.\n"
+    "- Maximo 250 palabras totales. Tiene que leerse en 60 segundos.\n"
+    "- Lenguaje no acusatorio: 'sospechoso', 'amerita revision', NO 'fraude confirmado'."
+)
+
+
 @app.get("/reportes/ejecutivo")
 def reporte_ejecutivo():
     """Resumen ejecutivo generado por el agente.
@@ -771,32 +900,33 @@ def reporte_ejecutivo():
     El prompt fuerza un formato compacto y legible (sin tablas markdown crudas),
     pensado para mostrarse en el panel de Reportes y exportarse como PDF.
     """
-    prompt = (
-        "Sos el copiloto antifraude de Aseguradora del Sur. Escribi un resumen ejecutivo "
-        "DE LA CARTERA para el comite antifraude, estilo briefing de 1 minuto.\n\n"
-        "USA ESTAS HERRAMIENTAS para construir el resumen: top_riesgo, ranking_proveedores, "
-        "ranking_ciudades, simulacion_ahorro.\n\n"
-        "FORMATO OBLIGATORIO — usa exactamente estos titulos en negrita (NO tablas, NO codigo, NO pipes):\n\n"
-        "## El pulso de la cartera\n"
-        "Una oracion narrando el estado general (n total, tasa de fraude estimada, monto en juego).\n\n"
-        "## Los 3 casos que recomendamos revisar primero\n"
-        "Una lista con bullets, cada uno: **SIN-XXXXX** — explicacion en 1 linea de por que merece revision.\n\n"
-        "## Los proveedores que estan acelerando\n"
-        "Una lista con bullets, cada uno: **PRV-XXXX** *(nombre)* — explicacion del patron.\n\n"
-        "## Donde mirar geograficamente\n"
-        "Una lista corta de ciudades con mas concentracion (con su numero).\n\n"
-        "## 3 acciones concretas para esta semana\n"
-        "Bullets numerados con acciones operativas, no recomendaciones genericas.\n\n"
-        "## Impacto economico estimado\n"
-        "Una oracion con el monto USD que se puede recuperar/prevenir.\n\n"
-        "REGLAS:\n"
-        "- Lenguaje claro, conversacional, en espanol neutro.\n"
-        "- NO uses tablas markdown con pipes (|). Usa listas con bullets.\n"
-        "- Maximo 250 palabras totales. Tiene que leerse en 60 segundos.\n"
-        "- Lenguaje no acusatorio: 'sospechoso', 'amerita revision', NO 'fraude confirmado'."
-    )
-    result = get_agent().chat(prompt)
+    result = get_agent().chat(_REPORTE_EJECUTIVO_PROMPT)
     return result
+
+
+@app.post("/reportes/ejecutivo/stream")
+def reporte_ejecutivo_stream():
+    """Streaming NDJSON del resumen ejecutivo — efecto Jarvis "pensando en vivo".
+
+    Emite los mismos eventos que /chat/stream: tool_call, tool_result, delta, done.
+    El frontend (BriefingJarvis) renderiza la bitacora del condor en tiempo real.
+    """
+    import json as _json
+    from fastapi.responses import StreamingResponse
+
+    def event_generator():
+        try:
+            for event in get_agent().chat_stream(_REPORTE_EJECUTIVO_PROMPT):
+                yield _json.dumps(event, ensure_ascii=False, default=str) + "\n"
+        except Exception as exc:
+            log.exception("Error en /reportes/ejecutivo/stream")
+            yield _json.dumps({"type": "error", "message": f"{type(exc).__name__}: {exc}"}) + "\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/simulacion-ahorro")
@@ -1577,71 +1707,97 @@ async def evaluar_completo(
     docs_analizados: list[dict] = []
     fecha_hoy = pd.Timestamp.now().strftime("%Y-%m-%d")
 
+    def _run_analyzer(file_bytes: bytes, tipo: str, ctx: dict) -> Any:
+        if tipo == "factura":
+            return analyze_factura(file_bytes, fecha_ocurrencia=fecha_hoy)
+        if tipo == "imagen_dano":
+            return analyze_imagen_dano(file_bytes, descripcion)
+        if tipo == "parte_policial":
+            return analyze_parte_policial(file_bytes, contexto_siniestro=ctx)
+        if tipo == "declaracion_accidente":
+            return analyze_declaracion_accidente(file_bytes, contexto_siniestro=ctx)
+        return analyze_documento_generico(file_bytes, tipo=tipo, contexto_siniestro=ctx)
+
     async def _safe_analyze(name: str, file: UploadFile | None, tipo: str):
         if not file or not file.filename:
-            return
+            return None
+        filename = file.filename
         try:
             file_bytes = await file.read()
             ctx = {"fecha_ocurrencia": fecha_hoy, "descripcion": descripcion,
                    "ciudad_evento": ciudad_evento, "sucursal": sucursal}
-            if tipo == "factura":
-                r = analyze_factura(file_bytes, fecha_ocurrencia=fecha_hoy)
-            elif tipo == "imagen_dano":
-                r = analyze_imagen_dano(file_bytes, descripcion)
-            elif tipo == "parte_policial":
-                r = analyze_parte_policial(file_bytes, contexto_siniestro=ctx)
-            elif tipo == "declaracion_accidente":
-                r = analyze_declaracion_accidente(file_bytes, contexto_siniestro=ctx)
+
+            # Análisis principal + forensia visual corren en paralelo (cada uno en thread
+            # porque los SDKs de Azure son síncronos bloqueantes).
+            is_pdf = tipo != "imagen_dano" and (filename or "").lower().endswith(".pdf")
+            analysis_task = asyncio.to_thread(_run_analyzer, file_bytes, tipo, ctx)
+            if is_pdf:
+                forensia_task = asyncio.to_thread(analyze_visual_forensics, file_bytes, tipo)
+                r, forensia_result = await asyncio.gather(
+                    analysis_task, forensia_task, return_exceptions=True,
+                )
             else:
-                r = analyze_documento_generico(file_bytes, tipo=tipo, contexto_siniestro=ctx)
+                r = await analysis_task
+                forensia_result = None
+
+            if isinstance(r, Exception):
+                raise r
+
             d = r.to_dict()
             d["_etiqueta"] = name
-            d["_nombre_archivo"] = file.filename
+            d["_nombre_archivo"] = filename
 
             # ===== Forensia visual SOLO para PDFs (no para imagenes de daño que ya van por vision) =====
-            if tipo != "imagen_dano" and (file.filename or "").lower().endswith(".pdf"):
-                try:
-                    forensia = analyze_visual_forensics(file_bytes, tipo=tipo)
-                    f = forensia.to_dict()
-                    visual_incs = f.get("inconsistencias") or []
-                    if visual_incs:
-                        # Mergear inconsistencias visuales al doc principal
-                        for inc in visual_incs:
-                            inc["origen"] = "forensia_visual"
-                        d["inconsistencias"] = list(d.get("inconsistencias") or []) + visual_incs
-                        # Subir score si la forensia detecto algo importante
-                        d["score_doc"] = max(int(d.get("score_doc") or 0), int(f.get("score_doc") or 0))
-                        # Si la forensia es ROJO, el doc completo es ROJO
-                        if f.get("nivel_riesgo_doc") == "ROJO":
-                            d["nivel_riesgo_doc"] = "ROJO"
-                        # Anotar las observaciones visuales para el informe
-                        d.setdefault("forensia_visual", {})
-                        d["forensia_visual"]["documento_parece_autentico"] = f.get("extracted_fields", {}).get("documento_parece_autentico")
-                        d["forensia_visual"]["observaciones"] = f.get("extracted_fields", {}).get("observaciones_visuales", [])
-                        d["forensia_visual"]["score"] = f.get("score_doc")
-                        d["forensia_visual"]["nivel"] = f.get("nivel_riesgo_doc")
-                        d["forensia_visual"]["explicacion"] = f.get("explicacion", "")
-                except Exception as ef:
-                    log.warning("forensia visual %s fallo: %s", name, ef)
+            if is_pdf:
+                if isinstance(forensia_result, Exception):
+                    log.warning("forensia visual %s fallo: %s", name, forensia_result)
+                elif forensia_result is not None:
+                    try:
+                        f = forensia_result.to_dict()
+                        visual_incs = f.get("inconsistencias") or []
+                        if visual_incs:
+                            # Mergear inconsistencias visuales al doc principal
+                            for inc in visual_incs:
+                                inc["origen"] = "forensia_visual"
+                            d["inconsistencias"] = list(d.get("inconsistencias") or []) + visual_incs
+                            # Subir score si la forensia detecto algo importante
+                            d["score_doc"] = max(int(d.get("score_doc") or 0), int(f.get("score_doc") or 0))
+                            # Si la forensia es ROJO, el doc completo es ROJO
+                            if f.get("nivel_riesgo_doc") == "ROJO":
+                                d["nivel_riesgo_doc"] = "ROJO"
+                            # Anotar las observaciones visuales para el informe
+                            d.setdefault("forensia_visual", {})
+                            d["forensia_visual"]["documento_parece_autentico"] = f.get("extracted_fields", {}).get("documento_parece_autentico")
+                            d["forensia_visual"]["observaciones"] = f.get("extracted_fields", {}).get("observaciones_visuales", [])
+                            d["forensia_visual"]["score"] = f.get("score_doc")
+                            d["forensia_visual"]["nivel"] = f.get("nivel_riesgo_doc")
+                            d["forensia_visual"]["explicacion"] = f.get("explicacion", "")
+                    except Exception as ef:
+                        log.warning("forensia visual %s post-proceso fallo: %s", name, ef)
 
-            docs_analizados.append(d)
+            return d
         except Exception as e:
             log.warning("analisis %s fallo: %s", name, e)
-            docs_analizados.append({
+            return {
                 "_etiqueta": name,
-                "_nombre_archivo": file.filename if file else "—",
+                "_nombre_archivo": filename,
                 "error": f"{type(e).__name__}: {e}",
                 "score_doc": 0,
                 "nivel_riesgo_doc": "VERDE",
                 "inconsistencias": [],
                 "explicacion": "No se pudo analizar el documento.",
-            })
+            }
 
-    await _safe_analyze("Factura del taller", factura, "factura")
-    await _safe_analyze("Foto del dano", foto_dano, "imagen_dano")
-    await _safe_analyze("Parte policial", parte_policial_file, "parte_policial")
-    await _safe_analyze("Denuncia", denuncia_file, "denuncia")
-    await _safe_analyze("Declaracion de accidente", declaracion_accidente_file, "declaracion_accidente")
+    # Los 5 documentos se analizan en paralelo (antes era secuencial → 60-100s,
+    # ahora ~max de los docs ≈ 15-25s).
+    _results = await asyncio.gather(
+        _safe_analyze("Factura del taller", factura, "factura"),
+        _safe_analyze("Foto del dano", foto_dano, "imagen_dano"),
+        _safe_analyze("Parte policial", parte_policial_file, "parte_policial"),
+        _safe_analyze("Denuncia", denuncia_file, "denuncia"),
+        _safe_analyze("Declaracion de accidente", declaracion_accidente_file, "declaracion_accidente"),
+    )
+    docs_analizados = [d for d in _results if d is not None]
 
     # ===== 3) Score combinado — PONDERADO POR SEVERIDAD =====
     score_tabular = int(eval_tabular.get("score", 0))

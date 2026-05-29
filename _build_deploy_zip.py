@@ -6,7 +6,11 @@ EXCLUDE_DIRS = {
     ".mypy_cache", "notebooks", "tests", ".vscode", ".idea",
     ".venv", "venv", "node_modules",
 }
+# Importante: NO excluimos "data/Data set documentos evento/" porque sus PDFs
+# se sirven via /demo-docs/{tipo}/{filename} para el preset "SIN-0022 con factura
+# + parte" en la pantalla Evaluar. ~25MB extra en el deploy, vale la pena.
 EXCLUDE_PREFIXES = ("data/raw/", "data/synthetic/docs_demo/")
+EXCLUDE_BIG_FILES = {"data/processed/embeddings_descripciones.npz"}
 EXCLUDE_PATTERNS = ["*.pyc", "*.log", "*.swp", "*.zip"]
 EXCLUDE_FILES = {
     ".env", ".env.example", ".gitignore", ".deployignore",
@@ -29,6 +33,8 @@ def should_exclude(rel: str) -> bool:
     for pref in EXCLUDE_PREFIXES:
         if rel.startswith(pref):
             return True
+    if rel in EXCLUDE_BIG_FILES:
+        return True
     return False
 
 

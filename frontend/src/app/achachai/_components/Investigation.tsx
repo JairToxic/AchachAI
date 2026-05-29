@@ -2,7 +2,9 @@
 // @ts-nocheck
 import { useEffect, useRef, useState } from 'react';
 import { Condor, VueloDelCondor } from './Condor';
+import { CondorTeacher } from './CondorTeacher';
 import { RiskScore } from './RiskScore';
+import { getRuleExplain, getSignalExplain, type RuleExplain } from './rulesCatalog';
 import {
   FaArrowLeft,
   FaUserCircle,
@@ -31,9 +33,7 @@ import {
    MODO INVESTIGACIÓN PROFUNDA — datos REALES del backend
    ============================================================ */
 
-const API =
-  (typeof window !== 'undefined' && (window as any).NEXT_PUBLIC_API_URL) ||
-  'http://localhost:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const NIVEL_TONE: Record<string, 'red' | 'amber' | 'wing'> = {
   ROJO: 'red',
@@ -51,6 +51,92 @@ function shortFecha(s?: string | null) {
   return String(s).slice(0, 10);
 }
 
+/**
+ * Panel expandible con la explicación humana de una regla o señal.
+ * Diseñado para que cualquier analista (no técnico) entienda qué se detectó,
+ * por qué importa y qué hacer.
+ */
+function ExplainPanel({
+  open,
+  data,
+  tone = 'red',
+}: {
+  open: boolean;
+  data: RuleExplain | null;
+  tone?: 'red' | 'amber';
+}) {
+  if (!open || !data) return null;
+  const accent = tone === 'red' ? 'rgba(197,51,58,0.18)' : 'rgba(218,165,32,0.22)';
+  const accentText = tone === 'red' ? 'var(--rojo, #c5333a)' : 'var(--amber-strong, #b8860b)';
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        padding: 12,
+        background: 'var(--marfil-paper, #fbf7f0)',
+        border: `1px solid ${accent}`,
+        borderRadius: 8,
+        display: 'grid',
+        gap: 10,
+        fontSize: 12,
+        lineHeight: 1.5,
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: '.12em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-mute)',
+            marginBottom: 3,
+            fontWeight: 700,
+          }}
+        >
+          ¿Qué busca esta regla?
+        </div>
+        <div style={{ color: 'var(--ink, #1a1a1a)' }}>{data.descripcion}</div>
+      </div>
+      <div>
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: '.12em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-mute)',
+            marginBottom: 3,
+            fontWeight: 700,
+          }}
+        >
+          ¿Por qué importa?
+        </div>
+        <div style={{ color: accentText, fontWeight: 500 }}>{data.porQueImporta}</div>
+      </div>
+      <div>
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: '.12em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-mute)',
+            marginBottom: 3,
+            fontWeight: 700,
+          }}
+        >
+          ¿Qué hacer ahora?
+        </div>
+        <ol style={{ margin: 0, paddingLeft: 18, color: 'var(--ink, #1a1a1a)' }}>
+          {data.queHacer.map((paso, i) => (
+            <li key={i} style={{ marginBottom: 2 }}>
+              {paso}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 /* ============================================================ */
 
 export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegurado }: any) {
@@ -62,7 +148,13 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
   const [step, setStep] = useState(-1);
   const [running, setRunning] = useState(false);
   const [committee, setCommittee] = useState(false);
+  // Acordeón: trackea qué reglas/señales tienen el detalle expandido.
+  // Key: "RULE:RF-02" o "SIGNAL:11"
+  const [openExplain, setOpenExplain] = useState<Record<string, boolean>>({});
   const logRef = useRef<HTMLDivElement>(null);
+
+  const toggleExplain = (key: string) =>
+    setOpenExplain((prev) => ({ ...prev, [key]: !prev[key] }));
 
   // Fetch real data when caseId changes
   useEffect(() => {
@@ -388,6 +480,33 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
             </span>
           </h2>
         </div>
+        <CondorTeacher
+          screen={`investigation-${sid}`}
+          title="¿Te explico este caso paso a paso?"
+          hook={`${sid} · score ${score}/100 · nivel ${nivel}. Recorremos la bitácora juntos.`}
+          contextPrompt={`Estoy en el "Modo Investigación Profunda" del caso ${sid} en el sistema AchachAI.
+
+DATOS DEL CASO:
+- Score: ${score}/100
+- Nivel: ${nivel}
+- Cobertura: ${cob}
+- Ciudad: ${ciudad}
+- Reglas críticas activadas: ${reglas.length} (${reglas.map((r: any) => r.codigo).join(', ') || 'ninguna'})
+- Señales activadas: ${senales.length}
+- Documentos analizados: ${detail?.n_documentos || 0}
+
+La pantalla muestra una "bitácora del cóndor" con 8 pasos del análisis: recuperar datos → calcular score → aplicar reglas → evaluar señales → auditar documentos → buscar narrativas similares → analizar red de proveedores → informe ejecutivo.
+
+Por favor recorreme este caso específico paso a paso:
+1. ¿Cuál es el "titular" del caso en 1 frase?
+2. Para cada regla crítica activada, ¿qué significa y qué evidencia se citó?
+3. ¿Qué señales agregaron más puntos y por qué?
+4. ¿Hay algo en este caso que NO te cuadre o que pediría revisar manualmente?
+5. ¿Qué decisión recomendarías al analista (liquidar / retener / escalar / bloquear) y por qué?
+
+Tono amigable, latinoamericano neutro (sin "vos"). Sin acusar al asegurado. Al final dame el "telegram para el comité antifraude" en 3 líneas.`}
+          position="tr"
+        />
         <RiskScore score={score} variant="md" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {detail?.siniestro?.id_asegurado && onVerAsegurado && (
@@ -653,39 +772,71 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
                     Reglas críticas (RF-01..07)
                   </div>
                   <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
-                    {reglas.map((r: any) => (
-                      <div
-                        key={r.codigo}
-                        style={{
-                          display: 'flex',
-                          gap: 10,
-                          padding: '8px 12px',
-                          background: 'rgba(197,51,58,0.06)',
-                          borderRadius: 8,
-                          border: '1px solid rgba(197,51,58,0.18)',
-                        }}
-                      >
-                        <span className="mono chip red" style={{ fontSize: 10 }}>
-                          {r.codigo}
-                        </span>
-                        <div style={{ flex: 1, fontSize: 12.5 }}>
-                          <div style={{ fontWeight: 600 }}>{r.nombre}</div>
-                          {r.evidencia && (
-                            <div style={{ fontSize: 11, color: 'var(--ink-mute)' }}>{r.evidencia}</div>
-                          )}
-                          {r.clasificacion && (
-                            <span
-                              className={`chip mono ${
-                                r.clasificacion === 'ROJO' ? 'red' : 'amber'
-                              }`}
-                              style={{ fontSize: 9, marginTop: 4, display: 'inline-block' }}
-                            >
-                              fuerza {r.clasificacion}
+                    {reglas.map((r: any) => {
+                      const key = `RULE:${r.codigo}`;
+                      const isOpen = !!openExplain[key];
+                      const explain = getRuleExplain(r.codigo);
+                      return (
+                        <div
+                          key={r.codigo}
+                          style={{
+                            padding: '8px 12px',
+                            background: 'rgba(197,51,58,0.06)',
+                            borderRadius: 8,
+                            border: '1px solid rgba(197,51,58,0.18)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', gap: 10 }}>
+                            <span className="mono chip red" style={{ fontSize: 10 }}>
+                              {r.codigo}
                             </span>
-                          )}
+                            <div style={{ flex: 1, fontSize: 12.5 }}>
+                              <div style={{ fontWeight: 600 }}>{r.nombre}</div>
+                              {r.evidencia && (
+                                <div style={{ fontSize: 11, color: 'var(--ink-mute)' }}>{r.evidencia}</div>
+                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                                {r.clasificacion && (
+                                  <span
+                                    className={`chip mono ${
+                                      r.clasificacion === 'ROJO' ? 'red' : 'amber'
+                                    }`}
+                                    style={{ fontSize: 9, display: 'inline-block' }}
+                                  >
+                                    fuerza {r.clasificacion}
+                                  </span>
+                                )}
+                                {explain && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleExplain(key)}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      padding: 0,
+                                      color: 'var(--rojo, #c5333a)',
+                                      cursor: 'pointer',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      textDecoration: 'underline',
+                                      textUnderlineOffset: 2,
+                                    }}
+                                    aria-expanded={isOpen}
+                                  >
+                                    {isOpen ? 'Ocultar detalle ▲' : '¿Qué significa? ▼'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <ExplainPanel
+                            open={isOpen}
+                            data={explain}
+                            tone={r.clasificacion === 'AMARILLO' ? 'amber' : 'red'}
+                          />
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
@@ -695,36 +846,59 @@ export function InvestigationScreen({ caseId = 'SIN-100029', onBack, onVerAsegur
                     Señales ponderadas (1..14)
                   </div>
                   <div style={{ display: 'grid', gap: 6 }}>
-                    {senales.map((s: any) => (
-                      <div
-                        key={s.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                          padding: '6px 12px',
-                          background: 'var(--marfil-paper)',
-                          borderRadius: 8,
-                          border: '1px solid var(--line)',
-                        }}
-                      >
-                        <span className="mono" style={{ fontSize: 10, color: 'var(--ink-mute)' }}>
-                          S{s.id}
-                        </span>
-                        <div style={{ flex: 1, fontSize: 12.5 }}>
-                          {s.nombre}
-                          {s.evidencia && (
-                            <div style={{ fontSize: 10.5, color: 'var(--ink-mute)' }}>{s.evidencia}</div>
-                          )}
-                        </div>
-                        <span
-                          className="chip amber mono"
-                          style={{ fontSize: 10 }}
+                    {senales.map((s: any) => {
+                      const key = `SIGNAL:${s.id}`;
+                      const isOpen = !!openExplain[key];
+                      const explain = getSignalExplain(s.id);
+                      return (
+                        <div
+                          key={s.id}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'var(--marfil-paper)',
+                            borderRadius: 8,
+                            border: '1px solid var(--line)',
+                          }}
                         >
-                          +{s.puntos}
-                        </span>
-                      </div>
-                    ))}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-mute)' }}>
+                              S{s.id}
+                            </span>
+                            <div style={{ flex: 1, fontSize: 12.5 }}>
+                              {s.nombre}
+                              {s.evidencia && (
+                                <div style={{ fontSize: 10.5, color: 'var(--ink-mute)' }}>{s.evidencia}</div>
+                              )}
+                              {explain && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExplain(key)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    padding: 0,
+                                    color: 'var(--amber-strong, #b8860b)',
+                                    cursor: 'pointer',
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    textDecoration: 'underline',
+                                    textUnderlineOffset: 2,
+                                    marginTop: 2,
+                                  }}
+                                  aria-expanded={isOpen}
+                                >
+                                  {isOpen ? 'Ocultar detalle ▲' : '¿Qué significa? ▼'}
+                                </button>
+                              )}
+                            </div>
+                            <span className="chip amber mono" style={{ fontSize: 10 }}>
+                              +{s.puntos}
+                            </span>
+                          </div>
+                          <ExplainPanel open={isOpen} data={explain} tone="amber" />
+                        </div>
+                      );
+                    })}
                   </div>
                 </>
               )}

@@ -68,6 +68,10 @@ backups/**/embeddings_descripciones.npz
 backend_deploy.zip
 *_deploy.zip
 
+# --- Zips de datos/build pesados (regenerables; superan el limite de 100MB de GitHub) ---
+data.zip
+*.zip
+
 # --- Otros datos pesados regenerables (mantenemos similitudes.parquet que es chico) ---
 data/processed/features.parquet
 data/processed/siniestros_clean.csv

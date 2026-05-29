@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { BriefingJarvis } from './BriefingJarvis';
 import { Condor, VueloDelCondor } from './Condor';
 import { CondorLogo } from './CondorLogo';
+import { CondorTeacher } from './CondorTeacher';
 import { EmptyState } from './EmptyState';
 import {
   FaSearch,
@@ -86,11 +88,13 @@ export const KANBAN_DATA = {
 export function KanbanScreen({ onInvestigate }) {
   // Iniciamos VACIO para no mostrar datos hardcoded mientras el backend responde.
   const [liveData, setLiveData] = useSc({ rojo: [], amarillo: [], verde: [] });
+  // Totales disponibles por nivel (para mostrar "mostrando 25 de N")
+  const [disponibles, setDisponibles] = useSc({ rojo: 0, amarillo: 0, verde: 0 });
   const [loading, setLoading] = useSc(true);
   const [loadErr, setLoadErr] = useSc(null);
   const [sucursales, setSucursales] = useSc<any[]>([]);
   const [filtroSucursal, setFiltroSucursal] = useSc<string>("");  // "" = todas
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Cargar lista de sucursales una vez
   useScE(() => {
@@ -103,44 +107,37 @@ export function KanbanScreen({ onInvestigate }) {
   useScE(() => {
     setLoading(true);
     setLoadErr(null);
-    fetch(`${API}/top-riesgo?limit=40`)
+    // El filtro por ciudad/sucursal se aplica en el BACKEND, sobre todo el
+    // universo evaluado — asi al elegir "Quito" ves TODOS los casos de Quito,
+    // no solo los que entraban en el top global.
+    const ciudadQS = filtroSucursal ? `&ciudad=${encodeURIComponent(filtroSucursal)}` : "";
+    fetch(`${API}/top-riesgo?limit=80${ciudadQS}`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then(data => {
-        const buckets = { rojo: [], amarillo: [], verde: [] };
-        for (const c of data.top || []) {
-          // Filtro de sucursal en cliente (el backend evalua todo y filtramos arriba).
-          // Nota: el endpoint /top-riesgo NO devuelve sucursal; usamos ciudad como proxy
-          // que comparte nombre con la sucursal en la mayoria de casos.
-          if (filtroSucursal && c.ciudad && !c.ciudad.toLowerCase().includes(filtroSucursal.toLowerCase())) {
-            continue;
-          }
-          const key = c.nivel === "ROJO" ? "rojo" : c.nivel === "AMARILLO" ? "amarillo" : "verde";
-          if (buckets[key].length < 8) {
-            buckets[key].push({
-              id: c.id_siniestro,
-              score: c.score,
-              monto: `$${(c.monto_reclamado_usd || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`,
-              ciudad: c.ciudad || "—",
-              cobertura: c.cobertura,
-              reglas: c.reglas_disparadas || [],
-              prov: c.id_proveedor || "—",
-            });
-          }
-        }
-        if (buckets.verde.length === 0 && !filtroSucursal) {
-          return fetch(`${API}/casos?limit=3`).then(r => r.json()).then(d => {
-            buckets.verde = (d.items || []).slice(0, 3).map(s => ({
-              id: s.id_siniestro, score: 18,
-              monto: `$${(s.monto_reclamado_usd || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`,
-              ciudad: s.ciudad_evento, cobertura: s.cobertura, reglas: [], prov: "—",
-            }));
-            setLiveData(buckets);
-            setLoading(false);
-          });
-        }
+        const MAX_POR_COLUMNA = 25;
+        const mapCaso = (c: any) => ({
+          id: c.id_siniestro,
+          score: c.score,
+          monto: `$${(c.monto_reclamado_usd || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`,
+          ciudad: c.ciudad || "—",
+          cobertura: c.cobertura,
+          reglas: c.reglas_disparadas || [],
+          prov: c.id_proveedor || "—",
+        });
+        const top = data.top || [];
+        const buckets = {
+          rojo: top.filter((c: any) => c.nivel === "ROJO").slice(0, MAX_POR_COLUMNA).map(mapCaso),
+          amarillo: top.filter((c: any) => c.nivel === "AMARILLO").slice(0, MAX_POR_COLUMNA).map(mapCaso),
+          verde: (data.verdes || []).slice(0, MAX_POR_COLUMNA).map(mapCaso),
+        };
+        setDisponibles({
+          rojo: data.n_rojos_disponibles ?? buckets.rojo.length,
+          amarillo: data.n_amarillos_disponibles ?? buckets.amarillo.length,
+          verde: data.n_verdes_disponibles ?? buckets.verde.length,
+        });
         setLiveData(buckets);
         setLoading(false);
       })
@@ -150,16 +147,43 @@ export function KanbanScreen({ onInvestigate }) {
       });
   }, [filtroSucursal]);
 
+  // Prompt contextual para Bandeja
+  const nRojo = liveData.rojo.length;
+  const nAmarillo = liveData.amarillo.length;
+  const nVerde = liveData.verde.length;
+  const teacherPromptKanban = `Estoy en la pantalla "Bandeja priorizada" del sistema AchachAI. Es la cola de trabajo del analista antifraude: muestra los siniestros agrupados por nivel de riesgo en 3 carriles (rojo, amarillo, verde) según el score 0-100 que combina las 7 reglas críticas del manual + 14 señales + el modelo XGBoost.
+
+DATOS QUE ESTOY VIENDO:
+- Riesgo alto (ROJO): ${nRojo} caso(s)
+- Riesgo medio (AMARILLO): ${nAmarillo} caso(s)
+- Riesgo bajo (VERDE): ${nVerde} caso(s)
+${liveData.rojo[0] ? `- Top caso recomendado: ${liveData.rojo[0].id} con score ${liveData.rojo[0].score} (${liveData.rojo[0].cobertura} · ${liveData.rojo[0].ciudad})` : ''}
+
+Por favor explicame:
+1. ¿Cómo se calcula el score y por qué los rangos son 0-40 verde, 41-75 amarillo, 76-100 rojo?
+2. ¿Qué pasos seguir con los ROJOS vs AMARILLOS vs VERDES?
+3. ¿Cómo priorizar cuando hay muchos rojos? ¿Por monto, por antigüedad de póliza?
+4. ¿Cuándo bajar un caso del rojo al amarillo manualmente?
+
+Tono amigable, latinoamericano neutro (sin "vos"). Al final dame UNA acción prioritaria con id concreto.`;
+
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--marfil)" }}>
       {/* header */}
-      <div style={{ padding: "20px 32px 16px", borderBottom: "1px solid var(--line)" }}>
+      <div style={{ padding: "20px 32px 16px", borderBottom: "1px solid var(--line)", position: 'relative' }}>
+        <CondorTeacher
+          screen="kanban"
+          title="¿Te explico la bandeja priorizada?"
+          hook={`${nRojo} rojos, ${nAmarillo} amarillos, ${nVerde} verdes. Te explico cómo priorizar.`}
+          contextPrompt={teacherPromptKanban}
+          position="tr"
+        />
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <CondorLogo size={32} />
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: 22 }}>
               Bandeja priorizada
-              {loading && <span style={{ fontSize: 11, color: "var(--andes-orange)", marginLeft: 8 }}>● el cóndor está evaluando los 15K siniestros…</span>}
+              {loading && <span style={{ fontSize: 11, color: "var(--andes-orange)", marginLeft: 8 }}>● el cóndor está evaluando los 40.000 siniestros multi-ramo…</span>}
               {loadErr && <span style={{ fontSize: 11, color: "var(--danger)", marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 4 }}><FaExclamationTriangle size={11} /> backend caído ({loadErr})</span>}
             </h2>
             <div style={{ fontSize: 12, color: "var(--ink-mute)" }}>
@@ -214,6 +238,7 @@ export function KanbanScreen({ onInvestigate }) {
           subtitle="Revisión inmediata"
           tone="red"
           items={liveData.rojo}
+          total={disponibles.rojo}
           onInvestigate={onInvestigate}
         />
         <KanbanColumn
@@ -221,6 +246,7 @@ export function KanbanScreen({ onInvestigate }) {
           subtitle="Requiere revisión"
           tone="amber"
           items={liveData.amarillo}
+          total={disponibles.amarillo}
           onInvestigate={onInvestigate}
         />
         <KanbanColumn
@@ -228,6 +254,7 @@ export function KanbanScreen({ onInvestigate }) {
           subtitle="Pasar a trámite normal"
           tone="green"
           items={liveData.verde}
+          total={disponibles.verde}
           onInvestigate={onInvestigate}
         />
       </div>
@@ -235,8 +262,10 @@ export function KanbanScreen({ onInvestigate }) {
   );
 }
 
-function KanbanColumn({ title, subtitle, tone, items, onInvestigate }) {
+function KanbanColumn({ title, subtitle, tone, items, total, onInvestigate }) {
   const accent = { red: "var(--danger)", amber: "var(--warning)", green: "var(--success)" }[tone];
+  const totalReal = typeof total === "number" && total > items.length ? total : items.length;
+  const hayMas = totalReal > items.length;
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
       <div style={{
@@ -246,9 +275,12 @@ function KanbanColumn({ title, subtitle, tone, items, onInvestigate }) {
       }}>
         <div>
           <div className="display" style={{ fontSize: 13, fontWeight: 700, color: accent }}>{title}</div>
-          <div style={{ fontSize: 10.5, color: "var(--text-secondary)" }}>{subtitle}</div>
+          <div style={{ fontSize: 10.5, color: "var(--text-secondary)" }}>
+            {subtitle}
+            {hayMas && <> · mostrando los {items.length} de mayor score</>}
+          </div>
         </div>
-        <span className="chip" style={{ fontSize: 11, background: 'var(--bg-subtle)' }}>{items.length}</span>
+        <span className="chip" style={{ fontSize: 11, background: 'var(--bg-subtle)', fontWeight: 600 }}>{totalReal}</span>
       </div>
       <div style={{
         flex: 1, padding: 10, overflow: "auto",
@@ -310,7 +342,7 @@ export function DocumentsScreen({ onInvestigate }: any = {}) {
   const [vincularSin, setVincularSin] = useSc<string>("");
   const [casoCtx, setCasoCtx] = useSc<any>(null);
   const fileInputRef = useScR<any>(null);
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   function trigger() {
     if (fileInputRef.current) fileInputRef.current.click();
@@ -377,8 +409,35 @@ export function DocumentsScreen({ onInvestigate }: any = {}) {
     }
   }
 
+  const teacherPromptDocs = `Estoy en la pantalla "Analizar documento" del sistema AchachAI. Esta pantalla usa Azure Document Intelligence (OCR estructural) + GPT-4o Vision (forensia visual) para analizar PDFs y fotos: facturas, partes policiales, declaraciones de accidente, fotos del daño.
+
+Detecta automáticamente:
+- Falsificación documental (factura emitida ANTES del evento → RF-02)
+- Inconsistencias aritméticas (total ≠ subtotal + impuestos)
+- Documentos sin RUC o sin número
+- Cambios de tipografía / texto sobrepuesto (forensia visual)
+- Firmas alteradas, marcas de agua sospechosas
+- Relato formulaico / lenguaje no espontáneo
+- Documentos sintéticos / generados por IA
+
+Por favor explicame:
+1. ¿Qué es Azure Document Intelligence y qué diferencia tiene con un OCR común?
+2. ¿Cómo combina los datos del documento con los del siniestro (id_siniestro a vincular)?
+3. ¿Qué tipos de documento debo subir y cuál es más útil para cada cobertura?
+4. ¿Qué hace la forensia visual con GPT-4o? Dame 2 ejemplos de cosas que detecta y que el ojo humano podría pasar por alto.
+5. ¿Qué pasa si el documento es legítimo? ¿Cómo me lo dice?
+
+Tono amigable, latinoamericano neutro (sin "vos"). Al final dame 3 buenas prácticas para subir documentos.`;
+
   return (
-    <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)", padding: 32 }}>
+    <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)", padding: 32, position: 'relative' }}>
+      <CondorTeacher
+        screen="documents"
+        title="¿Te explico cómo funciona el escáner?"
+        hook="Document Intelligence + GPT-4o Vision. Detecto falsificación que el ojo no ve."
+        contextPrompt={teacherPromptDocs}
+        position="tr"
+      />
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
         <CondorLogo size={36} />
         <div>
@@ -663,7 +722,7 @@ export const TEJIDO_PHASES = [
 ];
 
 export function TejidoScreen({ onInvestigate, onVerAsegurado }: any = {}) {
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [red, setRed] = useSc<any>(null);
   const [loading, setLoading] = useSc(true);
   const [minSiniestros, setMinSiniestros] = useSc(5);
@@ -706,6 +765,31 @@ export function TejidoScreen({ onInvestigate, onVerAsegurado }: any = {}) {
   const clusterSeleccionado = selProv ? provClusters.find((p: any) => p.id === selProv) : null;
   const asegInSel = new Set(clusterSeleccionado?.asegurados || []);
 
+  // Prompt contextual rico para el Cóndor Profesor: incluye los datos REALES
+  // visibles en pantalla para que GPT-5-mini explique exactamente lo que el
+  // usuario está viendo (no algo genérico).
+  const tieneRed = !!red;
+  const top3 = provClusters.slice(0, 3);
+  const teacherPrompt = tieneRed
+    ? `Estoy en la pantalla "Red de relaciones" del sistema AchachAI. Es un grafo bipartito que cruza ASEGURADOS (izquierda, azules) con PROVEEDORES (derecha). El objetivo es detectar redes organizadas de fraude: si un solo proveedor concentra muchos asegurados distintos, eso es sospechoso.
+
+DATOS QUE ESTOY VIENDO AHORA MISMO:
+- Proveedores en el grafo: ${providers.length}
+- Asegurados conectados: ${insureds.length}
+- Relaciones detectadas: ${edges.length}
+- Cluster más grande: ${topCluster ? `${topCluster.n_asegurados_conectados} asegurados sobre ${topCluster.id} (${topCluster.nombre || ''})` : 'sin datos'}
+- Top 3 proveedores por concentración:
+${top3.map((p: any, i: number) => `  ${i + 1}. ${p.id} ${p.nombre ? `(${p.nombre})` : ''}: ${p.n_asegurados_conectados} asegurados recurrentes · ${p.n_casos_compartidos || p.n} casos`).join('\n')}
+
+Por favor explicame esta pantalla como si fuera mi primera vez:
+1. ¿Qué es un grafo bipartito y por qué sirve para detectar fraude?
+2. ¿Cómo leo los números en pantalla (proveedores, asegurados, conexiones)?
+3. ¿Qué pasa con el top 1 — ${topCluster?.id || 'el proveedor más conectado'}? ¿Es preocupante? ¿Por qué?
+4. ¿Qué tres pasos concretos debería tomar AHORA con esta información?
+
+Hablame en tono amigable, latinoamericano neutro (sin "vos"), claro, con ejemplos. No uses jerga técnica innecesaria. Al final dame UNA acción prioritaria con un id_siniestro o id_proveedor concreto que debería revisar.`
+    : `Estoy en la pantalla "Red de relaciones" pero los datos aún no cargaron. Explicame para qué sirve esta pantalla, qué es un grafo bipartito asegurados ↔ proveedores y cómo se usa para detectar redes organizadas de fraude.`;
+
   return (
     <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)" }}>
       {/* HEADER */}
@@ -713,7 +797,19 @@ export function TejidoScreen({ onInvestigate, onVerAsegurado }: any = {}) {
         padding: "20px 32px", borderBottom: "1px solid var(--line)",
         background: "linear-gradient(180deg, rgba(232,122,79,0.06), transparent)",
         display: "flex", alignItems: "center", gap: 14,
+        position: 'relative',
       }}>
+        {/* Cóndor Profesor flotante en la esquina derecha del header */}
+        <CondorTeacher
+          screen="red-relaciones"
+          title="¿Querés que te explique esta red?"
+          hook={tieneRed
+            ? `${providers.length} proveedores, ${edges.length} conexiones, cluster top de ${topCluster?.n_asegurados_conectados || '?'} asegurados. Te lo desarmo paso a paso.`
+            : 'Te explico para qué sirve este grafo y cómo leerlo.'}
+          contextPrompt={teacherPrompt}
+          position="tr"
+        />
+
         <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
           <FaNetworkWired size={20} />
         </div>
@@ -1185,7 +1281,7 @@ function TejidoCanvas({ phase }) {
    REPORTS — CU-06
    ============================================================ */
 export function ReportsScreen() {
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [kpis, setKpis] = useSc<any>(null);
   const [topCasos, setTopCasos] = useSc<any[]>([]);
   const [resumen, setResumen] = useSc<any>(null);
@@ -1273,6 +1369,30 @@ export function ReportsScreen() {
         background: "var(--bg-card)",
         borderBottom: "1px solid var(--border-color)",
       }}>
+        <CondorTeacher
+          screen="reports"
+          title="¿Te explico el centro de reportes?"
+          hook="4 tipos: ejecutivo, antifraude, auditoría, directorio. Cada uno con firma digital."
+          contextPrompt={`Estoy en el "Centro de reportes" del sistema AchachAI. Esta pantalla genera reportes con datos en vivo + síntesis del cóndor (GPT-5-mini) + hash de firma digital + listos para PDF.
+
+DATOS QUE ESTOY VIENDO:
+- Cartera vigilada: ${totalSin ? totalSin.toLocaleString("en-US") : '?'} siniestros
+- Alertas históricas: ${fraudes ? fraudes.toLocaleString("en-US") : '?'}
+- Monto USD total: $${monto ? Math.round(monto/1000).toLocaleString("en-US") + 'K' : '?'}
+- Documentos inconsistentes: ${docsInc ? docsInc.toLocaleString("en-US") : '?'}
+- Reportes recientes generados: ${recientes.length}
+- Tipo seleccionado actualmente: ${tipoSel}
+- Nivel filtro: ${nivelSel}
+
+Por favor explicame:
+1. ¿Qué diferencia hay entre los 4 tipos de reporte (ejecutivo, antifraude, auditoría, directorio) y para quién es cada uno?
+2. ¿Qué incluye el "hash de firma digital" y para qué sirve en auditoría?
+3. Si tengo que enviar un reporte al regulador (SBS Ecuador), ¿cuál uso?
+4. ¿Cómo armo un reporte mensual ejecutivo en 3 pasos?
+
+Tono amigable, latinoamericano neutro (sin "vos"). Al final dame UNA recomendación: ¿qué reporte debería generar HOY basado en los datos que tengo?`}
+          position="tr"
+        />
         <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 16 }}>
           <CondorLogo size={48} />
           <div style={{ flex: 1 }}>
@@ -1465,15 +1585,29 @@ export function ReportsScreen() {
         </div>
       )}
 
-      {/* === Botón síntesis GPT === */}
-      <div style={{ padding: "20px 32px 0", textAlign: "center" }}>
-        <button className="btn" onClick={generarResumen} disabled={loadingResumen}
-          style={{ fontSize: 13, padding: "10px 18px" }}>
-          <FaBrain size={13} /> {loadingResumen ? "Redactando síntesis con GPT…" : "Pedir síntesis ejecutiva en vivo"}
-        </button>
-      </div>
+      {/* === Briefing Jarvis (estilo HUD interactivo) — solo para Resumen Ejecutivo === */}
+      {tipoSel === "ejecutivo" && (
+        <div style={{ padding: "24px 32px 8px" }}>
+          <div className="diamond-divider" style={{ marginBottom: 14 }}>
+            Briefing del cóndor · en vivo + conversacional
+          </div>
+          <BriefingJarvis />
+        </div>
+      )}
 
       {/* === Vista previa del reporte (con síntesis GPT cuando está disponible) === */}
+      {tipoSel !== "ejecutivo" && (
+        <>
+          {/* Botón síntesis GPT (legacy, no-streaming) — para tipos que aún no migraron */}
+          <div style={{ padding: "20px 32px 0", textAlign: "center" }}>
+            <button className="btn" onClick={generarResumen} disabled={loadingResumen}
+              style={{ fontSize: 13, padding: "10px 18px" }}>
+              <FaBrain size={13} /> {loadingResumen ? "Redactando síntesis con GPT…" : "Pedir síntesis ejecutiva en vivo"}
+            </button>
+          </div>
+        </>
+      )}
+      {tipoSel !== "ejecutivo" && (
       <div style={{ padding: "20px 32px 32px" }}>
         <div className="diamond-divider" style={{ marginBottom: 12 }}>Vista previa · cómo se ve el reporte</div>
 
@@ -1586,6 +1720,7 @@ export function ReportsScreen() {
         </div>
       </div>
     </div>
+    )}
     </div>
   );
 }
@@ -1670,7 +1805,7 @@ export function RolesScreen({ currentRole, onPick }) {
    (prueba de fuego literal del jurado)
    ============================================================ */
 export function EvaluarScreen({ onInvestigate }: any) {
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const [form, setForm] = useSc({
     cobertura: "Choque",
@@ -1800,7 +1935,24 @@ export function EvaluarScreen({ onInvestigate }: any) {
   }
 
   // Presets rapidos para que el jurado pruebe escenarios
+  // Si un preset trae `docs`, esos PDFs se descargan automaticamente del backend
+  // y se setean en los inputs de archivo. Asi el jurado no pierde tiempo subiendo.
   const PRESETS: Record<string, any> = {
+    "📄 SIN-0022 con factura + parte (real)": {
+      __values: {
+        cobertura: "Choque", monto_reclamado_usd: 10352, suma_asegurada_usd: 18000,
+        dias_desde_inicio_poliza: 17, dias_desde_fin_poliza: 348,
+        dias_entre_ocurrencia_reporte: 2, historial_siniestros_asegurado: 0,
+        documentos_completos: false, tuvo_parte_policial: true,
+        fault_responsable: true, estado: "Investigación",
+        ciudad_evento: "Quito", sucursal: "Quito",
+        descripcion: "Accidente múltiple de madrugada, daños en carrocería.",
+      },
+      __docs: {
+        factura: { tipo: "factura", filename: "Muestras_Facturas_Siniestros-SIN-0022.pdf" },
+        parte_policial: { tipo: "parte_policial", filename: "PP_SIN-0022_DOC-0054.pdf" },
+      },
+    },
     "Caso normal (verde)": {
       cobertura: "Choque", monto_reclamado_usd: 3000, dias_desde_inicio_poliza: 180,
       dias_desde_fin_poliza: 180, dias_entre_ocurrencia_reporte: 1,
@@ -1825,6 +1977,40 @@ export function EvaluarScreen({ onInvestigate }: any) {
     },
   };
 
+  // Estado para mostrar al usuario que se estan descargando los PDFs del preset
+  const [presetDescargando, setPresetDescargando] = useSc(false);
+
+  async function aplicarPreset(nombre: string, vals: any) {
+    // Compat: si el preset usa el nuevo formato con __values/__docs, los separamos
+    const formVals = vals.__values || vals;
+    const docs = vals.__docs;
+    setForm((f: any) => ({ ...f, ...formVals }));
+    setPresetSel(nombre);
+
+    // Si el preset trae docs, los descargamos del backend y los seteamos como File
+    if (docs) {
+      setPresetDescargando(true);
+      limpiarArchivos();
+      try {
+        const promesas = Object.entries(docs).map(async ([slot, info]: [string, any]) => {
+          const url = `${API}/demo-docs/${info.tipo}/${encodeURIComponent(info.filename)}`;
+          const r = await fetch(url);
+          if (!r.ok) throw new Error(`No pude bajar ${info.filename} (HTTP ${r.status})`);
+          const blob = await r.blob();
+          const file = new File([blob], info.filename, { type: "application/pdf" });
+          if (slot === "factura") setFactura(file);
+          else if (slot === "parte_policial") setPartePolicial(file);
+          else if (slot === "denuncia") setDenuncia(file);
+        });
+        await Promise.all(promesas);
+      } catch (e: any) {
+        setErr(`No pude pre-cargar los documentos del preset: ${e?.message || e}`);
+      } finally {
+        setPresetDescargando(false);
+      }
+    }
+  }
+
   // Detectamos si fue evaluacion combinada (con docs) o solo tabular
   const esCombinado = !!result?.evaluacion_tabular;
   const evalTab = esCombinado ? result.evaluacion_tabular : result;
@@ -1835,30 +2021,84 @@ export function EvaluarScreen({ onInvestigate }: any) {
                   : nivel === "VERDE" ? "var(--paramo-green)" : "var(--ink-mute)";
   const docs = result?.analisis_documentos || [];
 
+  const teacherPromptEvaluar = `Estoy en la pantalla "Evaluar caso nuevo" del sistema AchachAI. Es la prueba de fuego en vivo: cargo un siniestro hipotético + documentos (factura, parte policial, declaración) y el cóndor devuelve un score 0-100 + nivel + reglas + señales en menos de 1s (sin documentos) o ~30s (con documentos analizados por Document Intelligence + GPT-4o Vision).
+
+CASO ACTUAL EN EL FORMULARIO:
+- Cobertura: ${form.cobertura}
+- Monto reclamado: USD ${form.monto_reclamado_usd}
+- Suma asegurada: USD ${form.suma_asegurada_usd}
+- Días desde inicio póliza: ${form.dias_desde_inicio_poliza}
+- Días entre ocurrencia y reporte: ${form.dias_entre_ocurrencia_reporte}
+- Documentos completos: ${form.documentos_completos ? 'sí' : 'no'}
+- Proveedor en lista restrictiva: ${form.proveedor_en_lista_restrictiva ? 'sí ⚠' : 'no'}
+
+Por favor explicame:
+1. ¿Cómo funciona la combinación de score tabular (datos del form) + score documental (PDFs)? Si los datos dan VERDE pero la factura está rota, ¿qué pasa?
+2. ¿Qué hace cada preset? ¿Cuándo uso "Caso normal" vs "Borde de vigencia" vs "SIN-0022 con docs reales"?
+3. ¿Cuáles son las 4 reglas críticas que dan RF-01..04 ROJO y cuáles RF-05..07 AMARILLO?
+4. Mirando los valores actuales del formulario, ¿qué señales esperarías que activen?
+
+Tono amigable, latinoamericano neutro (sin "vos"). Si los datos del form ya sugieren un caso problemático, decímelo concretamente. Al final dame una sugerencia: ¿qué cambio en el form me dejaría experimentar mejor?`;
+
   return (
     <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)" }}>
       <div style={{
-        padding: "20px 32px 18px", borderBottom: "1px solid var(--line)",
-        background: "linear-gradient(180deg, rgba(232,122,79,0.08), transparent)",
-        display: "flex", alignItems: "center", gap: 14,
+        padding: "32px 40px 28px", borderBottom: "1px solid var(--line)",
+        background: "linear-gradient(135deg, rgba(232,122,79,0.10) 0%, rgba(197,51,58,0.04) 100%)",
+        display: "flex", alignItems: "center", gap: 22,
+        position: 'relative',
       }}>
-        <CondorLogo size={40} />
+        <CondorTeacher
+          screen="evaluar"
+          title="¿Te explico cómo funciona la prueba de fuego?"
+          hook="Score multimodal: datos + documentos. Te muestro qué activar."
+          contextPrompt={teacherPromptEvaluar}
+          position="tr"
+        />
+        <div style={{
+          width: 72, height: 72, borderRadius: 18,
+          background: "linear-gradient(135deg, #fff, #fef6ee)",
+          boxShadow: "0 8px 20px rgba(231,111,81,0.20), inset 0 1px 0 rgba(255,255,255,0.5)",
+          border: "1px solid rgba(231,111,81,0.30)",
+          display: "grid", placeItems: "center",
+          flexShrink: 0,
+        }}>
+          <CondorLogo size={48} />
+        </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 10.5, letterSpacing: ".18em", color: "var(--andes-orange)", fontWeight: 700, textTransform: "uppercase" }}>
+          <div style={{
+            fontSize: 11, letterSpacing: ".22em", color: "var(--andes-orange)",
+            fontWeight: 800, textTransform: "uppercase",
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%', background: 'var(--andes-orange)',
+              boxShadow: '0 0 10px var(--andes-orange)',
+              animation: 'pulse-dot 1.6s ease-in-out infinite',
+            }} />
             Prueba de fuego · evaluar siniestro en vivo
           </div>
-          <h2 style={{ fontSize: 22, marginTop: 2 }}>Cargá un caso hipotético y pedile al cóndor</h2>
-          <div style={{ fontSize: 11.5, color: "var(--ink-mute)", marginTop: 2 }}>
-            POST /evaluar · responde con score 0-100, nivel, reglas activadas y señales en menos de 1s
+          <h2 style={{ fontSize: 32, marginTop: 6, fontWeight: 700, lineHeight: 1.15, color: 'var(--text-primary)' }}>
+            Cargá un caso hipotético y pedile al cóndor
+          </h2>
+          <div style={{ fontSize: 14, color: "var(--ink-soft)", marginTop: 8, maxWidth: 720 }}>
+            Score 0-100 + nivel + reglas activadas + señales en <strong>menos de 1 segundo</strong>.
+            Subí factura, parte policial o foto del daño para activar análisis multimodal con Azure DI + GPT-4o Vision.
           </div>
         </div>
+        <style jsx>{`
+          @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: 0.4; transform: scale(1.4); }
+          }
+        `}</style>
       </div>
 
-      <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20, alignItems: "flex-start" }}>
+      <div style={{ padding: "32px 40px", display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 28, alignItems: "flex-start", maxWidth: 1600, margin: '0 auto' }}>
         {/* Formulario */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {/* === SECCIÓN: Presets como cards visuales === */}
-          <div className="card" style={{ padding: 16 }}>
+          <div className="card" style={{ padding: 22 }}>
             <SectionHeader icon={FaBolt} title="Escenarios rápidos" hint={
               casoBaseId ? `caso base cargado: ${casoBaseId} — podés modificar y reevaluar` :
               presetSel ? `seleccionado: ${presetSel}` :
@@ -1928,52 +2168,76 @@ export function EvaluarScreen({ onInvestigate }: any) {
                 return (
                   <button
                     key={nombre}
-                    onClick={() => {
-                      setForm((f: any) => ({ ...f, ...vals }));
-                      setPresetSel(nombre);
-                    }}
+                    onClick={() => aplicarPreset(nombre, vals)}
+                    disabled={presetDescargando}
                     style={{
                       position: "relative",
-                      padding: "12px 8px", borderRadius: 8, cursor: "pointer",
-                      background: sel ? `linear-gradient(180deg, ${tone}25, ${tone}10)` : "white",
-                      border: sel ? `2px solid ${tone}` : `1.5px solid ${tone}30`,
-                      borderTop: sel ? `4px solid ${tone}` : `3px solid ${tone}`,
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                      transition: "all 0.15s ease", textAlign: "center",
-                      transform: sel ? "translateY(-2px)" : "none",
-                      boxShadow: sel ? `0 6px 16px ${tone}35` : "none",
+                      padding: "20px 14px", borderRadius: 12, cursor: presetDescargando ? "wait" : "pointer",
+                      background: sel ? `linear-gradient(180deg, ${tone}22, ${tone}08)` : "white",
+                      border: sel ? `2px solid ${tone}` : `1.5px solid ${tone}25`,
+                      borderTop: sel ? `5px solid ${tone}` : `4px solid ${tone}`,
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)", textAlign: "center",
+                      transform: sel ? "translateY(-3px)" : "none",
+                      boxShadow: sel ? `0 10px 24px ${tone}40, 0 2px 6px ${tone}20` : "0 1px 3px rgba(0,0,0,0.04)",
+                      minHeight: 96,
+                      opacity: presetDescargando ? 0.6 : 1,
                     }}
                     onMouseEnter={(e) => {
-                      if (sel) return;
-                      (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                      (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 12px ${tone}25`;
+                      if (sel || presetDescargando) return;
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)";
+                      (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 20px ${tone}30`;
                     }}
                     onMouseLeave={(e) => {
                       if (sel) return;
                       (e.currentTarget as HTMLElement).style.transform = "none";
-                      (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                      (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
                     }}
                   >
                     {/* badge cuando esta seleccionado */}
                     {sel && (
                       <span style={{
-                        position: "absolute", top: -8, right: -8,
-                        width: 20, height: 20, borderRadius: "50%",
+                        position: "absolute", top: -10, right: -10,
+                        width: 26, height: 26, borderRadius: "50%",
                         background: tone, color: "white",
                         display: "grid", placeItems: "center",
-                        boxShadow: `0 2px 8px ${tone}80`,
+                        boxShadow: `0 4px 10px ${tone}70`,
                         border: "2px solid var(--bg-card)",
-                      }}><FaCheckCircle size={10} /></span>
+                      }}><FaCheckCircle size={13} /></span>
                     )}
+                    {/* Icono grande */}
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 10,
+                      background: `${tone}15`, color: tone,
+                      display: 'grid', placeItems: 'center',
+                      fontSize: 20,
+                    }}>
+                      {i === 0 ? '📄' : i === 1 ? '✓' : i === 2 ? '⚠️' : i === 3 ? '🚨' : '🔴'}
+                    </div>
                     <span style={{
-                      fontSize: 10.5, fontWeight: sel ? 700 : 600,
+                      fontSize: 12, fontWeight: sel ? 700 : 600,
                       color: sel ? tone : "var(--condor-wing)",
-                      lineHeight: 1.2,
+                      lineHeight: 1.3,
                     }}>{nombre}</span>
                   </button>
                 );
               })}
             </div>
+            {presetDescargando && (
+              <div style={{
+                marginTop: 12, padding: "10px 14px",
+                background: "rgba(232,122,79,0.08)",
+                borderRadius: 8, fontSize: 12, color: "var(--andes-orange)",
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+              }}>
+                <span className="spinner" style={{
+                  width: 12, height: 12, border: "2px solid rgba(232,122,79,0.3)",
+                  borderTopColor: "var(--andes-orange)", borderRadius: "50%",
+                  animation: "spin 0.8s linear infinite",
+                }} />
+                Descargando documentos del preset…
+              </div>
+            )}
           </div>
 
 
@@ -2110,23 +2374,42 @@ export function EvaluarScreen({ onInvestigate }: any) {
             disabled={loading}
             className="btn warm"
             style={{
-              padding: "14px 18px", fontSize: 14, fontWeight: 600,
-              background: loading ? "var(--ink-mute)" : "linear-gradient(135deg, var(--andes-orange), var(--guayaba-red))",
-              border: 0, color: "white", borderRadius: 12,
-              boxShadow: loading ? "none" : "0 6px 20px rgba(232,122,79,0.35)",
+              padding: "22px 28px", fontSize: 17, fontWeight: 700,
+              background: loading ? "var(--ink-mute)" : "linear-gradient(135deg, #e76f51 0%, #d54a30 50%, #c5333a 100%)",
+              border: 0, color: "white", borderRadius: 16,
+              boxShadow: loading ? "none" : "0 10px 30px rgba(231,111,81,0.40), 0 2px 8px rgba(0,0,0,0.08)",
               cursor: loading ? "wait" : "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              transition: "all 0.2s ease",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 14,
+              transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+              letterSpacing: "0.02em",
+              textTransform: "uppercase",
+              position: "relative", overflow: "hidden",
             }}
-            onMouseEnter={(e) => { if (!loading) (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; }}
+            onMouseEnter={(e) => {
+              if (loading) return;
+              (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)";
+              (e.currentTarget as HTMLElement).style.boxShadow = "0 14px 36px rgba(231,111,81,0.50), 0 4px 12px rgba(0,0,0,0.10)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.transform = "none";
+              (e.currentTarget as HTMLElement).style.boxShadow = "0 10px 30px rgba(231,111,81,0.40), 0 2px 8px rgba(0,0,0,0.08)";
+            }}
           >
-            <FaClipboardCheck size={15} />
-            {loading
-              ? hayArchivos() ? "Procesando datos + documentos…" : "Cóndor evaluando…"
-              : hayArchivos() ? `Evaluar caso + ${[factura,fotoDano,partePolicial,denuncia].filter(Boolean).length} documento(s)`
-                              : "Evaluar con AchachAI"}
+            <FaClipboardCheck size={20} />
+            <span>
+              {loading
+                ? hayArchivos() ? "Procesando datos + documentos…" : "El cóndor está evaluando…"
+                : hayArchivos() ? `Evaluar con ${[factura,fotoDano,partePolicial,denuncia].filter(Boolean).length} documento(s) →`
+                                : "Pedirle al cóndor que evalúe →"}
+            </span>
           </button>
+          <div style={{
+            fontSize: 11.5, color: 'var(--ink-mute)', textAlign: 'center', marginTop: -8,
+          }}>
+            {hayArchivos()
+              ? "≈ 30 segundos (Azure DI + GPT-4o Vision analizan cada documento)"
+              : "≈ 1 segundo (solo datos tabulares con XGBoost + reglas)"}
+          </div>
         </div>
 
         {/* Resultado */}
@@ -2170,6 +2453,18 @@ export function EvaluarScreen({ onInvestigate }: any) {
                   </div>
                 </div>
               </div>
+
+              {/* INFORME RICO — narrativa + checklist + recomendaciones */}
+              <InformeRico
+                nivel={nivel}
+                score={score}
+                form={form}
+                evalTab={evalTab}
+                esCombinado={esCombinado}
+                docs={docs}
+                result={result}
+              />
+
 
               {/* Comparativa con score original cuando reevaluamos caso existente */}
               {casoBaseId && casoBaseScore && (
@@ -2481,49 +2776,92 @@ function EmptyStateEvaluar({ form, hayArchivos }: any) {
 
   return (
     <div className="card" style={{
-      padding: 28,
-      background: "linear-gradient(180deg, white, var(--marfil-paper))",
+      padding: 36,
+      background: "linear-gradient(180deg, white 0%, var(--marfil-paper) 100%)",
       textAlign: "center", overflow: "hidden", position: "relative",
-      minHeight: 360,
+      minHeight: 520,
+      borderRadius: 16,
+      boxShadow: "0 6px 18px rgba(0,0,0,0.04), 0 0 0 1px rgba(231,111,81,0.08)",
     }}>
       {/* halo radar de fondo */}
       <div style={{
         position: "absolute", inset: 0, pointerEvents: "none",
-        background: "radial-gradient(circle at center, rgba(232,122,79,0.06), transparent 70%)",
+        background: "radial-gradient(circle at center, rgba(232,122,79,0.10), transparent 65%)",
       }} />
       <div style={{ position: "relative", zIndex: 1 }}>
-        {/* Cóndor animado */}
-        <div style={{ position: "relative", width: 100, height: 100, margin: "0 auto" }}>
-          {/* círculos pulsantes */}
-          {[0, 1, 2].map(i => (
+        {/* Cóndor grande con sonar */}
+        <div style={{ position: "relative", width: 160, height: 160, margin: "0 auto" }}>
+          {[0, 1, 2, 3].map(i => (
             <div key={i} style={{
               position: "absolute", inset: 0, borderRadius: "50%",
-              border: "2px solid rgba(232,122,79,0.35)",
-              animation: `sonar-out 2.4s ease-out infinite ${i * 0.8}s`,
+              border: "2px solid rgba(232,122,79,0.30)",
+              animation: `sonar-out 2.8s ease-out infinite ${i * 0.7}s`,
             }} />
           ))}
           <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
-            <CondorLogo size={72} />
+            <CondorLogo size={120} />
           </div>
         </div>
 
-        <div style={{ marginTop: 16, fontFamily: "var(--serif)", fontSize: 18, color: "var(--condor-wing)", fontWeight: 600 }}>
+        <div style={{
+          marginTop: 24, fontFamily: "var(--serif)", fontSize: 24,
+          color: "var(--condor-wing)", fontWeight: 700, letterSpacing: '-0.01em',
+        }}>
           El cóndor está listo
         </div>
-        <div style={{ fontSize: 12, color: "var(--ink-mute)", marginTop: 4, maxWidth: 320, marginInline: "auto" }}>
-          Llená el formulario o usá un preset. Cuando presiones <strong style={{ color: "var(--andes-orange)" }}>Evaluar</strong>, en menos de 1 segundo (o 5s con documentos) tendrás el veredicto completo.
+        <div style={{
+          fontSize: 13.5, color: "var(--ink-soft)", marginTop: 8,
+          maxWidth: 380, marginInline: "auto", lineHeight: 1.55,
+        }}>
+          Llená el formulario o usá un preset. Cuando presiones{' '}
+          <strong style={{ color: "var(--andes-orange)" }}>Evaluar</strong>,
+          en menos de 1 segundo (o ~30s con documentos) tendrás el veredicto completo.
+        </div>
+
+        {/* Capacidades visibles del cóndor */}
+        <div style={{
+          marginTop: 24, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: 10, maxWidth: 420, marginInline: 'auto', textAlign: 'left',
+        }}>
+          {[
+            { ico: '⚖️', lbl: '7 reglas RF', sub: 'manual antifraude' },
+            { ico: '📊', lbl: '14 señales', sub: 'ponderadas 0-100' },
+            { ico: '🤖', lbl: 'XGBoost v5', sub: 'AUC 0.974' },
+            { ico: '📄', lbl: 'Doc Intelligence', sub: 'forensia visual' },
+          ].map((c, i) => (
+            <div key={i} style={{
+              padding: '10px 12px', background: 'white',
+              border: '1px solid var(--line)', borderRadius: 8,
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <span style={{ fontSize: 20, lineHeight: 1 }}>{c.ico}</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--condor-wing)' }}>{c.lbl}</div>
+                <div style={{ fontSize: 10, color: 'var(--ink-mute)' }}>{c.sub}</div>
+              </div>
+            </div>
+          ))}
         </div>
 
         {tips.length > 0 && (
           <div style={{
-            marginTop: 22, padding: 14, background: "rgba(232,122,79,0.08)",
-            borderRadius: 10, borderLeft: "3px solid var(--andes-orange)",
+            marginTop: 24, padding: "16px 18px",
+            background: "linear-gradient(135deg, rgba(232,122,79,0.10), rgba(197,51,58,0.06))",
+            borderRadius: 12, borderLeft: "4px solid var(--andes-orange)",
             textAlign: "left",
+            boxShadow: '0 2px 8px rgba(231,111,81,0.06)',
           }}>
-            <div style={{ fontSize: 10.5, color: "var(--andes-orange)", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 6 }}>
-              Lo que ya predigo con tus valores actuales:
+            <div style={{
+              fontSize: 11, color: "var(--andes-orange)", fontWeight: 700,
+              letterSpacing: ".12em", textTransform: "uppercase", marginBottom: 8,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+              🦅 Lo que ya predigo con tus valores actuales
             </div>
-            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11.5, color: "var(--ink-soft)", lineHeight: 1.55 }}>
+            <ul style={{
+              margin: 0, paddingLeft: 22, fontSize: 12.5, color: "var(--ink-soft)",
+              lineHeight: 1.7,
+            }}>
               {tips.slice(0, 4).map((t, i) => <li key={i}>{t}</li>)}
             </ul>
           </div>
@@ -2686,7 +3024,7 @@ const fieldStyle: any = {
    ASEGURADO 360 — vista completa de una persona
    ============================================================ */
 export function AseguradoScreen({ aseguradoId, onBack, onInvestigate }: any) {
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [data, setData] = useSc<any>(null);
   const [err, setErr] = useSc<string | null>(null);
 
@@ -2931,7 +3269,7 @@ function MiniKpi({ label, value, tone = 'wing' }: any) {
    EXPLORAR — ver todos los 25K siniestros con filtros amplios
    ============================================================ */
 export function ExplorarScreen({ onInvestigate }: any) {
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const [opciones, setOpciones] = useSc<any>(null);
   const [page, setPage] = useSc(0);
@@ -3200,7 +3538,7 @@ const expField: any = {
    CARGAR CASOS NUEVOS — bulk CSV + form individual
    ============================================================ */
 export function CargarCasosScreen({ onInvestigate }: any) {
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [archivo, setArchivo] = useSc<File | null>(null);
   const [preview, setPreview] = useSc<any[] | null>(null);
   const [subiendo, setSubiendo] = useSc(false);
@@ -3579,7 +3917,7 @@ export function CargarCasosScreen({ onInvestigate }: any) {
    "Lo que la industria llama 'detectar fraude' es ya tarde. AchachAI lo previene."
    ============================================================ */
 export function PrevencionScreen({ onInvestigate }: any) {
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [alertas, setAlertas] = useSc<any>(null);
   const [watchlist, setWatchlist] = useSc<any>(null);
   const [ventana, setVentana] = useSc(30);
@@ -3600,13 +3938,39 @@ export function PrevencionScreen({ onInvestigate }: any) {
     cluster_geografico: FaMapMarkerAlt,
   };
 
+  // Prompt contextual: explicar prevención con datos reales
+  const nAlertas = (alertas?.alertas || alertas?.items || alertas || []).length || 0;
+  const nWatchlist = (watchlist?.items || watchlist || []).length || 0;
+  const teacherPromptPrev = `Estoy en la pantalla "Prevención" del sistema AchachAI. El objetivo es detectar patrones que se están FORMANDO (proveedores que de repente facturan más, asegurados con frecuencia creciente, clusters geográficos) ANTES de que generen pérdidas — a diferencia de la bandeja priorizada que mira casos individuales ya ocurridos.
+
+DATOS QUE ESTOY VIENDO:
+- Ventana de análisis: últimos ${ventana} días
+- Alertas tempranas detectadas: ${nAlertas}
+- Watchlist sugerida (entidades a observar): ${nWatchlist}
+
+Por favor explicame:
+1. ¿Cuál es la diferencia entre "detectar fraude" y "prevenir fraude"? ¿Por qué importa?
+2. ¿Qué tipos de patrones se detectan acá (proveedor_uptick, asegurado_recurrente, cluster_geografico) y un ejemplo de cada uno?
+3. ¿Qué pasos concretos debería tomar con esta watchlist? ¿A quién contactar?
+4. Si tuviera que mostrarle esta pantalla a un comité antifraude, ¿qué historia les contaría?
+
+Tono amigable, latinoamericano neutro (sin "vos"), claro. Al final dame UNA acción prioritaria.`;
+
   return (
     <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)" }}>
       <div style={{
         padding: "20px 32px", borderBottom: "1px solid var(--line)",
         background: "linear-gradient(180deg, rgba(74,124,89,0.10), transparent)",
         display: "flex", alignItems: "center", gap: 14,
+        position: 'relative',
       }}>
+        <CondorTeacher
+          screen="prevencion"
+          title="¿Te explico el sistema de prevención?"
+          hook={`${nAlertas} alerta(s) temprana(s) y ${nWatchlist} entidad(es) en watchlist. Te muestro cómo se lee.`}
+          contextPrompt={teacherPromptPrev}
+          position="tr"
+        />
         <div style={{ width: 44, height: 44, borderRadius: 10, background: 'var(--success-soft)', color: 'var(--success)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
           <FaShieldAlt size={20} />
         </div>
@@ -3775,7 +4139,7 @@ export function PrevencionScreen({ onInvestigate }: any) {
    AJUSTES — pesos de senales y reglas editables
    ============================================================ */
 export function AjustesScreen() {
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [cfg, setCfg] = useSc<any>(null);
   const [savedMsg, setSavedMsg] = useSc<string | null>(null);
   const [busy, setBusy] = useSc(false);
@@ -4177,7 +4541,7 @@ export function AjustesScreen() {
    ANOMALIAS NOVEDOSAS — patrones nuevos via IsolationForest
    ============================================================ */
 export function AnomaliasScreen({ onInvestigate }: any) {
-  const API = (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [data, setData] = useSc<any>(null);
   const [contamination, setContamination] = useSc(0.02);
   const [loading, setLoading] = useSc(true);
@@ -4218,13 +4582,40 @@ export function AnomaliasScreen({ onInvestigate }: any) {
       .catch(e => { setLoadErr(String(e?.message || e)); setData(null); setLoading(false); });
   }, [contamination]);
 
+  // Prompt contextual: explicar IsolationForest con casos reales en pantalla
+  const nAnomalias = (data?.items || data?.anomalias || []).length || 0;
+  const topAnomalia = (data?.items || data?.anomalias || [])[0];
+  const teacherPromptAnom = `Estoy en la pantalla "Patrones inusuales" del sistema AchachAI. Usa IsolationForest (modelo NO supervisado) sobre 39.960 siniestros multi-ramo. La idea: detectar casos estadísticamente raros que las 7 reglas críticas NO ven — porque son patrones nuevos que el modelo supervisado XGBoost nunca fue entrenado a reconocer.
+
+DATOS QUE ESTOY VIENDO:
+- Tasa de contaminación seleccionada: ${(contamination * 100).toFixed(1)}%
+- Casos anómalos detectados: ${nAnomalias}
+${topAnomalia ? `- Top anomalía actual: ${topAnomalia.id_siniestro || topAnomalia.id || '?'} con score de rareza ${topAnomalia.anomaly_score || topAnomalia.score || '?'}` : ''}
+
+Por favor explicame:
+1. ¿Qué es IsolationForest y por qué se llama "no supervisado"? ¿En qué se diferencia de XGBoost?
+2. ¿Qué significa "contaminación" en este contexto? ¿Por qué importa el parámetro?
+3. ¿Cómo debería leer el "score de anomalía" y diferenciarlo del score regular 0-100?
+4. ¿Por qué un caso anómalo NO siempre es fraude? ¿Cuándo es falso positivo?
+5. ¿Qué tres pasos debo seguir con la lista de casos anómalos detectados?
+
+Tono amigable, latinoamericano neutro (sin "vos"), con ejemplos concretos. Al final dame UNA acción prioritaria con el id del top caso.`;
+
   return (
     <div style={{ height: "100%", overflow: "auto", background: "var(--marfil)" }}>
       <div style={{
         padding: "20px 32px", borderBottom: "1px solid var(--line)",
         background: "linear-gradient(180deg, rgba(44,95,141,0.08), transparent)",
         display: "flex", alignItems: "center", gap: 14,
+        position: 'relative',
       }}>
+        <CondorTeacher
+          screen="anomalias"
+          title="¿Te explico los patrones inusuales?"
+          hook={`${nAnomalias} caso(s) anómalo(s) detectado(s) por IsolationForest. Te explico qué significan y qué hacer.`}
+          contextPrompt={teacherPromptAnom}
+          position="tr"
+        />
         <CondorLogo size={40} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10.5, letterSpacing: ".18em", color: "var(--mountain-blue)", fontWeight: 700, textTransform: "uppercase" }}>
@@ -4385,4 +4776,252 @@ export const ROLE_PROMPTS_PREVIEW = {
   tecnologia: ["¿Hay endpoint con latencia alta?", "Comparar v3 vs v4"],
   gerencia: ["¿Cuánto recuperamos este mes?", "Top 3 logros para el board"],
 };
+
+/* ============================================================
+   InformeRico — narrativa + checklist + recomendaciones
+   Aparece en Evaluar caso, debajo del header del resultado.
+   ============================================================ */
+function InformeRico({ nivel, score, form, evalTab, esCombinado, docs, result }: any) {
+  const isVerde = nivel === "VERDE";
+  const isAmarillo = nivel === "AMARILLO";
+  const isRojo = nivel === "ROJO";
+
+  const tone = isRojo ? "var(--guayaba-red)"
+             : isAmarillo ? "var(--andes-orange)"
+             : "var(--paramo-green)";
+  const toneBg = isRojo ? "rgba(197,51,58,0.06)"
+                : isAmarillo ? "rgba(232,122,79,0.07)"
+                : "rgba(74,124,89,0.06)";
+
+  const reglas = evalTab?.reglas_criticas || [];
+  const senales = evalTab?.senales_activadas || [];
+  const nReglas = reglas.length;
+  const nSenales = senales.length;
+  const nDocsAlerta = (docs || []).filter((d: any) => d.nivel_riesgo_doc === "ROJO" || d.nivel_riesgo_doc === "AMARILLO").length;
+
+  // Diagnóstico narrativo según nivel
+  const diagnostico = isVerde
+    ? "Este caso pasa los filtros automáticos del manual antifraude. Lo evaluamos contra las 7 reglas críticas RF-01..07 y las 14 señales ponderadas; ninguna se disparó con suficiente fuerza para escalar."
+    : isAmarillo
+    ? "Este caso tiene patrones que ameritan revisión documental antes de pagar. No hay reglas críticas rojas, pero las señales acumuladas superan el umbral verde."
+    : `Este caso activó ${nReglas > 0 ? `${nReglas} regla(s) crítica(s)` : `${nSenales} señal(es) significativa(s)`}. Recomendamos NO autorizar pago hasta validación de la Unidad Antifraude.`;
+
+  // Lo que verificamos (checklist visual)
+  const checks = [
+    {
+      label: "Reglas críticas (RF-01..07)",
+      ok: nReglas === 0,
+      detail: nReglas === 0 ? "Ninguna disparada" : `${nReglas} disparada(s): ${reglas.map((r: any) => r.codigo).join(", ")}`,
+    },
+    {
+      label: "Borde de vigencia",
+      ok: !(form.dias_desde_inicio_poliza < 30 || form.dias_desde_fin_poliza < 30),
+      detail: form.dias_desde_inicio_poliza < 30
+        ? `⚠ Reclamo ${form.dias_desde_inicio_poliza}d después de iniciar póliza`
+        : form.dias_desde_fin_poliza < 30
+        ? `⚠ Reclamo cerca del fin de póliza (${form.dias_desde_fin_poliza}d)`
+        : "Reclamo en vigencia normal",
+    },
+    {
+      label: "Tiempo de reporte",
+      ok: form.dias_entre_ocurrencia_reporte <= 4,
+      detail: form.dias_entre_ocurrencia_reporte > 7
+        ? `⚠ Reporte tardío: ${form.dias_entre_ocurrencia_reporte}d`
+        : `Reportado en ${form.dias_entre_ocurrencia_reporte}d (normal)`,
+    },
+    {
+      label: "Documentación",
+      ok: !!form.documentos_completos,
+      detail: form.documentos_completos ? "Expediente completo" : "⚠ Faltan documentos obligatorios",
+    },
+    {
+      label: "Proveedor",
+      ok: !form.proveedor_en_lista_restrictiva,
+      detail: form.proveedor_en_lista_restrictiva ? "⚠ En lista restrictiva" : "Proveedor no observado",
+    },
+    {
+      label: "Historial del asegurado",
+      ok: form.historial_siniestros_asegurado < 3,
+      detail: form.historial_siniestros_asegurado >= 3
+        ? `⚠ ${form.historial_siniestros_asegurado} siniestros previos`
+        : `${form.historial_siniestros_asegurado} siniestro(s) previo(s)`,
+    },
+  ];
+
+  // Próximos pasos recomendados
+  const pasos = isVerde ? [
+    "Continuar el flujo normal de liquidación.",
+    "Verificar montos y datos bancarios del beneficiario antes de pagar.",
+    "Conservar el expediente digital por trazabilidad (RF-02 retroactiva).",
+  ] : isAmarillo ? [
+    "Escalar a la Unidad Antifraude para revisión documental.",
+    "Solicitar al asegurado la documentación faltante o aclaratoria.",
+    "Validar el proveedor en la lista interna actualizada.",
+    "Re-evaluar el caso después de la revisión humana.",
+  ] : [
+    "🚨 NO autorizar el pago hasta revisión especializada de campo.",
+    "Escalar a Unidad Antifraude + Comité Antifraude.",
+    "Solicitar entrevista presencial con el asegurado.",
+    "Verificar autenticidad documental (originales + cruces con SRI/policía).",
+    "Conservar trazabilidad completa: id_siniestro, regla, fecha, analista.",
+  ];
+
+  // Comparativa contra cartera (montos típicos por cobertura)
+  const PROMEDIO_COBERTURA: Record<string, number> = {
+    "Choque": 6500, "Robo": 12000, "RC": 4500, "Pérdida Total": 18000,
+    "Cristales": 800, "Daño": 7000, "Daño por Agua": 3500, "Incendio": 15000,
+    "Daño Estructural": 22000, "Rotura de Cristales": 800, "Robo en domicilio": 6500,
+    "Hospitalización": 4500, "Cirugía": 8500, "Consulta Externa": 120,
+    "Maternidad": 5500, "Urgencias": 700, "Exámenes": 350,
+  };
+  const promCob = PROMEDIO_COBERTURA[form.cobertura] || 5000;
+  const monto = form.monto_reclamado_usd || 0;
+  const ratioCob = promCob > 0 ? (monto / promCob) : 1;
+  const ratioColor = ratioCob > 1.5 ? "var(--guayaba-red)" : ratioCob > 1.15 ? "var(--andes-orange)" : "var(--paramo-green)";
+
+  return (
+    <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+      {/* 1. Diagnóstico narrativo */}
+      <div style={{
+        padding: 14, background: toneBg, borderLeft: `4px solid ${tone}`,
+        borderRadius: 8, fontSize: 13, lineHeight: 1.55, color: "var(--ink-soft)",
+      }}>
+        <div style={{
+          fontSize: 10.5, color: tone, fontWeight: 700,
+          letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 6,
+        }}>
+          {isVerde ? "🟢 Diagnóstico del cóndor" : isAmarillo ? "🟡 Atención del cóndor" : "🔴 Alerta del cóndor"}
+        </div>
+        {diagnostico}
+      </div>
+
+      {/* 2. Checklist de verificación */}
+      <div>
+        <div style={{
+          fontSize: 10.5, color: "var(--ink-mute)", letterSpacing: ".1em",
+          textTransform: "uppercase", marginBottom: 8, fontWeight: 600,
+        }}>
+          ✓ Lo que se verificó automáticamente
+        </div>
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6,
+        }}>
+          {checks.map((c, i) => (
+            <div key={i} style={{
+              display: "flex", alignItems: "flex-start", gap: 8,
+              padding: "8px 10px", background: c.ok ? "rgba(74,124,89,0.06)" : "rgba(232,122,79,0.08)",
+              border: `1px solid ${c.ok ? "rgba(74,124,89,0.20)" : "rgba(232,122,79,0.25)"}`,
+              borderRadius: 6, fontSize: 11.5,
+            }}>
+              <span style={{ fontSize: 14, lineHeight: 1, marginTop: 1, color: c.ok ? "var(--paramo-green)" : "var(--andes-orange)" }}>
+                {c.ok ? "✓" : "!"}
+              </span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, color: "var(--condor-wing)" }}>{c.label}</div>
+                <div style={{ fontSize: 10.5, color: "var(--ink-mute)", marginTop: 2 }}>{c.detail}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. Comparativa con cartera */}
+      <div style={{
+        padding: 12, background: "var(--marfil-paper)",
+        borderRadius: 8, border: "1px solid var(--line)",
+      }}>
+        <div style={{
+          fontSize: 10.5, color: "var(--ink-mute)", letterSpacing: ".1em",
+          textTransform: "uppercase", marginBottom: 8, fontWeight: 600,
+        }}>
+          📊 Comparativa con la cartera ({form.cobertura})
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, fontSize: 11.5 }}>
+          <div>
+            <div style={{ color: "var(--ink-mute)" }}>Monto reclamado</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: ratioColor }}>
+              ${monto.toLocaleString("en-US")}
+            </div>
+          </div>
+          <div>
+            <div style={{ color: "var(--ink-mute)" }}>Promedio cobertura</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink-soft)" }}>
+              ${promCob.toLocaleString("en-US")}
+            </div>
+          </div>
+          <div>
+            <div style={{ color: "var(--ink-mute)" }}>Ratio</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: ratioColor }}>
+              {ratioCob.toFixed(2)}x
+              <span style={{ fontSize: 10.5, marginLeft: 6, fontWeight: 500 }}>
+                {ratioCob > 1.5 ? "muy alto" : ratioCob > 1.15 ? "alto" : ratioCob > 0.85 ? "normal" : "bajo"}
+              </span>
+            </div>
+          </div>
+        </div>
+        {/* barra visual */}
+        <div style={{ marginTop: 8, height: 6, background: "var(--line)", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+          <div style={{
+            position: "absolute", left: 0, top: 0, bottom: 0,
+            width: `${Math.min(100, ratioCob * 50)}%`,
+            background: ratioColor, transition: "width 0.4s ease",
+          }} />
+          {/* línea del promedio */}
+          <div style={{
+            position: "absolute", left: "50%", top: -2, bottom: -2,
+            width: 2, background: "var(--ink-mute)", opacity: 0.4,
+          }} />
+        </div>
+        <div style={{ fontSize: 9.5, color: "var(--ink-mute)", marginTop: 4, display: "flex", justifyContent: "space-between" }}>
+          <span>0</span>
+          <span>promedio ({form.cobertura})</span>
+          <span>+200%</span>
+        </div>
+      </div>
+
+      {/* 4. Próximos pasos */}
+      <div style={{
+        padding: 14, background: "white",
+        borderLeft: `4px solid ${tone}`, borderRadius: 8,
+        border: `1px solid ${tone}40`,
+      }}>
+        <div style={{
+          fontSize: 10.5, color: tone, fontWeight: 700,
+          letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 8,
+        }}>
+          {isVerde ? "→ Próximos pasos" : isAmarillo ? "→ Acciones recomendadas" : "→ Acciones inmediatas"}
+        </div>
+        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.7, color: "var(--ink-soft)" }}>
+          {pasos.map((p, i) => (
+            <li key={i} style={{ marginBottom: 2 }}>{p}</li>
+          ))}
+        </ol>
+      </div>
+
+      {/* 5. Lo que NO se detectó (solo si es VERDE — refuerza confianza) */}
+      {isVerde && (
+        <div style={{
+          padding: 12, background: "rgba(74,124,89,0.05)",
+          borderRadius: 8, border: "1px dashed rgba(74,124,89,0.3)",
+          fontSize: 11.5, color: "var(--ink-soft)", lineHeight: 1.6,
+        }}>
+          <div style={{
+            fontSize: 10.5, color: "var(--paramo-green)", fontWeight: 700,
+            letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 6,
+          }}>
+            ℹ Lo que el cóndor descartó
+          </div>
+          • No hay coincidencia con lista restrictiva de proveedores<br/>
+          • No hay frecuencia inusual de reclamos para este asegurado<br/>
+          • La cronología (póliza ↔ evento ↔ reporte) es consistente<br/>
+          • No hay similitud narrativa con otros expedientes (RF-07)<br/>
+          {esCombinado && nDocsAlerta === 0 && (
+            <>• Documentos analizados con Azure Document Intelligence: sin inconsistencias<br/></>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 

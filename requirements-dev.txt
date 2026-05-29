@@ -1,0 +1,67 @@
+# =====================================================
+# AchachAI - Python dependencies (backend + ML + agente)
+# Python 3.11 recomendado
+# Instalar con:  pip install -r requirements.txt
+# =====================================================
+
+# --- Core data stack ---
+pandas==2.2.2
+numpy==1.26.4
+pyarrow==16.1.0
+duckdb==1.0.0                 # queries SQL sobre parquet (tools del agente)
+python-dateutil==2.9.0
+unidecode==1.3.8
+
+# --- Machine Learning supervisado ---
+scikit-learn==1.4.2           # IsolationForest, PCA AutoEncoder, StandardScaler
+xgboost==2.0.3                # modelo de clasificacion de fraude
+imbalanced-learn==0.12.2      # SMOTE para balancear clases
+joblib==1.4.2                 # persistencia de modelos
+
+# --- NLP / embeddings ---
+sentence-transformers==2.7.0  # similitud de narrativas (deteccion de copy-paste)
+rapidfuzz==3.9.0              # fuzzy matching de strings
+
+# --- Azure ML (entrenamiento + endpoint) ---
+azure-ai-ml==1.16.0
+azure-identity==1.16.0
+mlflow==2.13.0
+azureml-mlflow==1.56.0
+
+# --- Azure OpenAI / agente conversacional ---
+openai==1.30.1                # cliente AzureOpenAI (chat + vision + embeddings)
+tiktoken==0.7.0               # conteo de tokens
+
+# --- Azure Document Intelligence (analisis de facturas/PDFs) ---
+azure-ai-documentintelligence==1.0.0b4
+azure-core==1.30.1
+
+# --- API ---
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.7.1
+pydantic-settings==2.2.1
+python-multipart==0.0.9       # subida de archivos a /evaluar-completo
+httpx==0.27.0
+
+# --- Explainability ---
+shap==0.45.1                  # feature importance del modelo XGBoost
+
+# --- Visualizacion (solo notebooks de exploracion) ---
+matplotlib==3.9.0
+seaborn==0.13.2
+plotly==5.22.0
+
+# --- Notebooks / dev ---
+jupyter==1.0.0
+jupyterlab==4.2.1
+ipykernel==6.29.4
+
+# --- Config / utils ---
+python-dotenv==1.0.1          # carga del archivo .env
+loguru==0.7.2
+typer==0.12.3
+
+# --- Testing ---
+pytest==8.2.0
+pytest-cov==5.0.0

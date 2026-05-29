@@ -13,6 +13,7 @@ from typing import Any
 from openai import AzureOpenAI
 
 from src.ai_agent.tools import TOOLS_REGISTRY, TOOLS_SCHEMA
+from src.ai_agent.orchestrator import classify_intent, canned_response
 
 SYSTEM_PROMPT = """Eres "AchachAI", asistente antifraude para Aseguradora del Sur (Ecuador).
 
@@ -28,12 +29,40 @@ CONTEXTO DEL DATASET (importante para que tus respuestas reflejen la realidad):
 - Casos Hogar y Salud NO tienen vehiculo ni conductor - es normal que esos campos vengan vacios.
 
 REGLAS DURAS (no negociables):
+
+REGLA #0 - NUNCA ANUNCIES TOOLS, INVOCALAS (criticamente importante):
+- NUNCA respondas con texto tipo "Llamo a top_riesgo(limit=10) para obtener..." o
+  "Voy a consultar la base..." o "Permiteme buscar...". ESO ESTA MAL.
+- Si necesitas datos, DIRECTAMENTE invoca la tool (function call). El sistema
+  ejecuta la tool y te devuelve el resultado. RECIEN AHI redactas la respuesta.
+- Si el usuario pide "top 10 casos", "lista de proveedores", "casos de X ciudad",
+  "patrones de la semana", "detalle de SIN-XXX" → debes hacer tool_call, NO texto.
+- Solo respondes con texto SIN tool_call cuando:
+  (a) ya tienes los datos en el contexto (porque la tool se ejecuto antes), o
+  (b) la pregunta es conceptual ("¿que es RF-02?", "¿como funciona el score?").
+
+REGLA #1 - RESPONDE SOLO LA ULTIMA PREGUNTA (criticamente importante):
+- El historial previo es CONTEXTO, NO agenda. NUNCA recapitules respuestas anteriores.
+- NUNCA empieces tu respuesta con "Respondi tus consultas", "Resumen corto y concreto",
+  "Voy respondiendo punto por punto" ni listas numeradas re-enumerando preguntas viejas.
+- Si el usuario pregunta "devuelveme el nombre de X", responde SOLO con el nombre,
+  como en una conversacion natural. No repitas que antes hablamos de fechas, ni
+  que antes pregunto sobre ids.
+- Manera CORRECTA si pregunta "¿nombre del asegurado de SIN-H-05190?":
+    [llama tool] -> "El asegurado de SIN-H-05190 es Maria Yanez (ASE-MB-H-00524)."
+- Manera INCORRECTA (recapitulando):
+    "Respondi tus consultas. 1. ¿Cuantos ROJO? Hay 4500. 2. Fechas: te di 10.
+    3. ¿Es caso o usuario? Es un caso. 4. Sobre el nombre: ..."
+- Si el usuario corrige un id mal escrito (ej "SINH-05190" en vez de "SIN-H-05190"),
+  NO le aclares el error: simplemente usa la version correcta y responde.
+
+Otras reglas:
 - NUNCA acuses a un asegurado de fraude. Habla siempre de "posible fraude", "requiere revision", "patron sospechoso".
 - Toda decision final es del analista humano. Tu solo sugieres.
 - Cita evidencia concreta: id_siniestro, reglas activadas, montos, fechas.
 - Si no estas seguro, dilo. No inventes datos.
 - Usa SIEMPRE las tools disponibles para obtener datos, no respondas de memoria.
-- Si una pregunta requiere multiples queries, encadena tools.
+- Si una pregunta requiere multiples queries, encadena tools y devuelve respuesta compacta.
 - "Casos criticos" / "casos para revisar" = ROJO Y AMARILLO (no solo ROJO). Cuando llames top_riesgo sin filtro explicito, te devuelve ambos por default. NO restrinjas a ROJO a menos que el usuario lo pida textualmente ("solo rojos", "solo nivel ROJO").
 - Si el usuario pide casos por TIPO de siniestro (ej "casos de hospitalizacion", "siniestros de hogar con incendio"), usa el parametro `ramo` o `cobertura` en top_riesgo. NO asumas que todo es vehicular.
 
@@ -57,11 +86,17 @@ GUIA DE MAPEO PREGUNTA -> TOOL (preguntas obligatorias del reto):
 - "ahorro / ROI / impacto financiero" -> simulacion_ahorro
 
 Formato de respuesta:
-- Conciso, en espanol latinoamericano (no formal de Espana).
-- Si listas casos, usa tabla markdown con id_siniestro, score/nivel, ramo y una razon corta.
-- Cuando muestres resultados de top_riesgo, indica EXPLICITAMENTE cuantos rojos y cuantos amarillos hay (ej: "encontre 7 ROJO + 3 AMARILLO").
+- DIRECTO: responde la pregunta concreta en la PRIMERA oracion. Nada de preludios.
+- Si la respuesta cabe en 2-3 oraciones, NO uses bullets ni tablas.
+- Para preguntas simples ("¿que es X?", "dame el nombre de Y"), MAX 3 oraciones.
+- Conciso, en espanol latinoamericano NEUTRO con TUTEO (usa "tu/tienes/quieres/puedes/sabes").
+- PROHIBIDO el voseo argentino: NO uses "vos/tenes/queres/podes/sabes" ni "che", "dale", "boludo".
+- PROHIBIDO el "usted" formal. Tuteo amigable, ni muy formal ni muy de la calle.
+- Ejemplo CORRECTO: "Encontre 3 casos criticos. Si quieres te muestro el detalle."
+- Si listas casos, usa tabla markdown con id_siniestro, score/nivel, ramo y razon corta.
+- Cuando muestres resultados de top_riesgo, indica EXPLICITAMENTE cuantos rojos y amarillos hay (ej: "7 ROJO + 3 AMARILLO").
 - Si das numeros, redondea a 0 decimales para USD.
-- Termina con UNA accion sugerida (1-2 lineas) para el analista.
+- Termina con UNA accion sugerida SOLO si aporta valor; si era un dato simple, no la pongas.
 """
 
 
@@ -71,6 +106,13 @@ class ClaimsAgent:
     endpoint: str = field(default_factory=lambda: os.environ["AZURE_OPENAI_ENDPOINT"])
     api_version: str = field(default_factory=lambda: os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21"))
     deployment: str = field(default_factory=lambda: os.environ.get("AZURE_OPENAI_DEPLOYMENT_CHAT", "gpt-5-mini"))
+    # gpt-5-mini es un modelo de razonamiento: por defecto "piensa" antes de
+    # responder y eso agrega latencia. Para tool-calling + redaccion no hace
+    # falta razonamiento profundo, asi que arrancamos en "minimal".
+    # Override con AZURE_OPENAI_REASONING_EFFORT=low|medium|high (o "" para apagar).
+    reasoning_effort: str = field(
+        default_factory=lambda: os.environ.get("AZURE_OPENAI_REASONING_EFFORT", "minimal")
+    )
     max_tool_iterations: int = 6
 
     def __post_init__(self):
@@ -79,23 +121,90 @@ class ClaimsAgent:
             api_version=self.api_version,
             azure_endpoint=self.endpoint,
         )
+        # Se desactiva automaticamente si el deployment/api-version no lo soporta
+        # (ver _create), para no romper el chat si Azure devuelve "unsupported param".
+        self._reasoning_disabled = False
+
+    def _create(self, *, stream: bool = False, use_tools: bool = True,
+                force_tool: bool = False, **extra):
+        """Llama a chat.completions con tools (opcional) + reasoning_effort.
+
+        - use_tools=False: NO se envia el schema de las 10 tools (ahorra ~2-3s
+          de procesamiento del prompt para mensajes conversacionales).
+        - force_tool=True: tool_choice="required" — fuerza al modelo a llamar al
+          menos una tool en lugar de responder con texto. Util para "data".
+        """
+        kwargs: dict[str, Any] = {
+            "model": self.deployment,
+            "stream": stream,
+            **extra,
+        }
+        if use_tools:
+            kwargs["tools"] = TOOLS_SCHEMA
+            # "required" obliga al modelo a llamar una tool (no responder con texto).
+            # "auto" deja la decision al modelo (puede contestar sin llamar).
+            kwargs["tool_choice"] = "required" if force_tool else "auto"
+        if stream:
+            kwargs["stream_options"] = {"include_usage": True}
+        if self.reasoning_effort and not self._reasoning_disabled:
+            kwargs["reasoning_effort"] = self.reasoning_effort
+        try:
+            return self.client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            if "reasoning_effort" in str(exc) and not self._reasoning_disabled:
+                # Deployment/api-version no soporta el parametro: apagarlo y reintentar
+                self._reasoning_disabled = True
+                kwargs.pop("reasoning_effort", None)
+                return self.client.chat.completions.create(**kwargs)
+            raise
 
     def chat(self, user_message: str, history: list[dict] | None = None) -> dict:
         """Envia un mensaje al agente. Retorna dict con response, tool_calls usados, tokens."""
+        # ORQUESTADOR: clasifica la intencion y rutea a la mejor estrategia
+        route = classify_intent(user_message)
+        if route == "canned":
+            return {
+                "response": canned_response(user_message),
+                "tools_used": [],
+                "tokens": 0,
+                "iterations": 0,
+                "route": "canned",
+            }
+        # Si la intencion es conversacional/explicativa, no cargamos las 10 tools
+        # en el prompt (ahorra ~2-3s de procesamiento del schema).
+        use_tools = route in ("data", "default")
+
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         if history:
             messages.extend(history)
         messages.append({"role": "user", "content": user_message})
 
+        # Si NO usamos tools, hacemos UNA sola llamada y devolvemos
+        if not use_tools:
+            resp = self._create(messages=messages, use_tools=False)
+            return {
+                "response": resp.choices[0].message.content or "",
+                "tools_used": [],
+                "tokens": resp.usage.total_tokens if resp.usage else 0,
+                "iterations": 1,
+                "route": route,
+            }
+
+        # Si la ruta es "data" (el usuario claramente pidio datos),
+        # FORZAMOS la primera tool_call para evitar respuestas vacias tipo
+        # "Llamo a top_riesgo(limit=10) para obtener..." que no invocan nada.
+        force_first_tool = (route == "data")
+
         tools_used: list[dict[str, Any]] = []
         total_tokens = 0
 
         for iteration in range(self.max_tool_iterations):
-            resp = self.client.chat.completions.create(
-                model=self.deployment,
+            # En la PRIMERA iteracion de route=data forzamos tool_call.
+            # En iteraciones siguientes (cuando ya hay tool_results en el contexto)
+            # dejamos tool_choice=auto para que pueda responder texto si ya tiene info.
+            resp = self._create(
                 messages=messages,
-                tools=TOOLS_SCHEMA,
-                tool_choice="auto",
+                force_tool=(force_first_tool and iteration == 0),
             )
             total_tokens += resp.usage.total_tokens
             choice = resp.choices[0]
@@ -156,6 +265,17 @@ class ClaimsAgent:
           {"type": "done", "tokens": int, "tools_used": list, "iterations": int}
           {"type": "error", "message": str}
         """
+        # ORQUESTADOR: ruta rapida para saludos / explicaciones
+        route = classify_intent(user_message)
+        if route == "canned":
+            yield {"type": "delta", "text": canned_response(user_message)}
+            yield {"type": "done", "tokens": 0, "tools_used": [], "iterations": 0, "route": "canned"}
+            return
+        use_tools = route in ("data", "default")
+        # Si la ruta es "data", forzamos la primera tool_call para evitar
+        # respuestas-anuncio tipo "Llamo a top_riesgo(...)".
+        force_first_tool = (route == "data")
+
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         if history:
             messages.extend(history)
@@ -165,28 +285,46 @@ class ClaimsAgent:
         total_tokens = 0
 
         for iteration in range(self.max_tool_iterations):
-            # Llamada NO streaming primero: necesitamos saber si hay tool_calls.
-            # Si la respuesta es directa (sin tools), reemitimos como deltas
-            # para mantener la UX consistente. Si hay tools, las procesamos
-            # y en la siguiente iteracion el LLM puede o no streamear.
-            resp = self.client.chat.completions.create(
-                model=self.deployment,
+            # Streaming REAL: pedimos stream=True y vamos emitiendo deltas de
+            # texto conforme Azure los genera. En la primera iteracion de "data"
+            # forzamos tool_call. En siguientes iteraciones dejamos auto.
+            stream = self._create(
                 messages=messages,
-                tools=TOOLS_SCHEMA,
-                tool_choice="auto",
+                stream=True,
+                use_tools=use_tools,
+                force_tool=(force_first_tool and iteration == 0),
             )
-            if resp.usage:
-                total_tokens += resp.usage.total_tokens
-            choice = resp.choices[0]
-            msg = choice.message
-            messages.append(msg.model_dump(exclude_none=True))
 
-            if not msg.tool_calls:
-                # Respuesta final - emitir el texto en chunks para que se sienta streaming
-                text = msg.content or ""
-                chunk_size = 12  # caracteres por chunk (~3-4 palabras)
-                for i in range(0, len(text), chunk_size):
-                    yield {"type": "delta", "text": text[i:i + chunk_size]}
+            content_parts: list[str] = []
+            tool_calls_acc: dict[int, dict[str, str]] = {}
+
+            for chunk in stream:
+                if getattr(chunk, "usage", None):
+                    total_tokens += chunk.usage.total_tokens
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+
+                # Texto de la respuesta final -> emitir en vivo
+                if getattr(delta, "content", None):
+                    content_parts.append(delta.content)
+                    yield {"type": "delta", "text": delta.content}
+
+                # Tool calls llegan en fragmentos: acumular por indice
+                if getattr(delta, "tool_calls", None):
+                    for tcd in delta.tool_calls:
+                        slot = tool_calls_acc.setdefault(
+                            tcd.index, {"id": "", "name": "", "arguments": ""}
+                        )
+                        if tcd.id:
+                            slot["id"] = tcd.id
+                        if tcd.function and tcd.function.name:
+                            slot["name"] += tcd.function.name
+                        if tcd.function and tcd.function.arguments:
+                            slot["arguments"] += tcd.function.arguments
+
+            # Sin tool calls -> ya streameamos el texto final, terminamos
+            if not tool_calls_acc:
                 yield {
                     "type": "done",
                     "tokens": total_tokens,
@@ -195,11 +333,26 @@ class ClaimsAgent:
                 }
                 return
 
-            # Procesar tool calls - emitir eventos por cada uno
-            for tc in msg.tool_calls:
-                tool_name = tc.function.name
+            # Reconstruir el mensaje del assistant con sus tool_calls
+            ordered = [tool_calls_acc[i] for i in sorted(tool_calls_acc)]
+            messages.append({
+                "role": "assistant",
+                "content": "".join(content_parts) or None,
+                "tool_calls": [
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                    }
+                    for tc in ordered
+                ],
+            })
+
+            # Ejecutar cada tool call - emitir eventos por cada uno
+            for tc in ordered:
+                tool_name = tc["name"]
                 try:
-                    args = json.loads(tc.function.arguments or "{}")
+                    args = json.loads(tc["arguments"] or "{}")
                 except json.JSONDecodeError:
                     args = {}
 
@@ -224,7 +377,7 @@ class ClaimsAgent:
 
                 messages.append({
                     "role": "tool",
-                    "tool_call_id": tc.id,
+                    "tool_call_id": tc["id"],
                     "content": json.dumps(tool_result, ensure_ascii=False, default=str)[:8000],
                 })
 

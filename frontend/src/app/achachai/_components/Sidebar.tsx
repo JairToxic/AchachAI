@@ -146,7 +146,7 @@ export function Sidebar({
       </div>
 
       {/* Active session + role switcher */}
-      <div ref={wrapRef} style={{ position: 'relative' }} className="sidebar-only-expanded">
+      <div ref={wrapRef} style={{ position: 'relative' }} className="sidebar-only-expanded" data-tour="sidebar-role">
         <div
           className="role-switcher"
           onClick={() => setRoleOpen(o => !o)}
@@ -254,6 +254,15 @@ export function Sidebar({
             active === item.id ||
             (active === 'investigation' && item.id === 'kanban') ||
             (active === 'asegurado' && item.id === 'kanban');
+          // Mapeo de id de nav -> data-tour para el tutorial guiado
+          const tourMap: Record<string, string> = {
+            home: 'sidebar-home',
+            chat: 'sidebar-chat',
+            kanban: 'sidebar-bandeja',
+            evaluar: 'sidebar-evaluar',
+            tejido: 'sidebar-red',
+          };
+          const tourTag = tourMap[item.id];
           return (
             <button
               key={item.id}
@@ -261,6 +270,7 @@ export function Sidebar({
               className="nav-btn"
               data-active={isActive}
               data-tooltip={item.label}
+              data-tour={tourTag}
               onClick={() => handleNav(item.id)}
             >
               <span className="nav-icon">
