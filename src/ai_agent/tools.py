@@ -51,12 +51,19 @@ _TOP_RIESGO_CACHE: dict = {"ts": 0.0, "mtime": 0.0, "evaluated": []}
 _TOP_RIESGO_TTL_SEC = 300  # 5 min
 
 
-def _compute_top_riesgo_all() -> list[dict]:
+_TOP_RIESGO_DISK_CACHE = PROC / "_top_riesgo_cache.parquet"
+
+
+def _compute_top_riesgo_all(force: bool = False) -> list[dict]:
     """Ejecuta la evaluacion costosa (sample 2000 + reglas) UNA vez.
 
-    Devuelve la lista completa de evaluados (sin filtros ni limites).
-    Se cachea por _TOP_RIESGO_TTL_SEC; si los parquets de siniestros cambian,
-    se invalida automaticamente via mtime check.
+    Estrategia de cache (en cascada, mas rapida primero):
+      1) cache en memoria (proceso vivo)     -> ~0ms
+      2) parquet en disco (sobrevive boots)  -> ~50-200ms
+      3) recomputo completo                  -> ~15-20s
+
+    El parquet se invalida si siniestros.parquet tiene mtime distinto.
+    Para forzar recompute (ej. al cambiar pesos), pasar force=True.
     """
     import time
     from src.rules import build_contexto, evaluate_siniestro
@@ -64,10 +71,38 @@ def _compute_top_riesgo_all() -> list[dict]:
     sin_path = PROC / "siniestros.parquet"
     mtime = sin_path.stat().st_mtime if sin_path.exists() else 0.0
     now = time.time()
-    if (_TOP_RIESGO_CACHE["evaluated"]
+
+    # (1) cache en memoria
+    if (not force
+        and _TOP_RIESGO_CACHE["evaluated"]
         and (now - _TOP_RIESGO_CACHE["ts"]) < _TOP_RIESGO_TTL_SEC
         and _TOP_RIESGO_CACHE["mtime"] == mtime):
         return _TOP_RIESGO_CACHE["evaluated"]
+
+    # (2) cache en disco (parquet pre-computado, sobrevive cold starts)
+    if not force and _TOP_RIESGO_DISK_CACHE.exists():
+        try:
+            disk_mtime = _TOP_RIESGO_DISK_CACHE.stat().st_mtime
+            # Solo confiar en el parquet si fue generado DESPUES del ultimo
+            # cambio en siniestros.parquet (i.e. esta sincronizado con los datos).
+            if disk_mtime >= mtime:
+                df_cache = pd.read_parquet(_TOP_RIESGO_DISK_CACHE)
+                # Reglas_disparadas se guarda como string CSV (parquet no soporta listas mixtas bien)
+                def _parse_reglas(v):
+                    if isinstance(v, list):
+                        return v
+                    if isinstance(v, str) and v:
+                        return [x for x in v.split(",") if x]
+                    return []
+                records = df_cache.to_dict("records")
+                for r in records:
+                    r["reglas_disparadas"] = _parse_reglas(r.get("reglas_disparadas"))
+                _TOP_RIESGO_CACHE["evaluated"] = records
+                _TOP_RIESGO_CACHE["ts"] = now
+                _TOP_RIESGO_CACHE["mtime"] = mtime
+                return records
+        except Exception:
+            pass  # si el parquet esta corrupto, recomputamos
 
     con = _con()
     proveedores = con.execute("SELECT * FROM proveedores").df()
@@ -134,6 +169,18 @@ def _compute_top_riesgo_all() -> list[dict]:
     _TOP_RIESGO_CACHE["evaluated"] = evaluated
     _TOP_RIESGO_CACHE["ts"] = now
     _TOP_RIESGO_CACHE["mtime"] = mtime
+
+    # Persistir en parquet para que sobreviva al cold start del container.
+    try:
+        df_to_save = pd.DataFrame([
+            {**r, "reglas_disparadas": ",".join(r.get("reglas_disparadas") or [])}
+            for r in evaluated
+        ])
+        _TOP_RIESGO_DISK_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        df_to_save.to_parquet(_TOP_RIESGO_DISK_CACHE, index=False)
+    except Exception:
+        pass  # si no se puede escribir (FS read-only en algun cloud), seguimos solo con memoria
+
     return evaluated
 
 

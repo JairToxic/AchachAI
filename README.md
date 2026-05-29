@@ -39,7 +39,8 @@
 | 🎓 **Cóndor Profesor** | Tour guiado nativo + asistente flotante en 9 pantallas con prompts contextuales |
 | 🎨 **UI premium** | Markdown del cóndor con IDs como chips inline, callouts naranjas, headings con subrayado, JarvisHUD con KPIs auto-detectados |
 | 🔔 **Notificaciones reales** | Campana del topbar conectada al backend (top_riesgo + alertas tempranas) |
-| ☁️ **Deploy producción** | Azure App Service (Linux B2, East US 2) · Blob Storage para embeddings |
+| ⚡ **Performance** | **Cache persistente** del scoring en parquet (`data/processed/_top_riesgo_cache.parquet`) → `/top-riesgo` baja de **15-20s a <500ms** en cold start. Warmup en background al boot. Endpoint `/warmup` para verificar estado. |
+| ☁️ **Deploy producción** | Azure App Service Linux **Premium P0v3** (East US 2) · Always On en backend y frontend · Blob Storage para embeddings · Plan compartido `asp-achachai` |
 
 ---
 
@@ -150,6 +151,31 @@ Detalle completo: [`docs/arquitectura.md`](docs/arquitectura.md).
 | **Datos** | CSV sintético → 7 tablas normalizadas (parquet) |
 | **Reportes** | HTML imprimible servido desde `/reportes/pdf` → `Ctrl+P` → PDF |
 | **Repo / CI** | GitHub + GitHub Actions |
+| **Hosting** | Azure App Service Linux **Premium P0v3** (1 vCPU dedicado + 4GB RAM) + Always On + warmup en background |
+| **Cache** | Parquet `_top_riesgo_cache.parquet` (4500 casos pre-evaluados) + cache en memoria con TTL 5 min |
+
+---
+
+## ⚡ Performance y latencias (post-optimización)
+
+| Endpoint | Cold start | Hit caliente | Notas |
+|---|:---:|:---:|---|
+| `GET /health` | <300 ms | <50 ms | Solo listar parquets |
+| `GET /warmup` | <100 ms | <50 ms | Estado del precalentado (`top_riesgo_ready`, `agent_ready`) |
+| `GET /casos?limit=50` | <600 ms | <200 ms | DuckDB sobre parquet, sin score |
+| `GET /top-riesgo?limit=10` | **~500 ms** | **<50 ms** | Lee parquet pre-computado; antes era 15-20 s |
+| `GET /anomalias-novedosas` | ~3-5 s | <500 ms | Isolation Forest cacheado 10 min |
+| `POST /chat` (saludo) | ~50 ms | ~50 ms | Orquestador `canned` sin Azure OpenAI |
+| `POST /chat` (con tools) | ~5-10 s | ~3-5 s | gpt-5-mini + function calling |
+| `POST /evaluar-completo` | ~15-25 s | — | Document Intelligence + GPT-4o Vision |
+
+**Trucos clave que aplicamos:**
+
+1. **Cache en parquet** del scoring sobre 4500 casos → sobrevive cold starts y reinicios.
+2. **Warmup background** en `@app.on_event("startup")` que precarga top_riesgo + ClaimsAgent sin bloquear `/health`.
+3. **Orquestador de intenciones** (`src/ai_agent/orchestrator.py`) que evita ir al LLM para saludos / agradecimientos / despedidas (0 ms).
+4. **Always On** activado en ambos sites para evitar suspensión por inactividad.
+5. **Plan Premium P0v3** con vCPU dedicado (vs CPU compartida del tier Basic).
 
 ---
 
@@ -334,10 +360,11 @@ Tools adicionales: `evaluar_caso_hipotetico`, `simulacion_ahorro`, `exportar_rep
 
 ## 👥 Equipo
 
-| Rol | Integrante |
-|-----|-----------|
-| Lead / ML / Backend / Frontend | Jair Sánchez |
-| _por completar_ | _por completar_ |
+| Integrante | Rol |
+|---|---|
+| **Jair Sánchez** | Backend ML/IA, arquitectura Azure, Document Intelligence + GPT-4o Vision, orquestador del agente, optimización de latencias (cache parquet + warmup) |
+| **Pablo Arcos** | Frontend Next.js, UX del Modo Investigación, Cóndor Profesor, Voz Jarvis (Web Speech API), markdown premium con chips |
+| **Cristina Molina** | Datos sintéticos multi-ramo (39.960 siniestros), motor de reglas RF-01..07, calibración del modelo XGBoost, etiquetado y validación |
 
 ---
 
