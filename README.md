@@ -17,8 +17,8 @@
 | Integrante | Rol |
 |---|---|
 | **Jair Sánchez** | Backend ML/IA, arquitectura Azure, integración Document Intelligence + GPT-4o Vision |
-| **Pablo Arcos** | Frontend Next.js, UX del Modo Investigación, Cóndor Profesor, Voz Jarvis |
-| **Cristina Molina** | Datos sintéticos multi-ramo, motor de reglas RF-01..07, calibración del modelo XGBoost |
+| **Pablo Arcos** | Datos sintéticos multi-ramo, motor de reglas RF-01..07, Cóndor Profesor, Voz Jarvis |
+| **Cristina Molina** | Frontend Next.js, UX del Modo Investigación, calibración del modelo XGBoost |
 
 ---
 
@@ -323,19 +323,9 @@ Tools adicionales: `evaluar_caso_hipotetico`, `simulacion_ahorro`, `exportar_rep
 
 ---
 
-## 👥 Equipo
+## 🎥 Demo
 
-| Integrante | Rol |
-|---|---|
-| **Jair Sánchez** | Backend ML/IA, arquitectura Azure, Document Intelligence + GPT-4o Vision, orquestador del agente, optimización de latencias (cache parquet + warmup) |
-| **Pablo Arcos** | Frontend Next.js, UX del Modo Investigación, Cóndor Profesor, Voz Jarvis (Web Speech API), markdown premium con chips |
-| **Cristina Molina** | Datos sintéticos multi-ramo (39.960 siniestros), motor de reglas RF-01..07, calibración del modelo XGBoost, etiquetado y validación |
-
----
-
-## Demo
-
-https://youtu.be/Yx5kiuJ7PCU
+[![Ver demo de AchachAI](https://img.youtube.com/vi/Yx5kiuJ7PCU/maxresdefault.jpg)](https://youtu.be/Yx5kiuJ7PCU)
 
 ## 📄 Licencia
 
